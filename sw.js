@@ -1,6 +1,8 @@
 const SURUM = 'graph-ai-v5';
 const DOSYALAR = [
-  './', 'index.html', 'css/stil.css', 'js/arayuz.js', 'js/goruntu.js',
+  './', 'index.html', 'css/stil.css',
+  'js/arayuz.js', 'js/goruntu.js', 'js/formasyon.js',
+  'js/analiz.js', 'js/yorum.js', 'js/cizim.js',
   'manifest.json', 'icons/icon.svg'
 ];
 
