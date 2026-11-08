@@ -1,6 +1,6 @@
-const SURUM = 'graph-ai-v2';
+const SURUM = 'graph-ai-v3';
 const DOSYALAR = [
-  './', 'index.html', 'css/stil.css', 'js/arayuz.js',
+  './', 'index.html', 'css/stil.css', 'js/arayuz.js', js/goruntu.js',
   'manifest.json', 'icons/icon.svg'
 ];
 
