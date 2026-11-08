@@ -139,7 +139,7 @@ const Analiz = {
     }
     oy('RSI (yaklaşık)', rp, ry);
     oy('Alıcı/satıcı baskısı', alici >= 60 ? 1 : alici <= 40 ? -1 : 0, '%' + alici + ' alıcı');
-    const form = this. Formasyon.hepsi(c, p);
+    const form = Formasyon.hepsi(c, p);
     const fs = form.reduce((a, x) => a + x.yon, 0);
     oy('Formasyonlar', Math.sign(fs), form.length ? form.map(x => x.ad).join(', ') : 'belirgin yok');
 
