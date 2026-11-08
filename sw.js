@@ -1,8 +1,8 @@
-const SURUM = 'graph-ai-v6';
+const SURUM = 'graph-ai-v7';
 const DOSYALAR = [
   './', 'index.html', 'css/stil.css',
   'js/arayuz.js', 'js/goruntu.js', 'js/formasyon.js',
-  'js/analiz.js', 'js/yorum.js', 'js/cizim.js', 'js/ocr.js',
+  'js/analiz.js', 'js/yorum.js', 'js/cizim.js', 'js/ocr.js', 'js/veri.js',
   'manifest.json', 'icons/icon.svg'
 ];
 
@@ -22,6 +22,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  if (new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
     fetch(e.request).then(r => {
       const kopya = r.clone();
