@@ -179,7 +179,7 @@ const Analiz = {
         }
       }
     }
-    return { yB, R, sv, trend, rsi, alici, oylar, form, score, karar, not, plan,
+    return { c, p, yB, R, sv, trend, rsi, alici, oylar, form, score, karar, not, plan,
              uyum: Math.round(Math.abs(score) / 6 * 100) };
   },
 
