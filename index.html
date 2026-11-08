@@ -14,20 +14,32 @@
 <main>
   <section id="yukle" class="ekran aktif">
     <h1>Graph AI</h1>
-    <p class="alt">Grafik ekran görüntünü yükle, analiz et.</p>
-    <label class="buyuk-buton" for="dosya">GRAFİK YÜKLE</label>
-    <input type="file" id="dosya" accept="image/*" hidden>
-    <img id="onizleme" alt="" hidden>
-    <p id="dosya-bilgi" class="alt"></p>
+    <p class="alt">Varlık adını yaz, grafiği bulup analiz edeyim.</p>
+    <input id="ara-ad" placeholder="Örn: Pegasus, Bitcoin, Altın, Dolar" autocomplete="off" style="width:100%;padding:14px;margin:10px 0 8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:17px">
+    <select id="ara-zd" style="width:100%;padding:14px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:17px">
+      <option value="15m">15 dakikalık</option>
+      <option value="1h" selected>1 saatlik</option>
+      <option value="1d">Günlük</option>
+    </select>
+    <button id="ara-btn" class="buton">GRAFİĞİ BUL VE ANALİZ ET</button>
+    <p id="ara-durum" class="alt"></p>
+
+    <details class="kart" style="margin-top:16px">
+      <summary style="font-size:15px">Ekran görüntüsü ile analiz (internetsiz)</summary>
+      <label class="buton" for="dosya" style="display:block;text-align:center">GRAFİK YÜKLE</label>
+      <input type="file" id="dosya" accept="image/*" hidden>
+      <img id="onizleme" alt="" hidden>
+      <p id="dosya-bilgi" class="alt"></p>
+    </details>
   </section>
 
   <section id="analiz" class="ekran">
     <h2>Analiz Et</h2>
-    <p id="analiz-durum" class="kart">Önce bir grafik yükle.</p>
-    <p class="alt">İsteğe bağlı: gerçek fiyat için grafikte görünen en yüksek ve en düşük mum ucunun fiyatını yaz.</p>
+    <p id="analiz-durum" class="kart">Önce bir varlık ara ya da grafik yükle.</p>
+    <p class="alt">Ekran görüntüsü modu için isteğe bağlı: en yüksek ve en düşük mum ucunun fiyatını yaz. Boş bırakırsan eksenden otomatik okunur.</p>
     <input id="fiyat-ust" inputmode="decimal" placeholder="En yüksek fiyat" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">
     <input id="fiyat-alt" inputmode="decimal" placeholder="En düşük fiyat" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">
-    <button id="analiz-btn" class="buton" disabled>Analizi Başlat</button>
+    <button id="analiz-btn" class="buton" disabled>Yüklenen Görüntüyü Analiz Et</button>
     <div id="analiz-rapor" class="kart" style="white-space:pre-line" hidden></div>
     <div id="tuval-alan"></div>
   </section>
@@ -49,13 +61,13 @@
 
   <section id="ayarlar" class="ekran">
     <h2>Ayarlar</h2>
-    <p class="kart">Uygulama sürümü: 0.3 (Aşama 3)</p>
+    <p class="kart">Uygulama sürümü: 0.5 (isimle arama)</p>
     <p class="kart">Bu uygulama yatırım tavsiyesi vermez.</p>
   </section>
 </main>
 
 <nav>
-  <button data-git="yukle" class="aktif"><span>📤</span>Yükle</button>
+  <button data-git="yukle" class="aktif"><span>📤</span>Ara</button>
   <button data-git="analiz"><span>🔍</span>Analiz</button>
   <button data-git="sonuc"><span>📊</span>Sonuç</button>
   <button data-git="gecmis"><span>🕘</span>Geçmiş</button>
@@ -69,6 +81,7 @@
 <script src="js/yorum.js"></script>
 <script src="js/cizim.js"></script>
 <script src="js/ocr.js"></script>
+<script src="js/veri.js"></script>
 <script src="js/arayuz.js"></script>
 </body>
 </html> 
