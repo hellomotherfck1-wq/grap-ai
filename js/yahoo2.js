@@ -1,5 +1,5 @@
 (function () {
-  Veri.vekil = Veri.vekil || '';
+  Veri.vekil = 'https://grafik-vekil.hellomotherfck1.workers.dev/?u=';
 
   function yollar() {
     const l = [];
