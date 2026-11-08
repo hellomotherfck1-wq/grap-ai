@@ -151,7 +151,7 @@ const Formasyon2 = {
     return a.concat(b);
   };
 
-  if (window.Yorum) {
+   if (typeof Yorum !== 'undefined') {
     const eskiY = Yorum.olustur;
     Yorum.olustur = function (s, kal, uy) {
       const y = eskiY.call(this, s, kal, uy);
