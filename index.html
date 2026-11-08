@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1419">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg">
+<link rel="stylesheet" href="css/stil.css">
+<title>Graph AI</title>
+</head>
+<body>
+
+<main>
+  <section id="yukle" class="ekran aktif">
+    <h1>Graph AI</h1>
+    <p class="alt">Grafik ekran görüntünü yükle, analiz et.</p>
+    <label class="buyuk-buton" for="dosya">GRAFİK YÜKLE</label>
+    <input type="file" id="dosya" accept="image/*" hidden>
+    <img id="onizleme" alt="" hidden>
+    <p id="dosya-bilgi" class="alt"></p>
+  </section>
+
+  <section id="analiz" class="ekran">
+    <h2>Analiz Et</h2>
+    <p id="analiz-durum" class="kart">Önce bir grafik yükle.</p>
+    <button id="analiz-btn" class="buton" disabled>Analizi Başlat</button>
+    <p class="alt">Analiz motoru sonraki aşamalarda eklenecek.</p>
+  </section>
+
+  <section id="sonuc" class="ekran">
+    <h2>Analiz Sonuçları</h2>
+    <p class="kart">Henüz sonuç yok.</p>
+  </section>
+
+  <section id="gecmis" class="ekran">
+    <h2>Geçmiş Analizler</h2>
+    <p class="kart">Kayıtlı analiz yok.</p>
+  </section>
+
+  <section id="strateji" class="ekran">
+    <h2>Strateji Kütüphanesi</h2>
+    <p class="kart">Kütüphane sonraki aşamalarda eklenecek.</p>
+  </section>
+
+  <section id="ayarlar" class="ekran">
+    <h2>Ayarlar</h2>
+    <p class="kart">Uygulama sürümü: 0.2 (Aşama 2)</p>
+    <p class="kart">Bu uygulama yatırım tavsiyesi vermez.</p>
+  </section>
+</main>
+
+<nav>
+  <button data-git="yukle" class="aktif"><span>📤</span>Yükle</button>
+  <button data-git="analiz"><span>🔍</span>Analiz</button>
+  <button data-git="sonuc"><span>📊</span>Sonuç</button>
+  <button data-git="gecmis"><span>🕘</span>Geçmiş</button>
+  <button data-git="strateji"><span>📚</span>Strateji</button>
+  <button data-git="ayarlar"><span>⚙️</span>Ayarlar</button>
+</nav>
+
+<script src="js/arayuz.js"></script>
+</body>
+</html> 
