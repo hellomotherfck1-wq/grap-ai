@@ -3,7 +3,7 @@
 
   function yollar() {
     const l = [];
-    if (Veri.vekil) l.push({ ad: 'kendi vekilin', f: u => Veri.vekil + encodeURIComponent(u) });
+    if  Veri.vekil = https://cool-resonance-e2e8.hellomotherfck1.workers.dev/ u=';
     l.push({ ad: 'doğrudan', f: u => u });
     l.push({ ad: 'allorigins', f: u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u) });
     l.push({ ad: 'allorigins-get', f: u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u), sar: true });
