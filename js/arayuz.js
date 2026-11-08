@@ -91,7 +91,27 @@ document.getElementById('analiz-btn').addEventListener('click', async () => {
       durum.textContent = 'Analiz tamamlandı.';
       return;
     }
-    const kal = kalibrasyon();
+
+    let kal = kalibrasyon();
+    let bitis = 'Analiz tamamlandı.';
+    if (kal) {
+      bitis = 'Analiz tamamlandı. Fiyatlar senin yazdığın değerlerle hesaplandı.';
+    } else {
+      durum.textContent = 'Fiyat ekseni okunuyor... İlk seferde dosyalar indirilir, 1-2 dakika sürebilir.';
+      try {
+        const o = await OCR.oku(r, m);
+        if (o) {
+          kal = { hi: o.hi, lo: o.lo };
+          bitis = 'Analiz tamamlandı. Fiyatlar eksendeki ' + o.n + ' etiketten otomatik okundu. Grafikteki eksenle karşılaştırıp kontrol et.';
+        } else {
+          uyarilar.push('Fiyat ekseni okunamadı. Seviyeler yüzde olarak gösteriliyor.');
+        }
+      } catch (e) {
+        uyarilar.push('Fiyat ekseni okunamadı: ' + e.message);
+      }
+    }
+
+    durum.textContent = 'Rapor hazırlanıyor...';
     const s = Analiz.yap(m, t);
     const y = Yorum.olustur(s, kal, uyarilar);
     alan.appendChild(karar(y));
@@ -103,7 +123,7 @@ document.getElementById('analiz-btn').addEventListener('click', async () => {
     not.textContent = 'Grafik, görüntüden okunan mumlardan yeniden çizilmiştir.';
     alan.appendChild(not);
     y.kartlar.forEach(k => alan.appendChild(kartYap(k.baslik, k.satirlar)));
-    durum.textContent = 'Analiz tamamlandı.';
+    durum.textContent = bitis;
   } catch (e) {
     durum.textContent = 'Hata: ' + e.message;
   }
