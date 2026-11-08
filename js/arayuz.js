@@ -26,29 +26,83 @@ document.getElementById('dosya').addEventListener('change', e => {
   document.getElementById('analiz-btn').disabled = false;
 });
 
+function sayi(id) {
+  const x = parseFloat(document.getElementById(id).value.trim().replace(',', '.'));
+  return isFinite(x) ? x : null;
+}
+
+function kalibrasyon() {
+  const hi = sayi('fiyat-ust'), lo = sayi('fiyat-alt');
+  return (hi !== null && lo !== null && hi > lo) ? { hi, lo } : null;
+}
+
+function kartYap(baslik, satirlar, renk) {
+  const d = document.createElement('div');
+  d.className = 'kart';
+  if (renk) d.style.borderLeft = '4px solid ' + renk;
+  if (baslik) {
+    const h = document.createElement('h3');
+    h.textContent = baslik;
+    h.style.cssText = 'font-size:16px;margin-bottom:8px';
+    d.appendChild(h);
+  }
+  satirlar.forEach(t => {
+    const p = document.createElement('p');
+    p.textContent = t;
+    p.style.cssText = 'font-size:15px;line-height:1.5;margin-bottom:8px';
+    d.appendChild(p);
+  });
+  return d;
+}
+
+function karar(y) {
+  const d = document.createElement('div');
+  d.className = 'kart';
+  d.style.borderLeft = '6px solid ' + y.renk;
+  const k = document.createElement('div');
+  k.textContent = y.karar;
+  k.style.cssText = 'font-size:40px;font-weight:800;color:' + y.renk;
+  const u = document.createElement('div');
+  u.textContent = 'Teknik uyum puanı: %' + y.uyum + ' (kazanma olasılığı değildir)';
+  u.style.cssText = 'font-size:13px;color:#8b98a5;margin:4px 0 12px';
+  d.appendChild(k); d.appendChild(u);
+  y.ozet.forEach(t => {
+    const p = document.createElement('p');
+    p.textContent = t;
+    p.style.cssText = 'font-size:15px;line-height:1.5;margin-bottom:8px';
+    d.appendChild(p);
+  });
+  return d;
+}
+
 document.getElementById('analiz-btn').addEventListener('click', async () => {
   const durum = document.getElementById('analiz-durum');
-  const rapor = document.getElementById('analiz-rapor');
   const alan = document.getElementById('tuval-alan');
   durum.textContent = 'Analiz ediliyor...';
-  rapor.hidden = true; alan.innerHTML = '';
+  document.getElementById('analiz-rapor').hidden = true;
+  alan.innerHTML = '';
   try {
     const r = await Goruntu.yukle(GrafikAI.resim);
     const uyarilar = Goruntu.kalite(r);
     const m = Goruntu.mumlar(r);
     const t = Goruntu.trend(m);
-    const tuval = Goruntu.ciz(r, m);
-    tuval.style.cssText = 'width:100%;border-radius:12px;margin-top:10px';
+    if (m.length < 5) {
+      alan.appendChild(kartYap('Sonuç', ['Yeterli mum bulunamadı.', '⚠️ Mum çubukları net seçilemedi. Daha net bir grafik dene.'].concat(uyarilar.map(u => '⚠️ ' + u)), '#f0b429'));
+      durum.textContent = 'Analiz tamamlandı.';
+      return;
+    }
+    const kal = kalibrasyon();
+    const s = Analiz.yap(m, t);
+    const y = Yorum.olustur(s, kal, uyarilar);
+    alan.appendChild(karar(y));
+    const tuval = Cizim.grafik(s, kal);
+    tuval.style.cssText = 'width:100%;border-radius:12px;margin:4px 0 12px';
     alan.appendChild(tuval);
-    const yesil = m.filter(k => k.renk === 1).length;
-    const satirlar = ['Bulunan mum sayısı: ' + m.length + ' (yeşil: ' + yesil + ', kırmızı: ' + (m.length - yesil) + ')'];
-    if (t) satirlar.push('Tahmini trend: ' + t.yon + ' (güç: %' + t.guc + ')');
-    else satirlar.push('Yeterli mum bulunamadı, trend belirlenemedi.');
-    satirlar.push('Fiyat seviyeleri henüz okunmuyor.');
-    uyarilar.forEach(u => satirlar.push('⚠️ ' + u));
-    if (m.length < 5) satirlar.push('⚠️ Mum çubukları net seçilemedi. Daha net bir grafik dene.');
-    rapor.textContent = satirlar.join('\n');
-    rapor.hidden = false;
+    const not = document.createElement('p');
+    not.className = 'alt';
+    not.textContent = 'Grafik, görüntüden okunan mumlardan yeniden çizilmiştir.';
+    alan.appendChild(not);
+    y.kartlar.forEach(k => alan.appendChild(kartYap(k.baslik, k.satirlar)));
     durum.textContent = 'Analiz tamamlandı.';
   } catch (e) {
     durum.textContent = 'Hata: ' + e.message;
