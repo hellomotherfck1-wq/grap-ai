@@ -53,7 +53,7 @@ document.getElementById('analiz-btn').addEventListener('click', async () => {
   } catch (e) {
     durum.textContent = 'Hata: ' + e.message;
   }
-}); 
+});
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
