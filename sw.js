@@ -1,8 +1,8 @@
-const SURUM = 'graph-ai-v7';
+const SURUM = 'graph-ai-v8';
 const DOSYALAR = [
   './', 'index.html', 'css/stil.css',
   'js/arayuz.js', 'js/goruntu.js', 'js/formasyon.js',
-  'js/analiz.js', 'js/yorum.js', 'js/cizim.js', 'js/ocr.js', 'js/veri.js',
+  'js/analiz.js', 'js/yorum.js', 'js/cizim.js', 'js/ocr.js', 'js/veri.js', 'js/liste.js',
   'manifest.json', 'icons/icon.svg'
 ];
 
@@ -30,4 +30,4 @@ self.addEventListener('fetch', e => {
       return r;
     }).catch(() => caches.match(e.request))
   );
-}); 
+});
