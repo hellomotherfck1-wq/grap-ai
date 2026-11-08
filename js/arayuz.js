@@ -10,32 +10,6 @@ document.querySelectorAll('nav button').forEach(b => {
   b.addEventListener('click', () => ekranGoster(b.dataset.git));
 });
 
-document.getElementById('dosya').addEventListener('change', e => {
-  const dosya = e.target.files[0];
-  if (!dosya) return;
-  if (!dosya.type.startsWith('image/')) {
-    document.getElementById('dosya-bilgi').textContent = 'Lütfen bir resim dosyası seç.';
-    return;
-  }
-  GrafikAI.resim = dosya;
-  const onizleme = document.getElementById('onizleme');
-  onizleme.src = URL.createObjectURL(dosya);
-  onizleme.hidden = false;
-  document.getElementById('dosya-bilgi').textContent = 'Grafik yüklendi: ' + dosya.name;
-  document.getElementById('analiz-durum').textContent = 'Grafik hazır.';
-  document.getElementById('analiz-btn').disabled = false;
-});
-
-function sayi(id) {
-  const x = parseFloat(document.getElementById(id).value.trim().replace(',', '.'));
-  return isFinite(x) ? x : null;
-}
-
-function kalibrasyon() {
-  const hi = sayi('fiyat-ust'), lo = sayi('fiyat-alt');
-  return (hi !== null && lo !== null && hi > lo) ? { hi, lo } : null;
-}
-
 function kartYap(baslik, satirlar, renk) {
   const d = document.createElement('div');
   d.className = 'kart';
@@ -75,11 +49,77 @@ function karar(y) {
   return d;
 }
 
+function goster(m, t, kal, uyarilar, ekKartlar) {
+  const alan = document.getElementById('tuval-alan');
+  alan.innerHTML = '';
+  document.getElementById('analiz-rapor').hidden = true;
+  const s = Analiz.yap(m, t);
+  const y = Yorum.olustur(s, kal, uyarilar);
+  alan.appendChild(karar(y));
+  const tuval = Cizim.grafik(s, kal);
+  tuval.style.cssText = 'width:100%;border-radius:12px;margin:4px 0 12px';
+  alan.appendChild(tuval);
+  ekKartlar.forEach(k => alan.appendChild(k));
+  y.kartlar.forEach(k => alan.appendChild(kartYap(k.baslik, k.satirlar)));
+}
+
+/* ---------- İsimle arama ---------- */
+document.getElementById('ara-btn').addEventListener('click', async () => {
+  const ad = document.getElementById('ara-ad').value.trim();
+  const dur = document.getElementById('ara-durum');
+  const btn = document.getElementById('ara-btn');
+  if (!ad) { dur.textContent = 'Önce bir varlık adı yaz.'; return; }
+  btn.disabled = true;
+  try {
+    const v = await Veri.ara(ad, document.getElementById('ara-zd').value, x => { dur.textContent = x; });
+    const dn = Veri.donustur(v, 80);
+    const t = Goruntu.trend(dn.m);
+    goster(dn.m, t, dn.kal, [], [kartYap('Grafik bilgisi', Veri.bilgi(v, dn.d), '#2f81f7')]);
+    document.getElementById('analiz-durum').textContent = 'Analiz tamamlandı: ' + v.ad;
+    dur.textContent = '';
+    ekranGoster('analiz');
+  } catch (e) {
+    dur.textContent = '⚠️ ' + e.message + ' İnternetini ve yazımı kontrol et. Kodla da deneyebilirsin (örn. PGSUS.IS veya BTCUSDT).';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('ara-ad').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('ara-btn').click();
+});
+
+/* ---------- Ekran görüntüsü modu ---------- */
+document.getElementById('dosya').addEventListener('change', e => {
+  const dosya = e.target.files[0];
+  if (!dosya) return;
+  if (!dosya.type.startsWith('image/')) {
+    document.getElementById('dosya-bilgi').textContent = 'Lütfen bir resim dosyası seç.';
+    return;
+  }
+  GrafikAI.resim = dosya;
+  const onizleme = document.getElementById('onizleme');
+  onizleme.src = URL.createObjectURL(dosya);
+  onizleme.hidden = false;
+  document.getElementById('dosya-bilgi').textContent = 'Grafik yüklendi. Alttaki Analiz sekmesine geç ve analiz et.';
+  document.getElementById('analiz-durum').textContent = 'Grafik hazır.';
+  document.getElementById('analiz-btn').disabled = false;
+});
+
+function sayi(id) {
+  const x = parseFloat(document.getElementById(id).value.trim().replace(',', '.'));
+  return isFinite(x) ? x : null;
+}
+
+function kalibrasyon() {
+  const hi = sayi('fiyat-ust'), lo = sayi('fiyat-alt');
+  return (hi !== null && lo !== null && hi > lo) ? { hi, lo } : null;
+}
+
 document.getElementById('analiz-btn').addEventListener('click', async () => {
   const durum = document.getElementById('analiz-durum');
   const alan = document.getElementById('tuval-alan');
   durum.textContent = 'Analiz ediliyor...';
-  document.getElementById('analiz-rapor').hidden = true;
   alan.innerHTML = '';
   try {
     const r = await Goruntu.yukle(GrafikAI.resim);
@@ -91,7 +131,6 @@ document.getElementById('analiz-btn').addEventListener('click', async () => {
       durum.textContent = 'Analiz tamamlandı.';
       return;
     }
-
     let kal = kalibrasyon();
     let bitis = 'Analiz tamamlandı.';
     if (kal) {
@@ -102,7 +141,7 @@ document.getElementById('analiz-btn').addEventListener('click', async () => {
         const o = await OCR.oku(r, m);
         if (o) {
           kal = { hi: o.hi, lo: o.lo };
-          bitis = 'Analiz tamamlandı. Fiyatlar eksendeki ' + o.n + ' etiketten otomatik okundu. Grafikteki eksenle karşılaştırıp kontrol et.';
+          bitis = 'Analiz tamamlandı. Fiyatlar eksendeki ' + o.n + ' etiketten otomatik okundu. Eksenle karşılaştırıp kontrol et.';
         } else {
           uyarilar.push('Fiyat ekseni okunamadı. Seviyeler yüzde olarak gösteriliyor.');
         }
@@ -110,19 +149,8 @@ document.getElementById('analiz-btn').addEventListener('click', async () => {
         uyarilar.push('Fiyat ekseni okunamadı: ' + e.message);
       }
     }
-
     durum.textContent = 'Rapor hazırlanıyor...';
-    const s = Analiz.yap(m, t);
-    const y = Yorum.olustur(s, kal, uyarilar);
-    alan.appendChild(karar(y));
-    const tuval = Cizim.grafik(s, kal);
-    tuval.style.cssText = 'width:100%;border-radius:12px;margin:4px 0 12px';
-    alan.appendChild(tuval);
-    const not = document.createElement('p');
-    not.className = 'alt';
-    not.textContent = 'Grafik, görüntüden okunan mumlardan yeniden çizilmiştir.';
-    alan.appendChild(not);
-    y.kartlar.forEach(k => alan.appendChild(kartYap(k.baslik, k.satirlar)));
+    goster(m, t, kal, uyarilar, [kartYap(null, ['Grafik, görüntüden okunan mumlardan yeniden çizilmiştir.'])]);
     durum.textContent = bitis;
   } catch (e) {
     durum.textContent = 'Hata: ' + e.message;
