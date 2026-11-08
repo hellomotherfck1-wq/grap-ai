@@ -1,4 +1,4 @@
-const SURUM = 'graph-ai-v3';
+const SURUM = 'graph-ai-v4';
 const DOSYALAR = [
   './', 'index.html', 'css/stil.css', 'js/arayuz.js', 'js/goruntu.js',
   'manifest.json', 'icons/icon.svg'
