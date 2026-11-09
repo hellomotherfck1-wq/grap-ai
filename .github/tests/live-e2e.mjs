@@ -123,6 +123,54 @@ try {
     check('Tarama tablosundan hisse grafiği açma', scanChartCount > 0, scanChartCount + ' canvas');
   }
 
+  // Verify the new standalone financial panel and its API contract using deterministic mock responses.
+  await page.locator('nav button[data-git="strateji"]').click();
+  await page.locator('#finansal-panel').waitFor({ state: 'visible' });
+  const financialOptions = await page.locator('#finansal-sembol option').count();
+  check('Bağımsız finansal analiz paneli', financialOptions === 100, financialOptions + ' hisse seçeneği');
+
+  await page.locator('#finansal-panel button').click();
+  await page.waitForFunction(() => (document.querySelector('#finansal-durum')?.textContent || '').includes('Geçerli bir istfin API anahtarı gir'));
+  check('API anahtarı doğrulaması', true, 'Anahtar olmadan istek gönderilmiyor');
+
+  await page.route('https://api.istfin.com/v1/**', async route => {
+    const url = new URL(route.request().url());
+    const statement = url.pathname.split('/').pop();
+    let data;
+    if (url.pathname.endsWith('/fundamentals/THYAO')) {
+      data = {
+        symbol: 'THYAO',
+        asOfQuarter: '2026Q2',
+        updatedAt: '2026-10-05T21:30:00.000Z',
+        valuation: { marketCap: 431250000000, peRatio: 4.8, pbRatio: 0.9, evToEbitda: 3.7 },
+        income: { revenue: 645000000000, profit: 89000000000, ebitda: 165000000000 },
+        ratios: { currentRatio: 1.1, roe: 19.2, profitMargin: 13.8, netDebtToEbitda: 1.1 },
+        growth: { revenueYoY: 21.4, profitYoY: -8.2 },
+        balanceSheet: { totalAssets: 1060000000000, totalEquity: 470000000000, totalDebt: 320000000000, cashAndEquivalents: 140000000000 },
+        cashFlow: { operating: 150000000000, investing: -95000000000, financing: -30000000000, free: 55000000000 }
+      };
+    } else {
+      data = {
+        symbol: 'THYAO',
+        statement,
+        periods: ['2026-06', '2026-03', '2025-12', '2025-09'],
+        items: [{ code: '3C', tr: statement === 'income' ? 'Hasılat' : 'Örnek kalem', values: { '2026-06': 180000000000, '2026-03': 142000000000, '2025-12': 171000000000, '2025-09': 152000000000 } }]
+      };
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) });
+  });
+
+  await page.locator('#finansal-sembol').selectOption('THYAO');
+  await page.locator('#finansal-api-anahtari').fill('istfin_test_key_for_e2e');
+  await page.locator('#finansal-panel button').click();
+  await page.waitForFunction(() => (document.querySelector('#finansal-durum')?.textContent || '').includes('Temel analiz tamamlandı'));
+  const financialText = await page.locator('#finansal-sonuc').innerText();
+  check('Finansal API yanıtı işleniyor', financialText.includes('THYAO') && financialText.includes('F/K'), financialText.slice(0, 350));
+  check('Gelir, bilanço ve nakit akış tabloları', ['Gelir tablosu', 'Bilanço', 'Nakit akış tablosu'].every(label => financialText.includes(label)), financialText.includes('Nakit akış tablosu') ? 'Üç tablo da oluşturuldu' : 'Tablo eksik');
+  const sharedSymbol = await page.evaluate(() => window.TahminAI?.temelAnaliz?.symbol || '');
+  check('Finansal rapor diğer ajanlarla paylaşıldı', sharedSymbol === 'THYAO', sharedSymbol || 'Paylaşılan rapor bulunamadı');
+  await page.unroute('https://api.istfin.com/v1/**');
+
   check('Tarayıcı JavaScript hatası yok', report.pageErrors.length === 0, report.pageErrors.join(' | ') || 'Hata yakalanmadı');
   report.finalURL = page.url();
   report.finishedAt = new Date().toISOString();
