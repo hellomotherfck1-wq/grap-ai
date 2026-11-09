@@ -1,5 +1,5 @@
 // ====== SUPABASE AYARLARI ======
-const SUPABASE_URL = 'BURAYA_PROJECT_URL';
+const SUPABASE_URL = 'https://qkkhguyngmsddnkunyws.supabase.co/rest/v1/';
 const SUPABASE_ANON_KEY = 'BURAYA_ANON_KEY';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
