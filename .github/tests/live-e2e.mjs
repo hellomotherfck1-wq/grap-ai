@@ -286,6 +286,20 @@ try {
     await route.fulfill({ status: 502, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify({ error: 'Unexpected test URL', requested }) });
   });
 
+  await page.route('https://api.allorigins.win/**', async route => {
+    const target = new URL(route.request().url()).searchParams.get('url') || '';
+    if (target.includes('/v1/finance/search?q=FALLBACK')) {
+      await route.fulfill({
+        status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json',
+        body: JSON.stringify({ news: [{ title: 'AllOrigins yedek haber testi', publisher: 'Test kaynağı', link: 'https://example.com/fallback', providerPublishTime: Math.floor(Date.now() / 1000) }] })
+      });
+      return;
+    }
+    await route.continue();
+  });
+  const fallbackNews = await page.evaluate(async () => window.BistArastirma.haberGetir('FALLBACK'));
+  check('Yahoo haberlerinde ikinci ücretsiz proxy yedeği', fallbackNews.length === 1 && fallbackNews[0].title.includes('AllOrigins'), fallbackNews.map(x => x.title).join(', ') || 'Haber alınamadı');
+
   const binanceRows = chartPayload.chart.result[0].timestamp.map((timestamp, i) => {
     const quote = chartPayload.chart.result[0].indicators.quote[0];
     return [timestamp * 1000, quote.open[i], quote.high[i], quote.low[i], quote.close[i], quote.volume[i]];
