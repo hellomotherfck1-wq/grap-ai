@@ -396,6 +396,7 @@ try {
       total: window.CoinTahminAI.LISTE.length,
       scanned: result && result.adaylar ? result.adaylar.length : 0,
       errors: result && result.hatalar ? result.hatalar.length : -1,
+      errorDetails: result && result.hatalar ? result.hatalar.slice(0, 8) : [],
       status: document.querySelector('#coin-tahmin-durum')?.textContent || ''
     };
   });
