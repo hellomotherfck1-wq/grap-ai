@@ -27,8 +27,8 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 - Tarama tablosu: son fiyat, son mum değişimi, son hacim, 20 mum ortalama hacmi, hacim oranı, RSI, ortak karar ve skor.
 - Ücretsiz fiyat/hacim: Yahoo Finance herkese açık chart uçları; uygulamanın mevcut proxy'si üzerinden alınır. Gecikme, erişim kesintisi ve kullanım kısıtları olabilir.
 - Teknik göstergeler: RSI(14), EMA(20/50/100/200), 20/60 günlük getiri, son hacim/20 günlük ortalama hacim ve trend yönü tarayıcıda hesaplanır.
-- Temel oranlar ve haberler: Yahoo Finance'ın herkese açık quoteSummary ve search uçlarından erişilebilen alanlar kullanılır. Bu uçlar resmî/garantili API değildir ve her BIST hissesi için veri sunmayabilir.
-- KAP: şirket kodu ve şirket kimliği, kamuya açık KAP sayfalarından; finansal rapor ve özel durum bildirim listeleri KAP'ın herkese açık sayfalarından alınır. KAP'ın ücretli kurumsal veri dağıtım hizmeti kullanılmaz.
+- Temel oranlar ve haberler: Yeni ücretsiz finansal panel Yahoo Finance'ın herkese açık haber aramasını kullanır; fiyat/hacim verisinden teknik göstergeleri kendisi hesaplar. QuoteSummary gibi erişimi kısıtlı uçlar yeni panelin çalışması için gerekli değildir.
+- KAP: şirket kimliği, finansal rapor bildirimleri ve özel durum açıklamaları KAP'ın herkese açık sayfalarından alınır. Son finansal raporun HTML tablosu tarayıcıda ayrıştırılarak hasılat, dönem kârı, varlıklar, özkaynaklar, likidite ve nakit akışı kalemleri çıkarılır. KAP'ın ücretli kurumsal veri dağıtım hizmeti kullanılmaz.
 - Ajan paylaşımı: son araştırma `window.TahminAI.temelAnaliz`, `window.TahminAI.arastirmaBaglami`, `window.Ajan.temelAnaliz` ve `window.GrafikAI.temelAnaliz` alanlarına verilir.
 - Değerleme: ücretsiz kaynaktan F/K, PD/DD veya EPS gelmiyorsa sayı uydurulmaz; adil değer hesaplanmış gibi gösterilmez.
 
