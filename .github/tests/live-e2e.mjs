@@ -93,6 +93,11 @@ try {
     check('Grafik sonrası araştırma özeti', chartAreaText.includes('Araştırma Ajanı') || chartAreaText.includes('Araştırma ajanı şu anda veri alamadı'), chartAreaText.slice(-600));
   }
 
+  await page.locator('nav button[data-git="sonuc"]').click();
+  const resultPageText = await page.locator('#sonuc-alan').innerText();
+  check('Analiz sonuçları ve geçmiş ekranı', resultPageText.includes('THYAO') || resultPageText.includes('THYAO.IS'), resultPageText.slice(0, 180));
+  await page.locator('nav button[data-git="yukle"]').click();
+
   // Test local image upload, candle detection and chart rendering without OCR.
   const chartImage = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
@@ -343,6 +348,34 @@ try {
   });
   check('Coin hacim ajanına veri aktarımı', coinVolumeAgent.price > 0 && typeof coinVolumeAgent.volumeScore === 'number', JSON.stringify(coinVolumeAgent));
 
+  const symbolMappings = await page.evaluate(() => ({
+    bist: Veri.coz('PGSUS.IS')[0]?.sembol,
+    coin: Veri.coz('BTC')[0]?.sembol,
+    timeframes: ['15m', '1h', '1d'].every(value => ['15m', '1h', '1d'].includes(value))
+  }));
+  check('PGSUS.IS ve BTCUSDT sembol eşleştirmesi', symbolMappings.bist === 'PGSUS.IS' && symbolMappings.coin === 'BTCUSDT', JSON.stringify(symbolMappings));
+
+  await page.locator('nav button[data-git="gecmis"]').click();
+  const coinUI = await page.locator('#coin-tahmin-btn').count();
+  const coinCount = await page.evaluate(() => window.CoinTahminAI.LISTE.length);
+  check('Coin Tahmin paneli ve sembol listesi', coinUI === 1 && coinCount >= 200, coinCount + ' coin seçeneği');
+  await page.locator('#coin-tahmin-btn').click();
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#coin-tahmin-durum')?.textContent || '';
+    return status.startsWith('Tamamlandı') || status.startsWith('Hata:');
+  }, null, { timeout: 600000 });
+  const coinScan = await page.evaluate(() => {
+    const result = window.CoinTahminAI.sonDurum;
+    return {
+      total: window.CoinTahminAI.LISTE.length,
+      scanned: result && result.adaylar ? result.adaylar.length : 0,
+      errors: result && result.hatalar ? result.hatalar.length : -1,
+      status: document.querySelector('#coin-tahmin-durum')?.textContent || ''
+    };
+  });
+  check('Coin toplu tarama akışı', coinScan.scanned === coinScan.total && coinScan.errors === 0 && coinScan.status.startsWith('Tamamlandı'), JSON.stringify(coinScan));
+  await page.locator('nav button[data-git="strateji"]').click();
+
   await page.locator('#finansal-sembol').selectOption('THYAO');
   await page.locator('#finansal-panel button').click();
   await page.waitForFunction(() => {
@@ -401,6 +434,13 @@ try {
   await page.unroute('https://grafik-vekil.hellomotherfck1.workers.dev/**');
   await page.unroute('https://query1.finance.yahoo.com/v8/finance/chart/THYAO.IS**');
   await page.unroute('https://query1.finance.yahoo.com/v8/finance/chart/FLAT.IS**');
+
+  await page.locator('nav button[data-git="ayarlar"]').click();
+  const adminUI = await page.locator('#admin-giris').isVisible() &&
+    await page.locator('#admin-email').count() === 1 &&
+    await page.locator('#admin-sifre').count() === 1 &&
+    await page.locator('#admin-giris-btn').count() === 1;
+  check('Admin giriş ekranı yükleniyor', adminUI, adminUI ? 'E-posta, şifre ve giriş kontrolleri hazır' : 'Admin giriş alanları eksik');
 
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileLayout = await page.evaluate(() => {
