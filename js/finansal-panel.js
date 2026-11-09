@@ -440,8 +440,8 @@
     card(grid, 'EMA 20', money(m.ema20, m.currency));
     card(grid, 'EMA 50', money(m.ema50, m.currency));
     card(grid, 'EMA 200', money(m.ema200, m.currency));
-    card(grid, '52 hafta içi en yüksek', money(m.highPeriod, m.currency));
-    card(grid, '52 hafta içi en düşük', money(m.lowPeriod, m.currency));
+    card(grid, 'Son 6 ay en yüksek', money(m.highPeriod, m.currency));
+    card(grid, 'Son 6 ay en düşük', money(m.lowPeriod, m.currency));
     card(grid, 'Uzun trend', m.longTrend || 'Yetersiz geçmiş');
     result.appendChild(grid);
 
