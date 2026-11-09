@@ -154,3 +154,11 @@ button:focus-visible, summary:focus-visible, label:focus-visible { outline: 2px 
 .finansal-tablo th:first-child, .finansal-tablo td:first-child { text-align: left; white-space: normal; }
 .finansal-tablo th { color: #9db0c2; background: #1a2734; }
 @media (min-width: 600px) { .finansal-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+
+/* Free BIST research panel */
+.finansal-veri-notu { margin: 10px 0; padding: 10px 12px; border: 1px solid #42624e; border-radius: 10px; background: rgba(38, 110, 69, .12); color: #b9dec6; font-size: 12px; line-height: 1.55; }
+.finansal-kap-satir { margin: 8px 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.finansal-kap-satir a { color: #8abaff; text-decoration: underline; }
+.finansal-kap-satir small { display: block; color: var(--soluk); font-size: 11px; }
+.finansal-kap-ozet { margin-top: 3px; }
