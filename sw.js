@@ -1,4 +1,4 @@
-const SURUM = 'graph-ai-v9';
+const SURUM = 'graph-ai-v10';
 
 const DOSYALAR = [
   './',
@@ -37,10 +37,7 @@ self.addEventListener('install', function(event) {
       })
       .filter(Boolean);
 
-    if (hatalar.length) {
-      console.warn('Önbelleğe alınamayan dosyalar:', hatalar);
-    }
-
+    if (hatalar.length) console.warn('Önbelleğe alınamayan dosyalar:', hatalar);
     await self.skipWaiting();
   })());
 });
@@ -66,19 +63,18 @@ self.addEventListener('fetch', function(event) {
   event.respondWith((async function() {
     try {
       const yanit = await fetch(event.request);
-
       if (yanit && yanit.ok) {
         const cache = await caches.open(SURUM);
         await cache.put(event.request, yanit.clone());
       }
-
       return yanit;
     } catch (hata) {
       const kayitli = await caches.match(event.request);
       if (kayitli) return kayitli;
 
       if (event.request.mode === 'navigate') {
-        const anaSayfa = await caches.match('./index.html');
+        const anaSayfaURL = new URL('./index.html', self.registration.scope).href;
+        const anaSayfa = await caches.match(anaSayfaURL);
         if (anaSayfa) return anaSayfa;
       }
 
