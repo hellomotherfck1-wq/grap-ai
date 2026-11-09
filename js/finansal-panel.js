@@ -101,11 +101,24 @@
 
   function parseTurkishNumber(value) {
     if (value == null) return null;
-    var text = String(value).replace(/\s/g, '').replace(/%/g, '').replace(/[^0-9,.-]/g, '');
+
+    var original = String(value).trim();
+    var parantezNegatif = /^\(.*\)$/.test(original);
+    var text = original.replace(/\s/g, '').replace(/%/g, '').replace(/[^0-9,.-]/g, '');
+
     if (!text || text === '-' || text === ',') return null;
-    if (text.indexOf(',') >= 0) text = text.replace(/\./g, '').replace(',', '.');
-    var number = Number(text);
-    return isFinite(number) ? number : null;
+
+    if (text.indexOf(',') >= 0) {
+      // Türkçe biçim: 1.234.567,89 -> 1234567.89
+      text = text.replace(/\./g, '').replace(',', '.');
+    } else if (/^-?\d{1,3}(\.\d{3})+$/.test(text)) {
+      // Ondalık kısmı olmayan binlik ayraç: 1.234.567 -> 1234567
+      text = text.replace(/\./g, '');
+    }
+
+    var parsed = Number(text);
+    if (!isFinite(parsed)) return null;
+    return parantezNegatif ? -Math.abs(parsed) : parsed;
   }
 
   function normalizeLabel(value) {
@@ -222,6 +235,8 @@
       avgGain = (avgGain * (period - 1) + Math.max(change, 0)) / period;
       avgLoss = (avgLoss * (period - 1) + Math.max(-change, 0)) / period;
     }
+    // Fiyat hiç değişmediyse RSI nötrdür; yalnızca yükseliş varsa 100 olur.
+    if (avgGain === 0 && avgLoss === 0) return 50;
     if (avgLoss === 0) return 100;
     return 100 - (100 / (1 + avgGain / avgLoss));
   }
