@@ -337,9 +337,21 @@
       throw new Error('Goruntu modülü yok');
     }
 
-    // Coin için Binance sembolü tercih et
-    var arama = item.q;
-    var v = await Veri.ara(arama, zd, function () {});
+    // Coin taraması yalnızca Binance USDT çiftini kullanır.
+    // Genel sembol eşleştiricisi aynı kodu bir BIST hissesiyle karıştırabilir.
+    var code = String(item.q || '').toUpperCase().replace(/USDT$/, '');
+    if (!/^[A-Z0-9]{2,12}$/.test(code)) throw new Error('Geçersiz Binance coin sembolü');
+    var symbol = code + 'USDT';
+    var candles = await Veri.binance(symbol, zd);
+    var v = {
+      kaynak: 'b',
+      sembol: symbol,
+      ad: item.ad || code,
+      tur: 'Kripto',
+      zd: zd,
+      mumlar: candles,
+      cekim: new Date()
+    };
     var dn = Veri.donustur(v, 80);
     if (!dn || !dn.m || dn.m.length < 5) {
       throw new Error('Yeterli mum yok');
