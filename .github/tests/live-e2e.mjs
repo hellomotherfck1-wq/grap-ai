@@ -168,6 +168,10 @@ try {
 
   await page.route('https://grafik-vekil.hellomotherfck1.workers.dev/**', async route => {
     const requested = new URL(route.request().url()).searchParams.get('u') || '';
+    if (requested.includes('/v8/finance/chart/THYAO.IS')) {
+      await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(chartPayload) });
+      return;
+    }
     if (requested.includes('/v10/finance/quoteSummary/THYAO.IS')) {
       const quoteSummary = {
         quoteSummary: {
