@@ -21,16 +21,18 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 
 ## BIST 100 Araştırma Ajanı
 
-`js/bist-arastirma.js`, mevcut teknik/hacim/denetçi ajanlarıyla birlikte çalışır.
+`js/bist-arastirma.js` teknik araştırmayı, `js/finansal-panel.js` ise ücretsiz temel araştırma panelini sağlar.
 
 - BIST taraması: uygulamadaki 100 sembollük liste üzerinden günlük veya saatlik teknik tarama.
 - Tarama tablosu: son fiyat, son mum değişimi, son hacim, 20 mum ortalama hacmi, hacim oranı, RSI, ortak karar ve skor.
-- Grafik bağlantısı: tablodaki Grafik düğmesi seçilen hisseyi teknik analiz ekranında açar.
-- Araştırma raporu: Yahoo Finance üzerinden erişilebilen temel oranlar ve haber başlıkları; grafikte kısa vadeli teknik özet ve uzun vadeli temel görünüm.
-- Değerleme: pozitif EPS varsa 8x/12x/16x F/K varsayım senaryoları gösterilir. Bunlar sektör medyanı veya kesin içsel değer değildir.
-- Kaynaklar: Yahoo Finance, KAP bildirim sorgusu ve Borsa İstanbul veri sayfalarına bağlantılar.
+- Ücretsiz fiyat/hacim: Yahoo Finance herkese açık chart uçları; uygulamanın mevcut proxy'si üzerinden alınır. Gecikme, erişim kesintisi ve kullanım kısıtları olabilir.
+- Teknik göstergeler: RSI(14), EMA(20/50/100/200), 20/60 günlük getiri, son hacim/20 günlük ortalama hacim ve trend yönü tarayıcıda hesaplanır.
+- Temel oranlar ve haberler: Yahoo Finance'ın herkese açık quoteSummary ve search uçlarından erişilebilen alanlar kullanılır. Bu uçlar resmî/garantili API değildir ve her BIST hissesi için veri sunmayabilir.
+- KAP: şirket kodu ve şirket kimliği, kamuya açık KAP sayfalarından; finansal rapor ve özel durum bildirim listeleri KAP'ın herkese açık sayfalarından alınır. KAP'ın ücretli kurumsal veri dağıtım hizmeti kullanılmaz.
+- Ajan paylaşımı: son araştırma `window.TahminAI.temelAnaliz`, `window.TahminAI.arastirmaBaglami`, `window.Ajan.temelAnaliz` ve `window.GrafikAI.temelAnaliz` alanlarına verilir.
+- Değerleme: ücretsiz kaynaktan F/K, PD/DD veya EPS gelmiyorsa sayı uydurulmaz; adil değer hesaplanmış gibi gösterilmez.
 
-**Veri ve güven sınırları:** BIST 100 üyeliği zamanla değişir; tarama sembol listesi düzenli güncellenmelidir. Yahoo Finance verileri gecikmeli veya eksik olabilir. KAP bağlantısı kullanıcıyı resmî bildirim sorgusuna götürür; bu statik GitHub Pages sürümü KAP'ın MKK API'sine doğrudan bağlanmaz. Resmî KAP/MKK otomatik veri erişimi için MKK API anahtarı ve IP yetkilendirmesi gerekir. Temel veri gelmezse ajan adil değer uydurmaz. Otomatik çıktılar yatırım tavsiyesi değildir.
+**Veri ve güven sınırları:** BIST 100 üyeliği zamanla değişir; sembol listesi güncel tutulmalıdır. Ücretsiz fiyat ve haber uçları gecikmeli, eksik veya geçici olarak erişilemez olabilir. KAP bildirim listesi şirketin finansal tablosunun tamamını tarayıcıya indirmez; rapor bağlantıları kullanıcıyı KAP'a götürür. Veri gelmediğinde ilgili alan boş/uyarı olarak gösterilir. Otomatik çıktılar yatırım tavsiyesi değildir. Ücretli API anahtarı veya kullanıcı aboneliği gerekmez.
 
 ## Supabase yönetici paneli
 
