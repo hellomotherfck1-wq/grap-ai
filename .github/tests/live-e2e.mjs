@@ -250,7 +250,7 @@ try {
   check('Ücretsiz araştırma isteği tamamlandı', financialStatus.includes('Ücretsiz araştırma tamamlandı'), financialStatus);
   const financialText = await page.locator('#finansal-sonuc').innerText();
   check('Ücretsiz piyasa ve teknik göstergeler', financialText.includes('RSI (14)') && financialText.includes('EMA 200') && financialText.includes('Son fiyat'), financialText.slice(0, 450));
-  check('KAP finansal tablosundan temel oranlar', financialText.includes('Hasılat') && financialText.includes('Cari oran') && financialText.includes('1234567'), financialText.includes('Dönem net kârı') ? 'Hasılat, dönem kârı ve likidite oranı hesaplandı' : financialText.slice(0, 350));
+  check('KAP finansal tablosundan temel oranlar', financialText.includes('Hasılat') && financialText.includes('Cari oran') && financialText.includes('1.234.567'), financialText.includes('Dönem net kârı') ? 'Hasılat, dönem kârı ve likidite oranı hesaplandı' : financialText.slice(0, 350));
   check('KAP bildirimleri ve haberler', financialText.includes('2026 ikinci çeyrek finansal raporu') && financialText.includes('THYAO ücretsiz test haber başlığı'), financialText.includes('Özel durum açıklaması') ? 'Finansal rapor, özel durum ve haber listelendi' : 'KAP veya haber eksik');
   const sharedSymbol = await page.evaluate(() => window.TahminAI?.temelAnaliz?.symbol || '');
   check('Ücretsiz araştırma diğer ajanlarla paylaşıldı', sharedSymbol === 'THYAO', sharedSymbol || 'Paylaşılan rapor bulunamadı');
