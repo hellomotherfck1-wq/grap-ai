@@ -108,7 +108,7 @@
     return R;
   }
 
-  /* ---------- 2. AJAN: DENETÇİ ---------- */
+  /* ---------- 2. AJAN: DENETÇİ (güçlendirilmiş) ---------- */
   function denetci(s, kal, uy, c, v, H) {
     var n = c.length;
     var sor = [];
@@ -118,8 +118,9 @@
     var oylar = Array.isArray(s.oylar) ? s.oylar : [];
     var pos = oylar.filter(function (o) { return o.puan > 0; }).length;
     var neg = oylar.filter(function (o) { return o.puan < 0; }).length;
-    var i;
+    var i, j;
 
+    /* ---- 1) Veri kalitesi ---- */
     if (n < 20) ekle(3, 'Mum sayısı çok az (' + n + '). Sonuç güvenilir değil.');
     else if (n < 30) ekle(2, 'Mum sayısı az (' + n + ').');
 
@@ -132,6 +133,7 @@
     }
     if (!kal && !okunamadi) ekle(1, 'Gerçek fiyat bilinmiyor, seviyeler yüzde olarak gösteriliyor.');
 
+    /* ---- 2) Oy ve trend çelişkisi ---- */
     if (yon === 1 && neg >= 2) ekle(2, 'Karar AL ama ' + neg + ' yöntem düşüş diyor.');
     else if (yon === -1 && pos >= 2) ekle(2, 'Karar SAT ama ' + pos + ' yöntem yükseliş diyor.');
     else if (pos >= 2 && neg >= 2) ekle(1, 'Yöntemler iki yöne ayrılmış.');
@@ -146,16 +148,17 @@
       if (yon === -1 && s.rsi < 30) ekle(2, 'RSI aşırı satım bölgesinde (' + s.rsi + ').');
     }
 
+    /* ---- 3) Plan / RR ---- */
     var p = s.plan;
     if (yon !== 0) {
       if (!p) ekle(2, 'İşlem planı çıkarılamadı.');
       else {
         if (p.rr < 1) ekle(3, 'Risk/kazanç oranı çok düşük (1/' + f1(p.rr) + ').');
         else if (p.rr < 1.5) ekle(2, 'Risk/kazanç oranı düşük (1/' + f1(p.rr) + ').');
-        var son = c[n - 1].c;
+        var sonF = c[n - 1].c;
         var gMax = Math.max(p.g1, p.g2), gMin = Math.min(p.g1, p.g2);
-        if (yon === 1 && son > gMax + 0.03) ekle(1, 'Fiyat giriş bölgesinin üstünde, geç kalınmış olabilir.');
-        if (yon === -1 && son < gMin - 0.03) ekle(1, 'Fiyat giriş bölgesinin altında, geç kalınmış olabilir.');
+        if (yon === 1 && sonF > gMax + 0.03) ekle(1, 'Fiyat giriş bölgesinin üstünde, geç kalınmış olabilir.');
+        if (yon === -1 && sonF < gMin - 0.03) ekle(1, 'Fiyat giriş bölgesinin altında, geç kalınmış olabilir.');
       }
     }
 
@@ -166,10 +169,153 @@
     var sv = s.sv || { destekler: [], direncler: [] };
     if (!(sv.destekler && sv.destekler.length) && !(sv.direncler && sv.direncler.length)) ekle(1, 'Net destek ve direnç bulunamadı.');
 
+    /* ============================================================
+       YENİ KONTROLLER (Denetçi güçlendirme)
+       ============================================================ */
+
+    /* ---- 4) Mum fitil / tuzak (son 3 mum) ---- */
+    if (n >= 5) {
+      for (i = n - 3; i < n; i++) {
+        var m = c[i];
+        var govde = Math.abs(m.c - m.o);
+        var ustFitil = m.h - Math.max(m.c, m.o);
+        var altFitil = Math.min(m.c, m.o) - m.l;
+        var aralik = m.h - m.l;
+        if (aralik <= 0) continue;
+        if (ustFitil > govde * 1.8 && ustFitil / aralik >= 0.55) {
+          if (yon === 1) ekle(2, 'Son mumlarda uzun üst fitil (alıcı ret / tuzak riski).');
+          else ekle(1, 'Uzun üst fitil var; yukarı deneme reddedilmiş olabilir.');
+          break;
+        }
+        if (altFitil > govde * 1.8 && altFitil / aralik >= 0.55) {
+          if (yon === -1) ekle(2, 'Son mumlarda uzun alt fitil (satıcı ret / tuzak riski).');
+          else ekle(1, 'Uzun alt fitil var; aşağı deneme reddedilmiş olabilir.');
+          break;
+        }
+        if (govde / aralik < 0.12 && aralik > 0) {
+          ekle(1, 'Son mumlarda doji benzeri kararsız mum var.');
+          break;
+        }
+      }
+    }
+
+    /* ---- 5) Ani / aşırı mum (likidite avı) ---- */
+    if (n >= 12) {
+      var govdeler = [];
+      for (i = n - 12; i < n - 1; i++) govdeler.push(Math.abs(c[i].c - c[i].o));
+      var medG = medyan(govdeler);
+      var sonG = Math.abs(c[n - 1].c - c[n - 1].o);
+      var sonAr = c[n - 1].h - c[n - 1].l;
+      if (medG > 0 && (sonG > medG * 3.5 || sonAr > medG * 4.5)) {
+        ekle(2, 'Son mum normalin çok üzerinde (ani hareket / likidite avı riski).');
+      }
+    }
+
+    /* ---- 6) Bollinger sıkışması ---- */
+    if (n >= 22) {
+      var cl = [];
+      for (i = 0; i < n; i++) cl.push(c[i].c);
+      var w = cl.slice(n - 20);
+      var mu = ort(w), vr = 0;
+      for (j = 0; j < w.length; j++) vr += (w[j] - mu) * (w[j] - mu);
+      var sd = Math.sqrt(vr / w.length);
+      if (sd > 1e-12 && mu > 0) {
+        var genislik = (4 * sd) / mu;
+        if (genislik < 0.03) ekle(2, 'Volatilite çok düşük (Bollinger sıkışması). Patlama riski yüksek, yön belirsiz.');
+        else if (genislik < 0.05) ekle(1, 'Volatilite düşük; sıkışma sonrası ani hareket gelebilir.');
+      }
+    }
+
+    /* ---- 7) RSI divergans (basit) ---- */
+    if (n >= 30 && isFinite(s.rsi)) {
+      var cl2 = [];
+      for (i = 0; i < n; i++) cl2.push(c[i].c);
+      var son14 = cl2.slice(n - 14);
+      var once14 = cl2.slice(n - 28, n - 14);
+      var maxSon = Math.max.apply(null, son14);
+      var maxOnce = Math.max.apply(null, once14);
+      var minSon = Math.min.apply(null, son14);
+      var minOnce = Math.min.apply(null, once14);
+      if (yon === 1 && maxSon > maxOnce * 1.005 && s.rsi > 65) {
+        ekle(2, 'Fiyat yeni zirveye yakın ama RSI yüksek; negatif divergans riski (AL zayıf olabilir).');
+      }
+      if (yon === -1 && minSon < minOnce * 0.995 && s.rsi < 35) {
+        ekle(2, 'Fiyat yeni dibe yakın ama RSI düşük; pozitif divergans riski (SAT zayıf olabilir).');
+      }
+    }
+
+    /* ---- 8) Trend kırılımı ---- */
+    if (n >= 10 && t && t.yon) {
+      var yukselisKirik = 0, dususKirik = 0;
+      for (i = n - 5; i < n; i++) {
+        if (c[i].c < c[i - 1].c) yukselisKirik++;
+        if (c[i].c > c[i - 1].c) dususKirik++;
+      }
+      if (t.yon === 'Yükseliş' && yon === 1 && yukselisKirik >= 4) {
+        ekle(2, 'Trend yükseliş görünüyor ama son 5 mumun çoğu kırmızı; yapı bozuluyor olabilir.');
+      }
+      if (t.yon === 'Düşüş' && yon === -1 && dususKirik >= 4) {
+        ekle(2, 'Trend düşüş görünüyor ama son 5 mumun çoğu yeşil; yapı bozuluyor olabilir.');
+      }
+    }
+
+    /* ---- 9) Hacim + fitil uyumsuzluğu ---- */
+    if (H && H.var && v && n >= 5) {
+      var sonM = c[n - 1];
+      var gov = Math.abs(sonM.c - sonM.o);
+      var ar = sonM.h - sonM.l;
+      var uF = sonM.h - Math.max(sonM.c, sonM.o);
+      var aF = Math.min(sonM.c, sonM.o) - sonM.l;
+      var bazH = 0, sayH = 0;
+      for (i = Math.max(0, n - 25); i < n - 3; i++) {
+        if (v[i] > 0) { bazH += v[i]; sayH++; }
+      }
+      bazH = sayH ? bazH / sayH : 0;
+      var sonV = v[n - 1] || 0;
+      if (bazH > 0 && sonV >= bazH * 1.8) {
+        if (uF > gov * 1.5 && uF / (ar || 1) >= 0.4 && yon === 1) {
+          ekle(3, 'Yüksek hacim + uzun üst fitil: alıcılar reddedilmiş olabilir (AL için kırmızı bayrak).');
+        }
+        if (aF > gov * 1.5 && aF / (ar || 1) >= 0.4 && yon === -1) {
+          ekle(3, 'Yüksek hacim + uzun alt fitil: satıcılar reddedilmiş olabilir (SAT için kırmızı bayrak).');
+        }
+      }
+    }
+
+    /* ---- 10) Destek/direnç test sayısı ---- */
+    if (sv) {
+      var sonC = c[n - 1].c;
+      function yakinTest(seviyeler, esik) {
+        if (!Array.isArray(seviyeler) || !seviyeler.length) return 0;
+        var sev = seviyeler[0].seviye;
+        if (!isFinite(sev)) return 0;
+        var say = 0;
+        for (i = Math.max(0, n - 30); i < n; i++) {
+          if (Math.abs(c[i].h - sev) <= esik || Math.abs(c[i].l - sev) <= esik) say++;
+        }
+        return say;
+      }
+      var es = Math.abs(sonC) * 0.008;
+      var tD = yakinTest(sv.direncler, es);
+      var tS = yakinTest(sv.destekler, es);
+      if (yon === 1 && tD >= 3) ekle(2, 'Direnç en az ' + tD + ' kez test edilmiş; kırılım olmadan AL riskli.');
+      if (yon === -1 && tS >= 3) ekle(2, 'Destek en az ' + tS + ' kez test edilmiş; kırılım olmadan SAT riskli.');
+    }
+
+    /* ---- 11) Coin volatilite ---- */
+    var tur = (s.tur || '').toLowerCase();
+    var kripto = tur.indexOf('kripto') >= 0 || tur.indexOf('coin') >= 0 || tur.indexOf('crypto') >= 0;
+    if (kripto && yon !== 0 && n >= 5) {
+      var pct = Math.abs(c[n - 1].c - c[n - 2].c) / (Math.abs(c[n - 2].c) || 1);
+      if (pct > 0.08) ekle(2, 'Kripto: son mumda %' + Math.round(pct * 100) + ' hareket (yüksek volatilite, temkinli ol).');
+    }
+
+    /* ---- Hacim teyidi ---- */
     var teyit = 'yok', teyitMetni = 'Teyit edilecek hacim yorumu yok.', yon2 = 0, oran2 = 0;
-    if (H.var) {
+    if (H && H.var && v) {
       var son2 = n - 2, obv = 0, top = 0;
       for (i = son2 - 9; i <= son2; i++) {
+        if (i < 1) continue;
         var d = c[i].c - c[i - 1].c;
         obv += (d > 0 ? 1 : d < 0 ? -1 : 0) * v[i];
         top += v[i];
@@ -197,7 +343,15 @@
     sor.forEach(function (x) { toplam += x.a; });
     var hata = toplam <= 2 ? 'Düşük' : toplam <= 5 ? 'Orta' : 'Yüksek';
     sor.sort(function (x, y) { return y.a - x.a; });
-    return { sorunlar: sor, hata: hata, teyit: teyit, teyitMetni: teyitMetni, yon2: yon2, oran2: oran2, kontrol: 11 };
+    return {
+      sorunlar: sor,
+      hata: hata,
+      teyit: teyit,
+      teyitMetni: teyitMetni,
+      yon2: yon2,
+      oran2: oran2,
+      kontrol: 18
+    };
   }
 
   /* ---------- Ortak sonuç ---------- */
@@ -359,7 +513,7 @@
     if (ay) {
       var pp = document.createElement('p');
       pp.className = 'kart';
-      pp.textContent = 'Ajan modülü: yüklendi (hacim ajanı + denetçi)';
+      pp.textContent = 'Ajan modülü: yüklendi (hacim ajanı + güçlendirilmiş denetçi v2)';
       ay.appendChild(pp);
     }
   } catch (e3) {}
