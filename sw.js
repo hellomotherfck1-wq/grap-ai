@@ -1,33 +1,91 @@
-const SURUM = 'graph-ai-v8';
+const SURUM = 'graph-ai-v9';
+
 const DOSYALAR = [
-  './', 'index.html', 'css/stil.css',
-  'js/arayuz.js', 'js/goruntu.js', 'js/formasyon.js',
-  'js/analiz.js', 'js/yorum.js', 'js/cizim.js', 'js/ocr.js', 'js/veri.js', 'js/liste.js',
-  'manifest.json', 'icons/icon.svg'
+  './',
+  './index.html',
+  './manifest.json',
+  './css/stil.css',
+  './icons/icon.svg',
+  './js/goruntu.js',
+  './js/formasyon.js',
+  './js/analiz.js',
+  './js/yorum.js',
+  './js/formasyon2.js',
+  './js/tani.js',
+  './js/cizim.js',
+  './js/ocr.js',
+  './js/veri.js',
+  './js/liste.js',
+  './js/bist100.js',
+  './js/yahoo3.js',
+  './js/ajan.js',
+  './js/ajan2.js',
+  './js/arayuz.js',
+  './js/tahmin.js',
+  './js/coin-tahmin.js'
 ];
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(SURUM).then(c =>
-    Promise.allSettled(DOSYALAR.map(d => c.add(d)))
-  ));
-  self.skipWaiting();
+self.addEventListener('install', function(event) {
+  event.waitUntil((async function() {
+    const cache = await caches.open(SURUM);
+    const results = await Promise.allSettled(
+      DOSYALAR.map(function(dosya) { return cache.add(dosya); })
+    );
+    const hatalar = results
+      .map(function(sonuc, i) {
+        return sonuc.status === 'rejected' ? DOSYALAR[i] : null;
+      })
+      .filter(Boolean);
+
+    if (hatalar.length) {
+      console.warn('Önbelleğe alınamayan dosyalar:', hatalar);
+    }
+
+    await self.skipWaiting();
+  })());
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(k => Promise.all(k.filter(x => x !== SURUM).map(x => caches.delete(x))))
-  );
-  self.clients.claim();
+self.addEventListener('activate', function(event) {
+  event.waitUntil((async function() {
+    const anahtarlar = await caches.keys();
+    await Promise.all(
+      anahtarlar
+        .filter(function(anahtar) { return anahtar !== SURUM; })
+        .map(function(anahtar) { return caches.delete(anahtar); })
+    );
+    await self.clients.claim();
+  })());
 });
 
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  if (new URL(e.request.url).origin !== location.origin) return;
-  e.respondWith(
-    fetch(e.request).then(r => {
-      const kopya = r.clone();
-      caches.open(SURUM).then(c => c.put(e.request, kopya));
-      return r;
-    }).catch(() => caches.match(e.request))
-  );
+self.addEventListener('fetch', function(event) {
+  if (event.request.method !== 'GET') return;
+
+  const istekURL = new URL(event.request.url);
+  if (istekURL.origin !== self.location.origin) return;
+
+  event.respondWith((async function() {
+    try {
+      const yanit = await fetch(event.request);
+
+      if (yanit && yanit.ok) {
+        const cache = await caches.open(SURUM);
+        await cache.put(event.request, yanit.clone());
+      }
+
+      return yanit;
+    } catch (hata) {
+      const kayitli = await caches.match(event.request);
+      if (kayitli) return kayitli;
+
+      if (event.request.mode === 'navigate') {
+        const anaSayfa = await caches.match('./index.html');
+        if (anaSayfa) return anaSayfa;
+      }
+
+      return new Response('Çevrimdışı: Bu dosya önbellekte bulunamadı.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
+    }
+  })());
 });
