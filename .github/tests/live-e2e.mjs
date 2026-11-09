@@ -42,11 +42,12 @@ try {
   );
   check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma ajanı');
 
-  await page.waitForSelector('#bist-arastirma-kutusu', { timeout: 30000 });
+  await page.waitForSelector('#bist-arastirma-kutusu', { state: 'attached', timeout: 30000 });
   const optionCount = await page.locator('#bist-arastirma-sembol option').count();
   check('BIST araştırma paneli ve sembol listesi', optionCount === 100, optionCount + ' hisse seçeneği');
 
   await page.locator('nav button[data-git="strateji"]').click();
+  await page.waitForSelector('#bist-arastirma-kutusu', { state: 'visible', timeout: 15000 });
   const selectedValue = await page.locator('#bist-arastirma-sembol').evaluate(select => {
     const found = Array.from(select.options).find(option => option.value === 'THYAO');
     return found ? found.value : (select.options[0] ? select.options[0].value : '');
