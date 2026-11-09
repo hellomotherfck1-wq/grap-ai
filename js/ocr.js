@@ -5,14 +5,44 @@ const OCR = {
     if (window.Tesseract) return Promise.resolve();
     if (!this.yukleniyor) {
       this.yukleniyor = new Promise((ok, hata) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-        s.onload = ok;
-        s.onerror = () => {
-          this.yukleniyor = null;
-          hata(new Error('OCR dosyaları yüklenemedi (ilk kullanımda internet gerekir).'));
+        const kaynaklar = [
+          'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+          'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js'
+        ];
+        let sira = 0;
+        const dene = () => {
+          if (window.Tesseract) { ok(); return; }
+          if (sira >= kaynaklar.length) {
+            this.yukleniyor = null;
+            hata(new Error('OCR motoru iki ücretsiz CDN üzerinden de yüklenemedi. İnternet bağlantısını kontrol et veya fiyatları elle gir.'));
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = kaynaklar[sira++];
+          let tamam = false;
+          const zamanAsimi = setTimeout(() => {
+            if (tamam) return;
+            tamam = true;
+            script.remove();
+            dene();
+          }, 12000);
+          script.onload = () => {
+            if (tamam) return;
+            tamam = true;
+            clearTimeout(zamanAsimi);
+            if (window.Tesseract) ok();
+            else { script.remove(); dene(); }
+          };
+          script.onerror = () => {
+            if (tamam) return;
+            tamam = true;
+            clearTimeout(zamanAsimi);
+            script.remove();
+            dene();
+          };
+          document.head.appendChild(script);
         };
-        document.head.appendChild(s);
+        dene();
       });
     }
     return this.yukleniyor;
