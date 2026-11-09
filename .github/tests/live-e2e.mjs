@@ -336,6 +336,15 @@ try {
   });
   check('Binance mumlarında hacim alanı', binanceVolume.count >= 20 && binanceVolume.lastVolume > 0, JSON.stringify(binanceVolume));
 
+  const timeframeChecks = await page.evaluate(async () => {
+    const yahoo15 = await Veri.yahoo('THYAO.IS', '15m');
+    const yahoo1h = await Veri.yahoo('THYAO.IS', '1h');
+    const binance15 = await Veri.binance('BTCUSDT', '15m');
+    const binance1h = await Veri.binance('BTCUSDT', '1h');
+    return { yahoo15: yahoo15.length, yahoo1h: yahoo1h.length, binance15: binance15.length, binance1h: binance1h.length };
+  });
+  check('15 dakika, 1 saat ve günlük veri aralıkları', Object.values(timeframeChecks).every(count => count >= 20), JSON.stringify(timeframeChecks));
+
   const bistVolumeAgent = await page.evaluate(async () => {
     const result = await TahminAI.taraBir({ q: 'THYAO', ad: 'Türk Hava Yolları' }, '1d');
     return { symbol: result.sembol, lastVolume: result.sonHacim, averageVolume: result.ortHacim20, ratio: result.hacimOrani };
@@ -442,6 +451,7 @@ try {
     await page.locator('#admin-giris-btn').count() === 1;
   check('Admin giriş ekranı yükleniyor', adminUI, adminUI ? 'E-posta, şifre ve giriş kontrolleri hazır' : 'Admin giriş alanları eksik');
 
+  await page.locator('nav button[data-git="strateji"]').click();
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileLayout = await page.evaluate(() => {
     const viewport = document.documentElement.clientWidth;
