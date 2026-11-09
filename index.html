@@ -59,11 +59,33 @@
     <p class="kart">Kütüphane sonraki aşamalarda eklenecek.</p>
   </section>
 
-  <section id="ayarlar" class="ekran">
-    <h2>Ayarlar</h2>
-    <p class="kart">Uygulama sürümü: 0.6 (BIST 100
+ <section id="ayarlar" class="ekran">
+  <h2>Admin Paneli</h2>
 
-      </main>
+  <!-- Giriş formu -->
+  <div id="admin-giris" class="kart">
+    <p class="alt" style="margin-bottom:12px">Sadece yetkili kişiler girebilir.</p>
+    <input id="admin-email" type="email" placeholder="E-posta" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">
+    <input id="admin-sifre" type="password" placeholder="Şifre" style="width:100%;padding:12px;margin-bottom:12px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">
+    <button id="admin-giris-btn" class="buton">Giriş Yap</button>
+    <p id="admin-hata" class="alt" style="color:#f85149;margin-top:8px"></p>
+  </div>
+
+  <!-- İstatistikler (giriş sonrası görünür) -->
+  <div id="admin-panel" hidden>
+    <div class="kart">
+      <h3 style="margin-bottom:12px">Günlük Özet</h3>
+      <div id="istatistikler" style="font-size:15px;line-height:1.7"></div>
+    </div>
+
+    <div class="kart">
+      <h3 style="margin-bottom:12px">Son Analizler</h3>
+      <div id="son-analizler" style="font-size:14px;line-height:1.6;max-height:320px;overflow-y:auto"></div>
+    </div>
+
+    <button id="admin-cikis-btn" class="buton" style="background:#da3633">Çıkış Yap</button>
+  </div>
+</section>
 
 <nav>
   <button data-git="yukle" class="aktif"><span>📤</span>Ara</button>
@@ -71,7 +93,7 @@
   <button data-git="sonuc"><span>📊</span>Sonuç</button>
   <button data-git="gecmis"><span>🕘</span>Geçmiş</button>
   <button data-git="strateji"><span>📚</span>Strateji</button>
-  <button data-git="ayarlar"><span>⚙️</span>Ayarlar</button>
+  <button data-git="ayarlar"><span>🔐</span>Admin</button>
 </nav>
 
 <script src="js/goruntu.js"></script>
@@ -91,5 +113,7 @@
 <script src="js/arayuz.js"></script>
 <script src="js/tahmin.js"></script>
 <script src="js/coin-tahmin.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/admin.js"></script>
 </body>
 </html>
