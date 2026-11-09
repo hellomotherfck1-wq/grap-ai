@@ -1,0 +1,50 @@
+name: Live browser end-to-end test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/tests/**"
+      - ".github/workflows/live-e2e.yml"
+      - "index.html"
+      - "js/**"
+      - "css/**"
+      - "sw.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Test live Graph AI
+        env:
+          BASE_URL: https://hellomotherfck1-wq.github.io/grap-ai/
+        run: node .github/tests/live-e2e.mjs
+
+      - name: Upload browser test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graph-ai-live-e2e-report
+          path: |
+            live-e2e-report.json
+            live-e2e-failure.png
+          if-no-files-found: ignore
+          retention-days: 7
