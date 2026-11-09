@@ -9,18 +9,108 @@
   var KEY = 'graphai_tahmin_v1';
   var BUGUN_KEY = 'graphai_tahmin_bugun';
 
+  /** BIST 100 — uygulamadaki bist100.js ile aynı liste */
   var LISTE = [
-    { q: 'PGSUS', ad: 'Pegasus' },
-    { q: 'THYAO', ad: 'Türk Hava Yolları' },
-    { q: 'GARAN', ad: 'Garanti BBVA' },
+    { q: 'AEFES', ad: 'Anadolu Efes' },
+    { q: 'AGHOL', ad: 'AG Anadolu Grubu' },
+    { q: 'AHGAZ', ad: 'Ahlatcı Doğalgaz' },
+    { q: 'AKBNK', ad: 'Akbank' },
+    { q: 'AKCNS', ad: 'Akçansa' },
+    { q: 'AKFYE', ad: 'Akfen Yenilenebilir' },
+    { q: 'AKSA', ad: 'Aksa Akrilik' },
+    { q: 'AKSEN', ad: 'Aksa Enerji' },
+    { q: 'ALARK', ad: 'Alarko Holding' },
+    { q: 'ALBRK', ad: 'Albaraka Türk' },
+    { q: 'ALTNY', ad: 'Altınay Savunma' },
+    { q: 'ANHYT', ad: 'Anadolu Hayat' },
+    { q: 'ANSGR', ad: 'Anadolu Sigorta' },
+    { q: 'ARCLK', ad: 'Arçelik' },
     { q: 'ASELS', ad: 'Aselsan' },
+    { q: 'ASTOR', ad: 'Astor Enerji' },
+    { q: 'AYGAZ', ad: 'Aygaz' },
+    { q: 'BERA', ad: 'Bera Holding' },
+    { q: 'BIMAS', ad: 'BİM' },
+    { q: 'BINHO', ad: '1000 Yatırımlar Holding' },
+    { q: 'BRSAN', ad: 'Borusan Boru' },
+    { q: 'BRYAT', ad: 'Borusan Yatırım' },
+    { q: 'BTCIM', ad: 'Batıçim' },
+    { q: 'CANTE', ad: 'Çan2 Termik' },
+    { q: 'CCOLA', ad: 'Coca-Cola İçecek' },
+    { q: 'CIMSA', ad: 'Çimsa' },
+    { q: 'CVKMD', ad: 'CVK Maden' },
+    { q: 'CWENE', ad: 'CW Enerji' },
+    { q: 'DOAS', ad: 'Doğuş Otomotiv' },
+    { q: 'DOHOL', ad: 'Doğan Holding' },
+    { q: 'ECILC', ad: 'Eczacıbaşı İlaç' },
+    { q: 'ECZYT', ad: 'Eczacıbaşı Yatırım' },
+    { q: 'EGEEN', ad: 'Ege Endüstri' },
+    { q: 'EGGUB', ad: 'Ege Gübre' },
+    { q: 'EKGYO', ad: 'Emlak Konut' },
+    { q: 'ENERY', ad: 'Enerya' },
+    { q: 'ENJSA', ad: 'Enerjisa' },
+    { q: 'ENKAI', ad: 'Enka İnşaat' },
+    { q: 'ENTRA', ad: 'IC Enterra' },
+    { q: 'EREGL', ad: 'Ereğli Demir Çelik' },
+    { q: 'EUREN', ad: 'Europen Endüstri' },
+    { q: 'FENER', ad: 'Fenerbahçe' },
+    { q: 'FROTO', ad: 'Ford Otosan' },
+    { q: 'GARAN', ad: 'Garanti BBVA' },
+    { q: 'GLRMK', ad: 'Gülermak' },
+    { q: 'GLYHO', ad: 'Global Yatırım Holding' },
+    { q: 'GRSEL', ad: 'Gürsel Turizm' },
+    { q: 'GUBRF', ad: 'Gübre Fabrikaları' },
+    { q: 'GWIND', ad: 'Galata Wind' },
+    { q: 'HALKB', ad: 'Halkbank' },
+    { q: 'HEKTS', ad: 'Hektaş' },
+    { q: 'ISCTR', ad: 'İş Bankası' },
+    { q: 'ISDMR', ad: 'İskenderun Demir Çelik' },
+    { q: 'ISMEN', ad: 'İş Yatırım' },
+    { q: 'KARSN', ad: 'Karsan' },
+    { q: 'KATMR', ad: 'Katmerciler' },
+    { q: 'KCAER', ad: 'Kocaer Çelik' },
+    { q: 'KCHOL', ad: 'Koç Holding' },
+    { q: 'KORDS', ad: 'Kordsa' },
+    { q: 'KRDMD', ad: 'Kardemir' },
+    { q: 'LMKDC', ad: 'Limak Doğu Anadolu Çimento' },
+    { q: 'MAVI', ad: 'Mavi' },
+    { q: 'MGROS', ad: 'Migros' },
+    { q: 'MPARK', ad: 'MLP Sağlık' },
+    { q: 'OBAMS', ad: 'Oba Makarnacılık' },
+    { q: 'ODAS', ad: 'Odaş Elektrik' },
+    { q: 'OTKAR', ad: 'Otokar' },
+    { q: 'OYAKC', ad: 'Oyak Çimento' },
+    { q: 'PAHOL', ad: 'Pasifik Holding' },
+    { q: 'PETKM', ad: 'Petkim' },
+    { q: 'PGSUS', ad: 'Pegasus' },
+    { q: 'RGYAS', ad: 'Rönesans GYO' },
+    { q: 'RYSAS', ad: 'Reysaş' },
+    { q: 'SAHOL', ad: 'Sabancı Holding' },
+    { q: 'SASA', ad: 'Sasa Polyester' },
+    { q: 'SISE', ad: 'Şişecam' },
+    { q: 'SNGYO', ad: 'Sinpaş GYO' },
+    { q: 'SOKM', ad: 'Şok Marketler' },
+    { q: 'TABGD', ad: 'TAB Gıda' },
+    { q: 'TAVHL', ad: 'TAV Havalimanları' },
+    { q: 'TCELL', ad: 'Turkcell' },
+    { q: 'TCKRC', ad: 'Kıraç Galvaniz' },
+    { q: 'THYAO', ad: 'Türk Hava Yolları' },
+    { q: 'TKFEN', ad: 'Tekfen Holding' },
+    { q: 'TOASO', ad: 'Tofaş' },
+    { q: 'TRALT', ad: 'Koza Altın' },
+    { q: 'TRENJ', ad: 'İpek Doğal Enerji' },
+    { q: 'TRGYO', ad: 'Torunlar GYO' },
+    { q: 'TRMET', ad: 'Koza Anadolu Metal' },
+    { q: 'TSKB', ad: 'TSKB' },
+    { q: 'TTKOM', ad: 'Türk Telekom' },
+    { q: 'TTRAK', ad: 'Türk Traktör' },
+    { q: 'TUKAS', ad: 'Tukaş' },
     { q: 'TUPRS', ad: 'Tüpraş' },
-    { q: 'EREGL', ad: 'Ereğli' },
-    { q: 'SASA', ad: 'SASA' },
-    { q: 'Bitcoin', ad: 'Bitcoin' },
-    { q: 'Ethereum', ad: 'Ethereum' },
-    { q: 'Dolar', ad: 'Dolar/TL' },
-    { q: 'Altın', ad: 'Altın' }
+    { q: 'TURSG', ad: 'Türkiye Sigorta' },
+    { q: 'ULKER', ad: 'Ülker' },
+    { q: 'VAKBN', ad: 'Vakıfbank' },
+    { q: 'VESTL', ad: 'Vestel' },
+    { q: 'YKBNK', ad: 'Yapı Kredi' },
+    { q: 'ZOREN', ad: 'Zorlu Enerji' }
   ];
 
   function pad2(n) {
@@ -372,7 +462,7 @@
       } catch (e) {
         hatalar.push(item.ad + ': ' + (e && e.message ? e.message : String(e)));
       }
-      await sleep(450);
+      await sleep(280);
     }
 
     adaylar.sort(function (a, b) {
@@ -418,7 +508,7 @@
       secim: secim,
       adaylar: adaylar.map(kisaOzet),
       hatalar: hatalar,
-      ajanSurum: 'tahmin-v1.1'
+      ajanSurum: 'tahmin-v1.2'
     };
 
     var hafiza = okuHafiza();
@@ -520,7 +610,7 @@
     }
 
     if (kayit.adaylar && kayit.adaylar.length) {
-      var satirlar = kayit.adaylar.slice(0, 8).map(function (a, idx) {
+      var satirlar = kayit.adaylar.slice(0, 15).map(function (a, idx) {
         return (idx + 1) + '. ' + (a.ad || '?') + ' → ' + (a.karar || '?') +
           ' (skor ' + (a.skor != null ? a.skor : '?') +
           (a.teknik ? ', tek:' + a.teknik : '') +
@@ -560,7 +650,7 @@
 
     sec.innerHTML =
       '<h2>Tahmin AI</h2>' +
-      '<p class="alt">İzleme listesindeki grafiklere bakar; Teknik, Hacim ve Denetçi ajanlarına sorar; en uygun kurulumu seçer. Hafıza bu cihazda saklanır.</p>' +
+      '<p class="alt">BIST 100’deki tüm hisseleri tarar; Teknik, Hacim ve Denetçi ajanlarına sorar; en yüksek skorlu kurulumu seçer. Hafıza bu cihazda saklanır.</p>' +
       '<select id="tahmin-zd" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">' +
       '<option value="1h" selected>1 saatlik</option>' +
       '<option value="1d">Günlük</option>' +
@@ -570,7 +660,7 @@
       '<p id="tahmin-durum" class="alt"></p>' +
       '<div id="tahmin-alan"></div>' +
       '<div id="tahmin-hafiza"></div>' +
-      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: Tarama 11 varlık için 1–2 dakika sürebilir. Aynı gün tekrar üretirsen önceki kayıtın üzerine yazılır.</p>';
+      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: BIST 100’ün tamamı taranır (~3–6 dk). Aynı gün tekrar üretirsen önceki kayıtın üzerine yazılır.</p>';
 
     var btn = document.getElementById('tahmin-btn');
     var durum = document.getElementById('tahmin-durum');
@@ -648,7 +738,7 @@
       if (ay) {
         var pp = document.createElement('p');
         pp.className = 'kart';
-        pp.textContent = 'Tahmin AI: yüklendi (v1.1 — ajan alışverişi + localStorage)';
+        pp.textContent = 'Tahmin AI: yüklendi (v1.2 — BIST 100 tarama + ajan alışverişi)';
         ay.appendChild(pp);
       }
     } catch (e3) {}
