@@ -297,7 +297,9 @@
     var f = tasks[0].status === 'fulfilled' ? tasks[0].value : null;
     var news = tasks[1].status === 'fulfilled' ? tasks[1].value : [];
     var errors = [];
-    if (tasks[0].status === 'rejected') errors.push('Temel finansallar: ' + tasks[0].reason.message);
+    if (tasks[0].status === 'rejected' && !/HTTP 401|HTTP 403/.test(tasks[0].reason && tasks[0].reason.message || '')) {
+      errors.push('Temel finansallar: ' + tasks[0].reason.message);
+    }
     if (tasks[1].status === 'rejected') errors.push('Haber akışı: ' + tasks[1].reason.message);
     return raporOlustur(v, dn, panel, f, news, errors);
   }
