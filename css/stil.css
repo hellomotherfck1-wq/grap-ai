@@ -71,7 +71,7 @@ label { display: block; margin: 10px 0 6px; color: #c6d2de; font-size: 13px; fon
 details summary { color: #dbe7f2; font-size: 14px; font-weight: 700; cursor: pointer; }
 details[open] summary { margin-bottom: 12px; }
 #tuval-alan { min-width: 0; }
-#tuval-alan .analiz-grafik { display: block; width: 100%; height: auto; margin: 5px 0 14px; border: 1px solid var(--kenar); border-radius: 14px; background: #0f1419; }
+.analiz-grafik { display: block; width: 100%; max-width: 100%; height: auto; margin: 5px 0 14px; border: 1px solid var(--kenar); border-radius: 14px; background: #0f1419; }
 #tuval-alan .kart p { overflow-wrap: anywhere; }
 .rapor { margin-top: 10px; color: #c6d2de; font: 13px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .istatistikler { display: grid; gap: 8px; color: #cbd7e2; font-size: 14px; }
