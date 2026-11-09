@@ -109,3 +109,19 @@ button:focus-visible, summary:focus-visible, label:focus-visible { outline: 2px 
   nav button span { font-size: 18px; }
   nav button small { font-size: 9px; }
 }
+
+
+/* BIST 100 research and scan table */
+.bist-table-wrap { width: 100%; margin-top: 12px; overflow-x: auto; overscroll-behavior-inline: contain; }
+.bist-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.bist-table th, .bist-table td { padding: 9px 8px; border-bottom: 1px solid var(--kenar); text-align: right; white-space: nowrap; }
+.bist-table th { position: sticky; top: 0; background: #1a2734; color: #9db0c2; font-weight: 700; }
+.bist-table th:first-child, .bist-table td:first-child { text-align: left; }
+.bist-mini-btn { padding: 6px 9px; border: 1px solid #36536f; border-radius: 8px; background: #20364d; color: #dbeafe; font: inherit; cursor: pointer; }
+.bist-research-line { margin: 7px 0; color: #cbd7e2; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+.bist-research-line strong { color: #f1f5f9; }
+.bist-research-news { margin: 7px 0; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.bist-research-news a, .bist-research-sources a { color: #8abaff; text-decoration: underline; }
+.bist-research-news small { color: var(--soluk); font-size: 11px; }
+.bist-research-sources { margin-top: 12px; font-size: 12px; line-height: 1.6; }
+#bist-arastirma-kutusu { margin-top: 18px; }
