@@ -63,7 +63,7 @@ try {
   const researchText = await page.locator('#bist-arastirma-sonuc').innerText();
   check('BIST araştırma akışı tamamlandı', researchStatus.includes('Araştırma tamamlandı'), researchStatus);
   check('Araştırma raporu ekrana çizildi', researchText.includes('Araştırma Ajanı') && researchText.includes('Son fiyat'), researchText.slice(0, 500));
-  check('Araştırma raporunda fiyat verisi var', /Son fiyat:.*\\d/.test(researchText), researchText.split('\\n').find(line => line.includes('Son fiyat')) || 'Fiyat satırı bulunamadı');
+  check('Araştırma raporunda fiyat verisi var', /Son fiyat:.*\d/.test(researchText), researchText.split('\n').find(line => line.includes('Son fiyat')) || 'Fiyat satırı bulunamadı');
 
   await page.locator('nav button[data-git="yukle"]').click();
   await page.locator('#ara-ad').fill('THYAO.IS');
