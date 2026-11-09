@@ -77,6 +77,125 @@
     throw lastError || new Error('Ücretsiz kaynaklara erişilemedi');
   }
 
+  async function textViaProxy(url) {
+    var routes = [
+      PROXY + encodeURIComponent(url),
+      'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
+    ];
+    var lastError;
+    for (var i = 0; i < routes.length; i++) {
+      var controller = new AbortController();
+      var timer = setTimeout(function () { controller.abort(); }, 18000);
+      try {
+        var response = await fetch(routes[i], { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return await response.text();
+      } catch (e) {
+        lastError = e && e.name === 'AbortError' ? new Error('KAP raporu zaman aşımına uğradı') : e;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    throw lastError || new Error('KAP raporu indirilemedi');
+  }
+
+  function parseTurkishNumber(value) {
+    if (value == null) return null;
+    var text = String(value).replace(/\\s/g, '').replace(/%/g, '').replace(/[^0-9,.-]/g, '');
+    if (!text || text === '-' || text === ',') return null;
+    if (text.indexOf(',') >= 0) text = text.replace(/\\./g, '').replace(',', '.');
+    var number = Number(text);
+    return isFinite(number) ? number : null;
+  }
+
+  function normalizeLabel(value) {
+    return String(value || '').toLocaleLowerCase('tr-TR')
+      .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')
+      .replace(/ı/g, 'i').replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\\s+/g, ' ').trim();
+  }
+
+  function kapFinancialRows(html) {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var rows = [];
+    Array.from(doc.querySelectorAll('tr')).forEach(function (tr) {
+      var labelNode = tr.querySelector('.gwt-Label.multi-language-content.content-tr') ||
+        tr.querySelector('[class*="content-tr"]');
+      if (!labelNode) return;
+      var label = (labelNode.textContent || '').trim();
+      if (!label) return;
+      var values = Array.from(tr.querySelectorAll('[class*="taxonomy-context-value"]'))
+        .map(function (cell) { return parseTurkishNumber(cell.textContent); })
+        .filter(function (value) { return value != null; });
+      if (values.length) rows.push({ label: label, values: values });
+    });
+    return rows;
+  }
+
+  function kapFinancialMetrics(rows) {
+    function value(patterns, column) {
+      var row = rows.find(function (item) {
+        var label = normalizeLabel(item.label);
+        return patterns.some(function (pattern) {
+          var target = normalizeLabel(pattern);
+          return label === target || label.indexOf(target) >= 0;
+        });
+      });
+      return row && row.values.length > (column || 0) ? row.values[column || 0] : null;
+    }
+    function growth(patterns) {
+      var current = value(patterns, 0);
+      var previous = value(patterns, 1);
+      return current != null && previous != null && previous !== 0 ? current / previous - 1 : null;
+    }
+    var revenuePatterns = ['Hasılat', 'Satış Gelirleri', 'Hasılat (Satışlar)'];
+    var profitPatterns = ['Dönem Kârı (Zararı)', 'Dönem Karı (Zararı)', 'Net Dönem Kârı', 'Net Dönem Karı'];
+    var revenue = value(revenuePatterns);
+    var profit = value(profitPatterns);
+    var assets = value(['Toplam Varlıklar']);
+    var equity = value(['Toplam Özkaynaklar', 'Özkaynaklar']);
+    var currentAssets = value(['Dönen Varlıklar']);
+    var currentLiabilities = value(['Kısa Vadeli Yükümlülükler']);
+    var cash = value(['Nakit ve Nakit Benzerleri', 'Nakit ve Nakit Benzeri']);
+    var shortDebt = value(['Kısa Vadeli Borçlanmalar']);
+    var longDebt = value(['Uzun Vadeli Borçlanmalar']);
+    var operating = value(['İşletme Faaliyetlerinden Nakit Akışları', 'İşletme Faaliyetlerinden Kaynaklanan Nakit Akışları']);
+    var investing = value(['Yatırım Faaliyetlerinden Nakit Akışları', 'Yatırım Faaliyetlerinden Kaynaklanan Nakit Akışları']);
+    var financing = value(['Finansman Faaliyetlerinden Nakit Akışları', 'Finansman Faaliyetlerinden Kaynaklanan Nakit Akışları']);
+    var debt = shortDebt != null || longDebt != null ? (shortDebt || 0) + (longDebt || 0) : null;
+    return {
+      revenue: revenue,
+      netProfit: profit,
+      totalAssets: assets,
+      equity: equity,
+      currentAssets: currentAssets,
+      currentLiabilities: currentLiabilities,
+      cash: cash,
+      totalDebt: debt,
+      netDebt: debt != null && cash != null ? debt - cash : null,
+      operatingCashFlow: operating,
+      investingCashFlow: investing,
+      financingCashFlow: financing,
+      currentRatio: currentAssets != null && currentLiabilities ? currentAssets / currentLiabilities : null,
+      profitMargin: revenue != null && revenue !== 0 && profit != null ? profit / revenue : null,
+      roe: equity != null && equity !== 0 && profit != null ? profit / equity : null,
+      revenueGrowth: growth(revenuePatterns),
+      earningsGrowth: growth(profitPatterns),
+      source: 'KAP kamuya açık finansal rapor HTML tablosu'
+    };
+  }
+
+  async function kapFinancialStatement(index) {
+    var html = await textViaProxy('https://www.kap.org.tr/tr/Bildirim/' + encodeURIComponent(index));
+    var rows = kapFinancialRows(html);
+    if (!rows.length) throw new Error('KAP raporunda okunabilir finansal tablo satırı bulunamadı');
+    return {
+      index: index,
+      rows: rows,
+      fundamentals: kapFinancialMetrics(rows)
+    };
+  }
+
   function ema(values, period) {
     if (!Array.isArray(values) || values.length < period) return null;
     var sum = 0;
@@ -204,6 +323,13 @@
       disclosures: normalize(lists[1]),
       errors: lists.filter(function (x) { return x.status === 'rejected'; }).length
     };
+    if (result.financialReports.length) {
+      try {
+        result.statement = await kapFinancialStatement(result.financialReports[0].index);
+      } catch (error) {
+        result.statementError = error && error.message ? error.message : String(error);
+      }
+    }
     kapCache.set(key, { time: Date.now(), value: result });
     return result;
   }
@@ -329,18 +455,19 @@
 
     var f = report.fundamentals;
     var valuation = el('div', 'finansal-ozet-kart');
-    valuation.appendChild(el('h4', '', 'Ücretsiz kaynaklardan erişilebilen temel veriler'));
+    valuation.appendChild(el('h4', '', 'KAP finansal tablosundan çıkarılan temel göstergeler'));
     var rows = [
-      ['F/K', f && f.trailingPE != null ? number(f.trailingPE, 2) : '—'],
-      ['İleri F/K', f && f.forwardPE != null ? number(f.forwardPE, 2) : '—'],
-      ['PD/DD', f && f.priceToBook != null ? number(f.priceToBook, 2) : '—'],
-      ['EPS', f && f.trailingEps != null ? money(f.trailingEps, f.currency) : '—'],
-      ['ROE', f && f.roe != null ? pct(f.roe * 100) : '—'],
-      ['Gelir büyümesi', f && f.revenueGrowth != null ? pct(f.revenueGrowth * 100) : '—'],
-      ['Kâr büyümesi', f && f.earningsGrowth != null ? pct(f.earningsGrowth * 100) : '—'],
-      ['Net kâr marjı', f && f.profitMargins != null ? pct(f.profitMargins * 100) : '—'],
-      ['Borç/özkaynak', f && f.debtToEquity != null ? number(f.debtToEquity, 1) : '—'],
-      ['Analist hedefi', f && f.targetMeanPrice != null ? money(f.targetMeanPrice, f.currency) : '—']
+      ['Hasılat', f && f.revenue != null ? money(f.revenue, 'TRY') : '—'],
+      ['Dönem net kârı', f && f.netProfit != null ? money(f.netProfit, 'TRY') : '—'],
+      ['Toplam varlıklar', f && f.totalAssets != null ? money(f.totalAssets, 'TRY') : '—'],
+      ['Özkaynaklar', f && f.equity != null ? money(f.equity, 'TRY') : '—'],
+      ['Cari oran', f && f.currentRatio != null ? number(f.currentRatio, 2) + 'x' : '—'],
+      ['Dönem net kâr marjı', f && f.profitMargin != null ? pct(f.profitMargin * 100) : '—'],
+      ['Dönem kârı / özkaynak', f && f.roe != null ? pct(f.roe * 100) : '—'],
+      ['Hasılat değişimi (rapordaki karşılaştırmalı sütun)', f && f.revenueGrowth != null ? pct(f.revenueGrowth * 100) : '—'],
+      ['Kâr değişimi (rapordaki karşılaştırmalı sütun)', f && f.earningsGrowth != null ? pct(f.earningsGrowth * 100) : '—'],
+      ['Net borç', f && f.netDebt != null ? money(f.netDebt, 'TRY') : '—'],
+      ['Faaliyet nakit akışı', f && f.operatingCashFlow != null ? money(f.operatingCashFlow, 'TRY') : '—']
     ];
     rows.forEach(function (row) {
       var line = el('div', 'finansal-ozet-satir');
@@ -349,24 +476,21 @@
       valuation.appendChild(line);
     });
     if (!f || rows.every(function (x) { return x[1] === '—'; })) {
-      valuation.appendChild(el('p', 'alt', 'Yahoo Finance bu hisse için temel oranları ücretsiz uçtan sağlamadı. Bu nedenle F/K, PD/DD veya hedef fiyat uydurulmadı. KAP finansal raporları aşağıda listelenmiştir.'));
-    }
-    if (f && f.trailingEps != null && f.trailingEps > 0 && m.price != null) {
-      var scenario = el('div', 'finansal-ozet-kart');
-      scenario.appendChild(el('h4', '', 'Varsayımsal EPS çarpanı senaryosu'));
-      var multiples = [8, 12, 16];
-      multiples.forEach(function (multiple) {
-        var estimate = f.trailingEps * multiple;
-        var difference = (estimate / m.price - 1) * 100;
-        var line = el('div', 'finansal-ozet-satir');
-        line.appendChild(el('span', '', 'EPS × ' + multiple));
-        line.appendChild(el('strong', '', money(estimate, m.currency) + ' · ' + (difference >= 0 ? '+' : '') + pct(difference)));
-        scenario.appendChild(line);
-      });
-      scenario.appendChild(el('p', 'alt', 'Bunlar sektör değerlemesi veya hedef fiyat değildir; yalnızca 8x/12x/16x varsayımsal F/K çarpanlarıyla yapılan senaryolardır. Şirketin sektör, borç, nakit akışı, enflasyon ve tek seferlik kalemleri ayrıca incelenmelidir.'));
-      result.appendChild(scenario);
+      valuation.appendChild(el('p', 'alt', 'KAP finansal tablosundan yeterli sayısal veri çıkarılamadı. F/K, PD/DD veya adil fiyat üretilmedi; rapor bağlantısını açarak kontrol edebilirsin.'));
     }
     result.appendChild(valuation);
+
+    if (report.kap && report.kap.statement && report.kap.statement.rows.length) {
+      var statementBox = el('details', 'finansal-tablo-detay');
+      statementBox.appendChild(el('summary', '', 'KAP finansal tablo kalemleri · ' + report.kap.statement.rows.length + ' satır'));
+      report.kap.statement.rows.slice(0, 35).forEach(function (item) {
+        var line = el('div', 'finansal-ozet-satir');
+        line.appendChild(el('span', '', item.label));
+        line.appendChild(el('strong', '', item.values.map(function (value) { return number(value, 0); }).join(' / ')));
+        statementBox.appendChild(line);
+      });
+      result.appendChild(statementBox);
+    }
 
     if (report.kap) {
       var kapLinks = el('p', 'finansal-kaynaklar');
@@ -430,21 +554,18 @@
 
       status.textContent = 'Yahoo Finance ve KAP üzerindeki ücretsiz şirket bilgileri araştırılıyor…';
       var tasks = await Promise.allSettled([
-        window.BistArastirma && typeof window.BistArastirma.finansalGetir === 'function'
-          ? window.BistArastirma.finansalGetir(code + '.IS') : Promise.reject(new Error('Temel veri modülü bulunamadı')),
         window.BistArastirma && typeof window.BistArastirma.haberGetir === 'function'
           ? window.BistArastirma.haberGetir(code + '.IS') : Promise.resolve([]),
         kapArastir(code)
       ]);
-      var fundamentals = tasks[0].status === 'fulfilled' ? tasks[0].value : null;
-      var news = tasks[1].status === 'fulfilled' ? tasks[1].value : [];
-      var kap = tasks[2].status === 'fulfilled' ? tasks[2].value : null;
+      var news = tasks[0].status === 'fulfilled' ? tasks[0].value : [];
+      var kap = tasks[1].status === 'fulfilled' ? tasks[1].value : null;
+      var fundamentals = kap && kap.statement ? kap.statement.fundamentals : null;
       var errors = [];
       tasks.forEach(function (task, i) {
-        if (task.status === 'rejected') errors.push(['Temel oranlar', 'Haberler', 'KAP bildirimleri'][i] + ': ' + (task.reason && task.reason.message ? task.reason.message : String(task.reason)));
+        if (task.status === 'rejected') errors.push(['Haberler', 'KAP bildirimleri'][i] + ': ' + (task.reason && task.reason.message ? task.reason.message : String(task.reason)));
       });
-
-      if (fundamentals && fundamentals.currentPrice != null) metrics.price = fundamentals.currentPrice;
+      if (kap && kap.statementError) errors.push('KAP finansal tablo: ' + kap.statementError);
       var assessment = buildAssessment(metrics, agents, fundamentals);
       var report = {
         symbol: code,
