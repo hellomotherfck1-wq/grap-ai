@@ -165,6 +165,32 @@ try {
     }
   });
   check('OCR motoru CDN yüklemesi', ocrEngine.loaded, JSON.stringify(ocrEngine));
+  if (ocrEngine.loaded) {
+    const ocrRecognition = await page.evaluate(async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 520;
+      canvas.height = 180;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#000000';
+      context.font = 'bold 88px Arial';
+      context.fillText('123.45', 28, 125);
+      let worker;
+      try {
+        worker = await window.Tesseract.createWorker('eng');
+        await worker.setParameters({ tessedit_char_whitelist: '0123456789.', tessedit_pageseg_mode: '7' });
+        const result = await worker.recognize(canvas);
+        const text = String(result && result.data && result.data.text || '').replace(/\\s/g, '');
+        return { ok: /123[.,]45/.test(text), text };
+      } catch (error) {
+        return { ok: false, error: error && error.message ? error.message : String(error) };
+      } finally {
+        if (worker) await worker.terminate().catch(() => {});
+      }
+    });
+    check('OCR sayısal metin tanıma', ocrRecognition.ok, JSON.stringify(ocrRecognition));
+  }
 
   // Exercise the full 100-symbol scan, not only the single-stock research path.
   await page.locator('nav button[data-git="strateji"]').click();
