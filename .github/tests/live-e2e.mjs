@@ -246,6 +246,14 @@ try {
       });
       return;
     }
+    if (requested.includes('/v1/finance/search?q=FLAT.IS')) {
+      await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify({ news: [] }) });
+      return;
+    }
+    if (requested.includes('/tr/api/member/filter/FLAT')) {
+      await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify({}) });
+      return;
+    }
     if (requested.includes('/tr/api/member/filter/THYAO')) {
       await route.fulfill({
         status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json',
