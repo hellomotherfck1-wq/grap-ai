@@ -163,7 +163,7 @@ try {
   })();
 
   await page.route('https://query1.finance.yahoo.com/v8/finance/chart/THYAO.IS**', async route => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(chartPayload) });
+    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(chartPayload) });
   });
 
   await page.route('https://grafik-vekil.hellomotherfck1.workers.dev/**', async route => {
@@ -190,33 +190,33 @@ try {
           error: null
         }
       };
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(quoteSummary) });
+      await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(quoteSummary) });
       return;
     }
     if (requested.includes('/v1/finance/search?q=THYAO.IS')) {
       await route.fulfill({
-        status: 200, contentType: 'application/json',
+        status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json',
         body: JSON.stringify({ news: [{ title: 'THYAO ücretsiz test haber başlığı', publisher: 'Test kaynağı', link: 'https://example.com/thy', providerPublishTime: Math.floor(Date.now() / 1000) }] })
       });
       return;
     }
     if (requested.includes('/tr/api/member/filter/THYAO')) {
       await route.fulfill({
-        status: 200, contentType: 'application/json',
+        status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json',
         body: JSON.stringify({ mkkMemberOid: 'TEST-MKK-OID', title: 'Türk Hava Yolları', permaLink: 'test-thy' })
       });
       return;
     }
     if (requested.includes('/tr/api/company-detail/disclosures/FR/TEST-MKK-OID')) {
       await route.fulfill({
-        status: 200, contentType: 'application/json',
+        status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json',
         body: JSON.stringify([{ disclosureBasic: { title: '2026 ikinci çeyrek finansal raporu', disclosureIndex: 123456, publishDate: '09.11.2026', year: '2026', period: '6 Aylık' } }])
       });
       return;
     }
     if (requested.includes('/tr/api/company-detail/disclosures/ODA/TEST-MKK-OID')) {
       await route.fulfill({
-        status: 200, contentType: 'application/json',
+        status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json',
         body: JSON.stringify([{ disclosureBasic: { title: 'Özel durum açıklaması', disclosureIndex: 123457, publishDate: '09.11.2026' } }])
       });
       return;
@@ -234,10 +234,10 @@ try {
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Uzun Vadeli Borçlanmalar</span></td><td class="taxonomy-context-value">500.000,00</td></tr>
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">İşletme Faaliyetlerinden Nakit Akışları</span></td><td class="taxonomy-context-value">200.000,00</td></tr>
       </table></body></html>`;
-      await route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html });
+      await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'text/html; charset=utf-8', body: html });
       return;
     }
-    await route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Unexpected test URL', requested }) });
+    await route.fulfill({ status: 502, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify({ error: 'Unexpected test URL', requested }) });
   });
 
   await page.locator('#finansal-sembol').selectOption('THYAO');
