@@ -1,117 +1,141 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f1419">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon.svg">
-<link rel="stylesheet" href="css/stil.css">
-<title>Graph AI</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1118">
+  <meta name="description" content="Graph AI ile hisse, kripto ve piyasa grafiklerini teknik olarak inceleyin.">
+  <meta name="color-scheme" content="dark">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/stil.css">
+  <title>Graph AI — Piyasa Analizi</title>
 </head>
 <body>
+  <main>
+    <section id="yukle" class="ekran aktif">
+      <header class="baslik-satiri">
+        <div class="logo" aria-hidden="true">📈</div>
+        <div>
+          <h1>Graph AI</h1>
+          <p class="alt">Piyasayı incele, grafiği analiz et.</p>
+        </div>
+      </header>
 
-<main>
-  <section id="yukle" class="ekran aktif">
-    <h1>Graph AI</h1>
-    <p class="alt">Varlık adını yaz, grafiği bulup analiz edeyim.</p>
-    <input id="ara-ad" placeholder="Örn: Pegasus, Bitcoin, Altın, Dolar" autocomplete="off" style="width:100%;padding:14px;margin:10px 0 8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:17px">
-    <select id="ara-zd" style="width:100%;padding:14px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:17px">
-      <option value="15m">15 dakikalık</option>
-      <option value="1h" selected>1 saatlik</option>
-      <option value="1d">Günlük</option>
-    </select>
-    <button id="ara-btn" class="buton">GRAFİĞİ BUL VE ANALİZ ET</button>
-    <p id="ara-durum" class="alt"></p>
+      <div class="kart">
+        <label for="ara-ad">Varlık adı veya sembolü</label>
+        <input id="ara-ad" class="form-alani" list="oneri" placeholder="Bitcoin, Pegasus, Altın, PGSUS.IS…" autocomplete="off">
+        <label for="ara-zd">Zaman dilimi</label>
+        <select id="ara-zd" class="form-alani">
+          <option value="15m">15 dakikalık</option>
+          <option value="1h" selected>1 saatlik</option>
+          <option value="1d">Günlük</option>
+        </select>
+        <button type="button" id="ara-btn" class="buton">GRAFİĞİ BUL VE ANALİZ ET</button>
+        <p id="ara-durum" class="durum" role="status" aria-live="polite"></p>
+      </div>
 
-    <details class="kart" style="margin-top:16px">
-      <summary style="font-size:15px">Ekran görüntüsü ile analiz (internetsiz)</summary>
-      <label class="buton" for="dosya" style="display:block;text-align:center">GRAFİK YÜKLE</label>
-      <input type="file" id="dosya" accept="image/*" hidden>
-      <img id="onizleme" alt="" hidden>
-      <p id="dosya-bilgi" class="alt"></p>
-    </details>
-  </section>
+      <details class="kart">
+        <summary>Grafik görüntüsü yükleyerek analiz et</summary>
+        <p class="alt">Bir ekran görüntüsü seç. Mumlar cihazında okunur; fiyat ekseni OCR ile okunamazsa en yüksek ve en düşük fiyatı elle girebilirsin.</p>
+        <label class="buton ikincil-buton dosya-buton" for="dosya">GRAFİK GÖRÜNTÜSÜ SEÇ</label>
+        <input type="file" id="dosya" accept="image/*" hidden>
+        <img id="onizleme" alt="Yüklenen grafik önizlemesi" hidden>
+        <p id="dosya-bilgi" class="alt" role="status" aria-live="polite"></p>
+      </details>
+    </section>
 
-  <section id="analiz" class="ekran">
-    <h2>Analiz Et</h2>
-    <p id="analiz-durum" class="kart">Önce bir varlık ara ya da grafik yükle.</p>
-    <p class="alt">Ekran görüntüsü modu için isteğe bağlı: en yüksek ve en düşük mum ucunun fiyatını yaz. Boş bırakırsan eksenden otomatik okunur.</p>
-    <input id="fiyat-ust" inputmode="decimal" placeholder="En yüksek fiyat" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">
-    <input id="fiyat-alt" inputmode="decimal" placeholder="En düşük fiyat" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">
-    <button id="analiz-btn" class="buton" disabled>Yüklenen Görüntüyü Analiz Et</button>
-    <div id="analiz-rapor" class="kart" style="white-space:pre-line" hidden></div>
-    <div id="tuval-alan"></div>
-  </section>
+    <section id="analiz" class="ekran">
+      <h2>Teknik analiz</h2>
+      <p id="analiz-durum" class="durum kart" role="status" aria-live="polite">Önce bir varlık ara ya da grafik görüntüsü yükle.</p>
 
-  <section id="sonuc" class="ekran">
-    <h2>Analiz Sonuçları</h2>
-    <p class="kart">Henüz sonuç yok.</p>
-  </section>
+      <div class="kart">
+        <h3>Görüntü fiyat kalibrasyonu</h3>
+        <p class="alt">Yalnızca ekran görüntüsü analizinde gereklidir. En yüksek ve en düşük fiyatı birlikte gir; boş bırakırsan eksen otomatik okunmaya çalışılır.</p>
+        <div class="form-grid">
+          <input id="fiyat-ust" class="form-alani" inputmode="decimal" placeholder="En yüksek fiyat">
+          <input id="fiyat-alt" class="form-alani" inputmode="decimal" placeholder="En düşük fiyat">
+        </div>
+        <button type="button" id="analiz-btn" class="buton" disabled>YÜKLENEN GÖRÜNTÜYÜ ANALİZ ET</button>
+      </div>
 
-  <section id="gecmis" class="ekran">
-    <h2>Geçmiş Analizler</h2>
-    <p class="kart">Kayıtlı analiz yok.</p>
-  </section>
+      <details id="rapor-kutusu" class="kart" hidden>
+        <summary>Detaylı metin raporunu göster</summary>
+        <pre id="analiz-rapor" class="rapor"></pre>
+      </details>
+      <div id="tuval-alan"></div>
+    </section>
 
-  <section id="strateji" class="ekran">
-    <h2>Strateji Kütüphanesi</h2>
-    <p class="kart">Kütüphane sonraki aşamalarda eklenecek.</p>
-  </section>
+    <section id="sonuc" class="ekran">
+      <h2>Analiz sonuçları</h2>
+      <div id="sonuc-alan">
+        <div class="kart"><p>Henüz analiz yapılmadı. Bir varlık arayarak başlayabilirsin.</p></div>
+      </div>
+    </section>
 
- <section id="ayarlar" class="ekran">
-  <h2>Admin Paneli</h2>
+    <section id="gecmis" class="ekran">
+      <h2>Coin Tahmin AI</h2>
+      <p class="kart">Coin tarama modülü yükleniyor…</p>
+    </section>
 
-  <!-- Giriş formu -->
-  <div id="admin-giris" class="kart">
-    <p class="alt" style="margin-bottom:12px">Sadece yetkili kişiler girebilir.</p>
-    <input id="admin-email" type="email" placeholder="E-posta" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">
-    <input id="admin-sifre" type="password" placeholder="Şifre" style="width:100%;padding:12px;margin-bottom:12px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">
-    <button id="admin-giris-btn" class="buton">Giriş Yap</button>
-    <p id="admin-hata" class="alt" style="color:#f85149;margin-top:8px"></p>
-  </div>
+    <section id="strateji" class="ekran">
+      <h2>BIST Tahmin AI</h2>
+      <p class="kart">BIST tarama modülü yükleniyor…</p>
+    </section>
 
-  <!-- İstatistikler (giriş sonrası görünür) -->
-  <div id="admin-panel" hidden>
-    <div class="kart">
-      <h3 style="margin-bottom:12px">Günlük Özet</h3>
-      <div id="istatistikler" style="font-size:15px;line-height:1.7"></div>
-    </div>
+    <section id="ayarlar" class="ekran">
+      <h2>Admin paneli</h2>
+      <div id="admin-giris" class="kart">
+        <p class="alt">Yalnızca yönetici yetkisi tanımlanmış Supabase hesabı giriş yapabilir.</p>
+        <label for="admin-email">E-posta</label>
+        <input id="admin-email" class="form-alani" type="email" autocomplete="username" placeholder="E-posta adresi">
+        <label for="admin-sifre">Şifre</label>
+        <input id="admin-sifre" class="form-alani" type="password" autocomplete="current-password" placeholder="Şifre">
+        <button type="button" id="admin-giris-btn" class="buton">GİRİŞ YAP</button>
+        <p id="admin-hata" class="durum" role="status" aria-live="polite"></p>
+      </div>
 
-    <div class="kart">
-      <h3 style="margin-bottom:12px">Son Analizler</h3>
-      <div id="son-analizler" style="font-size:14px;line-height:1.6;max-height:320px;overflow-y:auto"></div>
-    </div>
+      <div id="admin-panel" hidden>
+        <div class="kart">
+          <h3>Günlük özet</h3>
+          <div id="istatistikler" class="istatistikler"></div>
+        </div>
+        <div class="kart">
+          <h3>Son analizler</h3>
+          <div id="son-analizler" class="son-analizler"></div>
+        </div>
+        <button type="button" id="admin-cikis-btn" class="buton tehlike-buton">ÇIKIŞ YAP</button>
+      </div>
+      <p class="alt">Admin istatistikleri Supabase bağlantısı ve veritabanı izinleri gerektirir.</p>
+    </section>
+  </main>
 
-    <button id="admin-cikis-btn" class="buton" style="background:#da3633">Çıkış Yap</button>
-  </div>
-</section>
+  <nav aria-label="Ana menü">
+    <button type="button" data-git="yukle" class="aktif"><span>🔎</span><small>Ara</small></button>
+    <button type="button" data-git="analiz"><span>📊</span><small>Analiz</small></button>
+    <button type="button" data-git="sonuc"><span>🧾</span><small>Sonuç</small></button>
+    <button type="button" data-git="gecmis"><span>🪙</span><small>Coin</small></button>
+    <button type="button" data-git="strateji"><span>🎯</span><small>BIST</small></button>
+    <button type="button" data-git="ayarlar"><span>🔐</span><small>Admin</small></button>
+  </nav>
 
-<nav>
-  <button data-git="yukle" class="aktif"><span>📤</span>Ara</button>
-  <button data-git="analiz"><span>🔍</span>Analiz</button>
-  <button data-git="sonuc"><span>📊</span>Sonuç</button>
-  <button data-git="gecmis"><span>🕘</span>gecmis</button>
-  <button data-git="strateji"><span>📚</span>Strateji</button>
-  <button data-git="ayarlar"><span>🔐</span>Ayarlar</button>
-</nav>
-
-<script src="js/goruntu.js"></script>
-<script src="js/formasyon.js"></script>
-<script src="js/analiz.js"></script>
-<script src="js/yorum.js"></script>
-<script src="js/formasyon2.js"></script>
-<script src="js/tani.js"></script>
-<script src="js/cizim.js"></script>
-<script src="js/ocr.js"></script>
-<script src="js/veri.js"></script>
-<script src="js/liste.js"></script>
-<script src="js/bist100.js"></script>
-<script src="js/yahoo3.js"></script>
-<script src="js/ajan.js"></script>
-<script src="js/ajan2.js"></script>
-<script src="js/arayuz.js"></script>
-<script src="js/tahmin.js"></script>
-<script src="js/coin-tahmin.js"></script>
+  <script src="js/goruntu.js"></script>
+  <script src="js/formasyon.js"></script>
+  <script src="js/analiz.js"></script>
+  <script src="js/yorum.js"></script>
+  <script src="js/formasyon2.js"></script>
+  <script src="js/tani.js"></script>
+  <script src="js/cizim.js"></script>
+  <script src="js/ocr.js"></script>
+  <script src="js/veri.js"></script>
+  <script src="js/liste.js"></script>
+  <script src="js/bist100.js"></script>
+  <script src="js/ajan.js"></script>
+  <script src="js/ajan2.js"></script>
+  <script src="js/arayuz.js"></script>
+  <script src="js/tahmin.js"></script>
+  <script src="js/coin-tahmin.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/admin.js"></script>
 </body>
 </html>
