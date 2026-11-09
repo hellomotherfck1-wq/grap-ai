@@ -340,14 +340,15 @@ try {
   await page.unroute('https://query1.finance.yahoo.com/v8/finance/chart/THYAO.IS**');
 
   await page.setViewportSize({ width: 390, height: 844 });
-  const mobileLayout = await page.evaluate(() => ({
-    viewport: document.documentElement.clientWidth,
-    page: document.documentElement.scrollWidth,
-    navVisible: Array.from(document.querySelectorAll('nav button')).every(button => {
-      const rect = button.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    })
-  }));
+  const mobileLayout = await page.evaluate(() => {
+    const viewport = document.documentElement.clientWidth;
+    const offenders = Array.from(document.querySelectorAll('body *')).map(element => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return { tag: element.tagName, id: element.id, className: typeof element.className === 'string' ? element.className : '', left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width), scrollWidth: element.scrollWidth, overflowX: style.overflowX, display: style.display };
+    }).filter(item => item.display !== 'none' && item.width > 0 && (item.right > viewport + 2 || item.left < -2)).sort((a, b) => b.right - a.right).slice(0, 20);
+    return { viewport, page: document.documentElement.scrollWidth, navVisible: Array.from(document.querySelectorAll('nav button')).every(button => { const rect = button.getBoundingClientRect(); return rect.width > 0 && rect.height > 0; }), offenders };
+  });
   check('Mobil ekran taşma ve menü kontrolü', mobileLayout.page <= mobileLayout.viewport + 1 && mobileLayout.navVisible, JSON.stringify(mobileLayout));
 
   check('Tarayıcı JavaScript hatası yok', report.pageErrors.length === 0, report.pageErrors.join(' | ') || 'Hata yakalanmadı');
