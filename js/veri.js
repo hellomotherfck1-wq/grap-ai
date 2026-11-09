@@ -97,7 +97,7 @@ const Veri = {
       try {
         const j = await this.getir(h + '/api/v3/klines?symbol=' + sembol + '&interval=' + zd + '&limit=120');
         if (!Array.isArray(j) || j.length < 20) throw new Error('Yeterli veri yok');
-        return j.map(a => ({ t: a[0], o: +a[1], h: +a[2], l: +a[3], c: +a[4] }));
+        return j.map(a => ({ t: a[0], o: +a[1], h: +a[2], l: +a[3], c: +a[4], v: a[5] != null ? Number(a[5]) : null }));
       } catch (e) { son = e; }
     }
     throw son;
@@ -121,7 +121,7 @@ const Veri = {
         const out = [];
         r.timestamp.forEach((t, i) => {
           if (q.open[i] != null && q.high[i] != null && q.low[i] != null && q.close[i] != null)
-            out.push({ t: t * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] });
+            out.push({ t: t * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i], v: q.volume && q.volume[i] != null ? Number(q.volume[i]) : null });
         });
         if (out.length < 20) throw new Error('Yeterli veri yok');
         return out;
