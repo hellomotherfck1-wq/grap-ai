@@ -1,33 +1,74 @@
-const SURUM = 'graph-ai-v8';
+const SURUM = 'graph-ai-v9';
 const DOSYALAR = [
-  './', 'index.html', 'css/stil.css',
-  'js/arayuz.js', 'js/goruntu.js', 'js/formasyon.js',
-  'js/analiz.js', 'js/yorum.js', 'js/cizim.js', 'js/ocr.js', 'js/veri.js', 'js/liste.js',
-  'manifest.json', 'icons/icon.svg'
+  './',
+  './index.html',
+  './css/stil.css',
+  './manifest.json',
+  './icons/icon.svg',
+  './js/goruntu.js',
+  './js/formasyon.js',
+  './js/analiz.js',
+  './js/yorum.js',
+  './js/formasyon2.js',
+  './js/tani.js',
+  './js/cizim.js',
+  './js/ocr.js',
+  './js/veri.js',
+  './js/liste.js',
+  './js/bist100.js',
+  './js/ajan.js',
+  './js/ajan2.js',
+  './js/arayuz.js',
+  './js/tahmin.js',
+  './js/coin-tahmin.js',
+  './js/admin.js'
 ];
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(SURUM).then(c =>
-    Promise.allSettled(DOSYALAR.map(d => c.add(d)))
-  ));
-  self.skipWaiting();
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(SURUM)
+      .then(cache => Promise.allSettled(DOSYALAR.map(async dosya => {
+        const response = await fetch(dosya, { cache: 'reload' });
+        if (response.ok) await cache.put(dosya, response);
+      })))
+      .then(() => self.skipWaiting())
+  );
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(k => Promise.all(k.filter(x => x !== SURUM).map(x => caches.delete(x))))
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== SURUM).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  if (new URL(e.request.url).origin !== location.origin) return;
-  e.respondWith(
-    fetch(e.request).then(r => {
-      const kopya = r.clone();
-      caches.open(SURUM).then(c => c.put(e.request, kopya));
-      return r;
-    }).catch(() => caches.match(e.request))
-  );
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(request);
+      if (response && response.ok) {
+        const cache = await caches.open(SURUM);
+        await cache.put(request, response.clone());
+      }
+      return response;
+    } catch (error) {
+      const cached = await caches.match(request, { ignoreSearch: true });
+      if (cached) return cached;
+      if (request.mode === 'navigate') {
+        const home = await caches.match('./index.html');
+        if (home) return home;
+      }
+      return new Response('Çevrimdışı: Bu dosya henüz önbelleğe alınmadı.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
+    }
+  })());
 });
