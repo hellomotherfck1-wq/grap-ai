@@ -92,6 +92,48 @@ try {
     check('Grafik sonrası araştırma özeti', chartAreaText.includes('Araştırma Ajanı') || chartAreaText.includes('Araştırma ajanı şu anda veri alamadı'), chartAreaText.slice(-600));
   }
 
+  // Test local image upload, candle detection and chart rendering without OCR.
+  const chartImage = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 900;
+    canvas.height = 520;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#101820';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < 32; i++) {
+      const x = 35 + i * 25;
+      const center = 250 + Math.sin(i / 3) * 70 - i * 1.2;
+      const open = center + (i % 2 ? 14 : -14);
+      const close = center + (i % 2 ? -14 : 14);
+      const color = i % 2 ? '#20c997' : '#ef5350';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x + 6, center - 34);
+      ctx.lineTo(x + 6, center + 34);
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.fillRect(x, Math.min(open, close), 12, Math.max(10, Math.abs(close - open)));
+    }
+    return canvas.toDataURL('image/png');
+  });
+  await page.locator('#dosya').setInputFiles({
+    name: 'test-grafik.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(chartImage.split(',')[1], 'base64')
+  });
+  await page.locator('#fiyat-ust').fill('200');
+  await page.locator('#fiyat-alt').fill('100');
+  await page.locator('#analiz-btn').click();
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#analiz-durum')?.textContent || '';
+    return status.includes('Analiz tamamlandı') || status.startsWith('Hata:') || status.includes('yeterli veri okunamadı');
+  }, null, { timeout: 30000 });
+  const imageStatus = await page.locator('#analiz-durum').innerText();
+  const imageCanvasCount = await page.locator('#tuval-alan canvas').count();
+  check('Grafik görüntüsü yükleme ve mum tanıma', imageStatus.includes('Analiz tamamlandı'), imageStatus);
+  check('Görüntü analiz grafiği çizimi', imageCanvasCount > 0, imageCanvasCount + ' canvas');
+
   // Exercise the full 100-symbol scan, not only the single-stock research path.
   await page.locator('nav button[data-git="strateji"]').click();
   await page.locator('#tahmin-zd').selectOption('1d');
@@ -244,6 +286,40 @@ try {
     await route.fulfill({ status: 502, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify({ error: 'Unexpected test URL', requested }) });
   });
 
+  const binanceRows = chartPayload.chart.result[0].timestamp.map((timestamp, i) => {
+    const quote = chartPayload.chart.result[0].indicators.quote[0];
+    return [timestamp * 1000, quote.open[i], quote.high[i], quote.low[i], quote.close[i], quote.volume[i]];
+  });
+  await page.route('https://data-api.binance.vision/**', async route => {
+    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(binanceRows) });
+  });
+  await page.route('https://api.binance.com/**', async route => {
+    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(binanceRows) });
+  });
+
+  const yahooVolume = await page.evaluate(async () => {
+    const rows = await Veri.yahoo('THYAO.IS', '1d');
+    return { count: rows.length, lastVolume: rows[rows.length - 1].v };
+  });
+  check('Yahoo mumlarında hacim alanı', yahooVolume.count >= 20 && yahooVolume.lastVolume > 0, JSON.stringify(yahooVolume));
+  const binanceVolume = await page.evaluate(async () => {
+    const rows = await Veri.binance('BTCUSDT', '1d');
+    return { count: rows.length, lastVolume: rows[rows.length - 1].v };
+  });
+  check('Binance mumlarında hacim alanı', binanceVolume.count >= 20 && binanceVolume.lastVolume > 0, JSON.stringify(binanceVolume));
+
+  const bistVolumeAgent = await page.evaluate(async () => {
+    const result = await TahminAI.taraBir({ q: 'THYAO', ad: 'Türk Hava Yolları' }, '1d');
+    return { symbol: result.sembol, lastVolume: result.sonHacim, averageVolume: result.ortHacim20, ratio: result.hacimOrani };
+  });
+  check('BIST hacim ajanına veri aktarımı', bistVolumeAgent.lastVolume > 0 && bistVolumeAgent.averageVolume > 0 && bistVolumeAgent.ratio > 0, JSON.stringify(bistVolumeAgent));
+
+  const coinVolumeAgent = await page.evaluate(async () => {
+    const result = await CoinTahminAI.taraBir({ q: 'BTC', ad: 'Bitcoin' }, '1d');
+    return { symbol: result.sembol, price: result.fiyat, volumeScore: result.hacimSkor };
+  });
+  check('Coin hacim ajanına veri aktarımı', coinVolumeAgent.price > 0 && typeof coinVolumeAgent.volumeScore === 'number', JSON.stringify(coinVolumeAgent));
+
   await page.locator('#finansal-sembol').selectOption('THYAO');
   await page.locator('#finansal-panel button').click();
   await page.waitForFunction(() => {
@@ -262,6 +338,17 @@ try {
   check('Ücretli API anahtarı alanı kaldırıldı', apiKeyFields === 0, apiKeyFields + ' parola alanı');
   await page.unroute('https://grafik-vekil.hellomotherfck1.workers.dev/**');
   await page.unroute('https://query1.finance.yahoo.com/v8/finance/chart/THYAO.IS**');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileLayout = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    page: document.documentElement.scrollWidth,
+    navVisible: Array.from(document.querySelectorAll('nav button')).every(button => {
+      const rect = button.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    })
+  }));
+  check('Mobil ekran taşma ve menü kontrolü', mobileLayout.page <= mobileLayout.viewport + 1 && mobileLayout.navVisible, JSON.stringify(mobileLayout));
 
   check('Tarayıcı JavaScript hatası yok', report.pageErrors.length === 0, report.pageErrors.join(' | ') || 'Hata yakalanmadı');
   report.finalURL = page.url();
