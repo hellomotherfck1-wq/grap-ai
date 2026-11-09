@@ -199,6 +199,17 @@ el('ara-btn').addEventListener('click', async () => {
       kartYap('Grafik bilgisi', Veri.bilgi(v, dn.d), '#3988f7')
     ]);
 
+    if (window.BistArastirma && typeof window.BistArastirma.grafikOzet === 'function' &&
+        String(v.sembol || '').toUpperCase().endsWith('.IS')) {
+      const arastirmaKutusu = document.createElement('div');
+      arastirmaKutusu.className = 'kart';
+      arastirmaKutusu.textContent = '🔎 Araştırma ajanı finansal göstergeleri ve güncel haber başlıklarını tarıyor…';
+      el('tuval-alan').appendChild(arastirmaKutusu);
+      window.BistArastirma.grafikOzet(v, dn, sonuc, arastirmaKutusu).catch(function (e) {
+        arastirmaKutusu.textContent = 'Araştırma ajanı şu anda veri alamadı: ' + (e && e.message ? e.message : String(e));
+      });
+    }
+
     el('analiz-durum').textContent = 'Analiz tamamlandı: ' + v.ad + ' (' + v.sembol + ').';
     analizKaydet({
       ad: v.ad,
@@ -334,4 +345,14 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js', { scope: './' })
     .catch(e => console.warn('Service Worker kaydedilemedi:', e));
 }
+GrafikAI.araVarlik = function (sembol, zd) {
+  const alan = el('ara-ad');
+  const zaman = el('ara-zd');
+  const arama = el('ara-btn');
+  if (!alan || !zaman || !arama) return;
+  alan.value = String(sembol || '').replace(/\.IS$/i, '');
+  zaman.value = zd || '1d';
+  ekranGoster('yukle');
+  arama.click();
+};
 window.GrafikAI = GrafikAI;
