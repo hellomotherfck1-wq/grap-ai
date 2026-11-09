@@ -112,6 +112,7 @@ try {
   check('Tarama tablosu satırları', successCount > 0 && scanRows === successCount, scanRows + ' sonuç satırı');
 
   if (scanRows > 0) {
+    await page.locator('#tahmin-alan details').first().evaluate(element => { element.open = true; });
     const previousAnalysis = await page.evaluate(() => window.GrafikAI?.sonAnaliz?.tarih || '');
     await page.locator('#tahmin-alan .bist-mini-btn').first().click();
     await page.waitForFunction(previous => {
