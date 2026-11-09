@@ -16,6 +16,15 @@ alter table public.events enable row level security;
 grant insert on public.events to anon, authenticated;
 grant select on public.events to authenticated;
 
+-- Identity/serial sütununun varsayılan değer üretebilmesi için.
+do $$
+begin
+  if to_regclass('public.events_id_seq') is not null then
+    execute 'grant usage, select on sequence public.events_id_seq to anon, authenticated';
+  end if;
+end
+$$;
+
 drop policy if exists "Graph AI public event insert" on public.events;
 create policy "Graph AI public event insert"
 on public.events
