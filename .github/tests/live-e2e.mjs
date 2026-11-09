@@ -123,53 +123,119 @@ try {
     check('Tarama tablosundan hisse grafiği açma', scanChartCount > 0, scanChartCount + ' canvas');
   }
 
-  // Verify the new standalone financial panel and its API contract using deterministic mock responses.
+  // Verify the free research panel without any API key or paid provider.
   await page.locator('nav button[data-git="strateji"]').click();
   await page.locator('#finansal-panel').waitFor({ state: 'visible' });
   const financialOptions = await page.locator('#finansal-sembol option').count();
-  check('Bağımsız finansal analiz paneli', financialOptions === 100, financialOptions + ' hisse seçeneği');
+  check('Ücretsiz finansal araştırma paneli', financialOptions === 100, financialOptions + ' hisse seçeneği');
 
-  await page.locator('#finansal-panel button').click();
-  await page.waitForFunction(() => (document.querySelector('#finansal-durum')?.textContent || '').includes('Geçerli bir istfin API anahtarı gir'));
-  check('API anahtarı doğrulaması', true, 'Anahtar olmadan istek gönderilmiyor');
+  const chartPayload = (() => {
+    const now = Math.floor(Date.now() / 1000);
+    const rows = Array.from({ length: 220 }, (_, i) => {
+      const close = 250 + i * 0.35 + Math.sin(i / 5) * 3;
+      return {
+        timestamp: now - (220 - i) * 86400,
+        open: close - 0.8,
+        high: close + 2.1,
+        low: close - 2.4,
+        close,
+        volume: 1000000 + (i % 17) * 35000
+      };
+    });
+    return {
+      chart: {
+        result: [{
+          meta: { symbol: 'THYAO.IS', currency: 'TRY' },
+          timestamp: rows.map(x => x.timestamp),
+          indicators: {
+            quote: [{
+              open: rows.map(x => x.open),
+              high: rows.map(x => x.high),
+              low: rows.map(x => x.low),
+              close: rows.map(x => x.close),
+              volume: rows.map(x => x.volume)
+            }]
+          }
+        }],
+        error: null
+      }
+    };
+  })();
 
-  await page.route('https://api.istfin.com/v1/**', async route => {
-    const url = new URL(route.request().url());
-    const statement = url.pathname.split('/').pop();
-    let data;
-    if (url.pathname.endsWith('/fundamentals/THYAO')) {
-      data = {
-        symbol: 'THYAO',
-        asOfQuarter: '2026Q2',
-        updatedAt: '2026-10-05T21:30:00.000Z',
-        valuation: { marketCap: 431250000000, peRatio: 4.8, pbRatio: 0.9, evToEbitda: 3.7 },
-        income: { revenue: 645000000000, profit: 89000000000, ebitda: 165000000000 },
-        ratios: { currentRatio: 1.1, roe: 19.2, profitMargin: 13.8, netDebtToEbitda: 1.1 },
-        growth: { revenueYoY: 21.4, profitYoY: -8.2 },
-        balanceSheet: { totalAssets: 1060000000000, totalEquity: 470000000000, totalDebt: 320000000000, cashAndEquivalents: 140000000000 },
-        cashFlow: { operating: 150000000000, investing: -95000000000, financing: -30000000000, free: 55000000000 }
+  await page.route('https://query1.finance.yahoo.com/v8/finance/chart/THYAO.IS**', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(chartPayload) });
+  });
+
+  await page.route('https://grafik-vekil.hellomotherfck1.workers.dev/**', async route => {
+    const requested = new URL(route.request().url()).searchParams.get('u') || '';
+    if (requested.includes('/v10/finance/quoteSummary/THYAO.IS')) {
+      const quoteSummary = {
+        quoteSummary: {
+          result: [{
+            price: { currency: 'TRY', regularMarketPrice: { raw: 326.5 }, marketCap: { raw: 450000000000 } },
+            summaryDetail: { trailingPE: { raw: 5.2 }, forwardPE: { raw: 4.7 }, dividendYield: { raw: 0.018 } },
+            defaultKeyStatistics: { priceToBook: { raw: 0.95 }, trailingEps: { raw: 62.8 } },
+            financialData: {
+              currentPrice: { raw: 326.5 }, returnOnEquity: { raw: 0.18 },
+              returnOnAssets: { raw: 0.07 }, profitMargins: { raw: 0.12 },
+              revenueGrowth: { raw: 0.16 }, earningsGrowth: { raw: 0.11 },
+              debtToEquity: { raw: 95 }, currentRatio: { raw: 1.3 },
+              targetMeanPrice: { raw: 370 }, targetHighPrice: { raw: 410 },
+              targetLowPrice: { raw: 330 }, numberOfAnalystOpinions: { raw: 8 },
+              freeCashflow: { raw: 42000000000 }, totalDebt: { raw: 130000000000 },
+              totalCash: { raw: 85000000000 }
+            },
+            assetProfile: { sector: 'Industrials', industry: 'Airlines' }
+          }],
+          error: null
+        }
       };
-    } else {
-      data = {
-        symbol: 'THYAO',
-        statement,
-        periods: ['2026-06', '2026-03', '2025-12', '2025-09'],
-        items: [{ code: '3C', tr: statement === 'income' ? 'Hasılat' : 'Örnek kalem', values: { '2026-06': 180000000000, '2026-03': 142000000000, '2025-12': 171000000000, '2025-09': 152000000000 } }]
-      };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(quoteSummary) });
+      return;
     }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) });
+    if (requested.includes('/v1/finance/search?q=THYAO.IS')) {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ news: [{ title: 'THYAO ücretsiz test haber başlığı', publisher: 'Test kaynağı', link: 'https://example.com/thy', providerPublishTime: Math.floor(Date.now() / 1000) }] })
+      });
+      return;
+    }
+    if (requested.includes('/tr/api/member/filter/THYAO')) {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ mkkMemberOid: 'TEST-MKK-OID', title: 'Türk Hava Yolları', permaLink: 'test-thy' })
+      });
+      return;
+    }
+    if (requested.includes('/tr/api/company-detail/disclosures/FR/TEST-MKK-OID')) {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([{ disclosureBasic: { title: '2026 ikinci çeyrek finansal raporu', disclosureIndex: 123456, publishDate: '09.11.2026', year: '2026', period: '6 Aylık' } }])
+      });
+      return;
+    }
+    if (requested.includes('/tr/api/company-detail/disclosures/ODA/TEST-MKK-OID')) {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([{ disclosureBasic: { title: 'Özel durum açıklaması', disclosureIndex: 123457, publishDate: '09.11.2026' } }])
+      });
+      return;
+    }
+    await route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Unexpected test URL', requested }) });
   });
 
   await page.locator('#finansal-sembol').selectOption('THYAO');
-  await page.locator('#finansal-api-anahtari').fill('istfin_test_key_for_e2e');
   await page.locator('#finansal-panel button').click();
-  await page.waitForFunction(() => (document.querySelector('#finansal-durum')?.textContent || '').includes('Temel analiz tamamlandı'));
+  await page.waitForFunction(() => (document.querySelector('#finansal-durum')?.textContent || '').includes('Ücretsiz araştırma tamamlandı'));
   const financialText = await page.locator('#finansal-sonuc').innerText();
-  check('Finansal API yanıtı işleniyor', financialText.includes('THYAO') && financialText.includes('F/K'), financialText.slice(0, 350));
-  check('Gelir, bilanço ve nakit akış tabloları', ['Gelir tablosu', 'Bilanço', 'Nakit akış tablosu'].every(label => financialText.includes(label)), financialText.includes('Nakit akış tablosu') ? 'Üç tablo da oluşturuldu' : 'Tablo eksik');
+  check('Ücretsiz piyasa ve temel oran verileri', financialText.includes('F/K') && financialText.includes('RSI (14)') && financialText.includes('EMA 200'), financialText.slice(0, 450));
+  check('KAP bildirimleri ve haberler', financialText.includes('2026 ikinci çeyrek finansal raporu') && financialText.includes('THYAO ücretsiz test haber başlığı'), financialText.includes('Özel durum açıklaması') ? 'Finansal rapor, özel durum ve haber listelendi' : 'KAP veya haber eksik');
   const sharedSymbol = await page.evaluate(() => window.TahminAI?.temelAnaliz?.symbol || '');
-  check('Finansal rapor diğer ajanlarla paylaşıldı', sharedSymbol === 'THYAO', sharedSymbol || 'Paylaşılan rapor bulunamadı');
-  await page.unroute('https://api.istfin.com/v1/**');
+  check('Ücretsiz araştırma diğer ajanlarla paylaşıldı', sharedSymbol === 'THYAO', sharedSymbol || 'Paylaşılan rapor bulunamadı');
+  const apiKeyFields = await page.locator('#finansal-panel input[type="password"]').count();
+  check('Ücretli API anahtarı alanı kaldırıldı', apiKeyFields === 0, apiKeyFields + ' parola alanı');
+  await page.unroute('https://grafik-vekil.hellomotherfck1.workers.dev/**');
+  await page.unroute('https://query1.finance.yahoo.com/v8/finance/chart/THYAO.IS**');
 
   check('Tarayıcı JavaScript hatası yok', report.pageErrors.length === 0, report.pageErrors.join(' | ') || 'Hata yakalanmadı');
   report.finalURL = page.url();
