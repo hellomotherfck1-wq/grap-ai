@@ -1,4 +1,4 @@
-name: Live browser end-to-end test
+name: Browser end-to-end test
 
 on:
   push:
@@ -33,9 +33,23 @@ jobs:
           npm install --no-save playwright
           npx playwright install --with-deps chromium
 
-      - name: Test live Graph AI
+      - name: Start local Graph AI server
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory . > /tmp/graph-ai-http.log 2>&1 &
+          echo $! > /tmp/graph-ai-http.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              echo "Graph AI local server is ready."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/graph-ai-http.log
+          exit 1
+
+      - name: Test checked-out Graph AI in Chromium
         env:
-          BASE_URL: https://hellomotherfck1-wq.github.io/grap-ai/
+          BASE_URL: http://127.0.0.1:4173/
         run: node .github/tests/live-e2e.mjs
 
       - name: Upload browser test report
