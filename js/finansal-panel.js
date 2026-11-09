@@ -180,7 +180,7 @@
     result.appendChild(metrics);
 
     var judgement = node('div', 'finansal-yorum');
-    judgement.appendChild(node('h4', '', 'Yapay zekâ temel görünüm özeti · ' + summary.label));
+    judgement.appendChild(node('h4', '', 'Otomatik temel görünüm özeti · ' + summary.label));
     if (!summary.olumlu.length && !summary.risk.length) {
       judgement.appendChild(node('p', '', 'Yeterli temel gösterge bulunmadığı için olumlu veya olumsuz hüküm üretilmedi.'));
     }
@@ -335,7 +335,7 @@
     links.appendChild(document.createTextNode(' · '));
     links.appendChild(link('Resmî KAP bildirimleri', 'https://www.kap.org.tr/tr/bildirim-sorgu'));
     links.appendChild(document.createTextNode(' · '));
-    links.appendChild(link('Açık kaynak KAP-MCP', 'https://pypi.org/project/kap-mcp/'));
+    links.appendChild(link('Açık kaynak KAP-MCP', 'https://github.com/semudu/kap-client'));
     wrap.appendChild(links);
 
     var footer = node('p', 'alt', 'Not: istfin temel veri uçları API anahtarı ve fundamentals:read yetkisi gerektirir. Anahtarın yoksa KAP bağlantılarından şirket raporlarını inceleyebilirsin. Kısa vadeli fiyat hareketi için üstteki grafik ve teknik analiz ajanlarını kullan.');
