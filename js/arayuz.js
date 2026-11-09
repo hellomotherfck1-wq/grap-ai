@@ -62,7 +62,7 @@ function karar(y) {
 
 function goster(m, t, kal, uyarilar, ekKartlar) {
   if (!Array.isArray(m) || m.length < 5) throw new Error('Grafik oluşturmak için en az 5 mum gerekli.');
-  if (!window.Analiz || !window.Yorum || !window.Cizim) throw new Error('Analiz veya grafik modülü yüklenemedi.');
+  if (typeof Analiz === 'undefined' || typeof Yorum === 'undefined' || typeof Cizim === 'undefined') throw new Error('Analiz veya grafik modülü yüklenemedi.');
 
   const alan = el('tuval-alan');
   if (!alan) throw new Error('Grafik alanı bulunamadı.');
@@ -189,7 +189,7 @@ el('ara-btn').addEventListener('click', async () => {
   btn.disabled = true;
   dur.textContent = 'Veri kaynağına bağlanılıyor…';
   try {
-    if (!window.Veri || typeof Veri.ara !== 'function') throw new Error('Piyasa veri modülü yüklenemedi.');
+    if (typeof Veri === 'undefined' || typeof Veri.ara !== 'function') throw new Error('Piyasa veri modülü yüklenemedi.');
     const v = await Veri.ara(ad, el('ara-zd').value, x => { dur.textContent = x; });
     const dn = Veri.donustur(v, 80);
     if (!dn || !Array.isArray(dn.m) || dn.m.length < 15) throw new Error('Analiz için yeterli piyasa verisi alınamadı.');
