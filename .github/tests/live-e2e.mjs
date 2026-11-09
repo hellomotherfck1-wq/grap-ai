@@ -453,13 +453,13 @@ try {
       result: [{
         meta: { symbol: 'FLAT.IS', currency: 'TRY' },
         timestamp: flatRows.map(x => x.timestamp),
-        indicators: { quote: {
+        indicators: { quote: [{
           open: flatRows.map(x => x.open),
           high: flatRows.map(x => x.high),
           low: flatRows.map(x => x.low),
           close: flatRows.map(x => x.close),
           volume: flatRows.map(x => x.volume)
-        } }
+        }] }
       }],
       error: null
     }
