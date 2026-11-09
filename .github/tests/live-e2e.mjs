@@ -10,6 +10,7 @@ const report = {
   consoleErrors: []
 };
 let browser;
+let page;
 
 function check(name, passed, details = '') {
   report.checks.push({ name, passed: Boolean(passed), details: String(details || '') });
@@ -23,7 +24,7 @@ try {
     locale: 'tr-TR',
     timezoneId: 'Europe/Istanbul'
   });
-  const page = await context.newPage();
+  page = await context.newPage();
   page.setDefaultTimeout(25000);
 
   page.on('pageerror', error => report.pageErrors.push(error.message));
