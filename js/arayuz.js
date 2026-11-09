@@ -1,165 +1,233 @@
-const GrafikAI = { resim: null };
-
-function ekranGoster(id) {
-  document.querySelectorAll('.ekran').forEach(e => e.classList.toggle('aktif', e.id === id));
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('aktif', b.dataset.git === id));
-  window.scrollTo(0, 0);
-}
-
-document.querySelectorAll('nav button').forEach(b => {
-  b.addEventListener('click', () => ekranGoster(b.dataset.git));
-});
+var GrafikAI = { resim: null };
+var onizlemeURL = null;
 
 function kartYap(baslik, satirlar, renk) {
-  const d = document.createElement('div');
+  var d = document.createElement('div');
   d.className = 'kart';
-  if (renk) d.style.borderLeft = '4px solid ' + renk;
-  if (baslik) {
-    const h = document.createElement('h3');
-    h.textContent = baslik;
-    h.style.cssText = 'font-size:16px;margin-bottom:8px';
-    d.appendChild(h);
-  }
-  satirlar.forEach(t => {
-    const p = document.createElement('p');
-    p.textContent = t;
-    p.style.cssText = 'font-size:15px;line-height:1.5;margin-bottom:8px';
+  d.style.borderLeft = '3px solid ' + (renk || '#2f81f7');
+  var h = document.createElement('h3');
+  h.textContent = baslik;
+  d.appendChild(h);
+  (satirlar || []).forEach(function(s) {
+    var p = document.createElement('p');
+    p.textContent = s;
     d.appendChild(p);
   });
   return d;
 }
 
 function karar(y) {
-  const d = document.createElement('div');
-  d.className = 'kart';
-  d.style.borderLeft = '6px solid ' + y.renk;
-  const k = document.createElement('div');
-  k.textContent = y.karar;
-  k.style.cssText = 'font-size:40px;font-weight:800;color:' + y.renk;
-  const u = document.createElement('div');
-  u.textContent = 'Teknik uyum puanı: %' + y.uyum + ' (kazanma olasılığı değildir)';
-  u.style.cssText = 'font-size:13px;color:#8b98a5;margin:4px 0 12px';
-  d.appendChild(k); d.appendChild(u);
-  y.ozet.forEach(t => {
-    const p = document.createElement('p');
-    p.textContent = t;
-    p.style.cssText = 'font-size:15px;line-height:1.5;margin-bottom:8px';
-    d.appendChild(p);
-  });
+  var d = document.createElement('div');
+  d.className = 'karar ' + y.renk;
+  var h = document.createElement('h2');
+  h.textContent = y.baslik;
+  var p = document.createElement('p');
+  p.textContent = y.ozet;
+  var guven = document.createElement('strong');
+  guven.textContent = 'Güven: %' + y.guven;
+  d.appendChild(h);
+  d.appendChild(p);
+  d.appendChild(guven);
   return d;
 }
 
-function goster(m, t, kal, uyarilar, ekKartlar) {
-  const alan = document.getElementById('tuval-alan');
-  alan.innerHTML = '';
-  document.getElementById('analiz-rapor').hidden = true;
-  const s = Analiz.yap(m, t);
-  const y = Yorum.olustur(s, kal, uyarilar);
-  alan.appendChild(karar(y));
-  const tuval = Cizim.grafik(s, kal);
-  tuval.style.cssText = 'width:100%;border-radius:12px;margin:4px 0 12px';
-  alan.appendChild(tuval);
-  ekKartlar.forEach(k => alan.appendChild(k));
-  y.kartlar.forEach(k => alan.appendChild(kartYap(k.baslik, k.satirlar)));
+function sonucDurum(baslik, satirlar, renk) {
+  var hedef = document.getElementById('sonuc');
+  if (!hedef) return;
+  hedef.innerHTML = '';
+  var h = document.createElement('h2');
+  h.textContent = 'Analiz Sonuçları';
+  hedef.appendChild(h);
+  hedef.appendChild(kartYap(baslik, satirlar, renk));
 }
 
-/* ---------- İsimle arama ---------- */
-document.getElementById('ara-btn').addEventListener('click', async () => {
-  const ad = document.getElementById('ara-ad').value.trim();
-  const dur = document.getElementById('ara-durum');
-  const btn = document.getElementById('ara-btn');
-  if (!ad) { dur.textContent = 'Önce bir varlık adı yaz.'; return; }
+function raporYaz(hedef, s, kal, y, ekKartlar, baslik) {
+  hedef.innerHTML = '';
+  if (baslik) {
+    var h = document.createElement('h2');
+    h.textContent = baslik;
+    hedef.appendChild(h);
+  }
+
+  hedef.appendChild(karar(y));
+
+  var tuval = Cizim.grafik(s, kal);
+  tuval.style.cssText = 'width:100%;max-width:900px;height:auto;border-radius:12px;background:#0d1117;margin:12px 0';
+  hedef.appendChild(tuval);
+
+  (ekKartlar || []).forEach(function(k) {
+    if (k && k.nodeType === 1) hedef.appendChild(k.cloneNode(true));
+  });
+
+  (y.kartlar || []).forEach(function(k) {
+    hedef.appendChild(kartYap(k.baslik, k.satirlar, k.renk));
+  });
+}
+
+function goster(m, t, kal, uyarilar, ekKartlar) {
+  if (!Array.isArray(m) || m.length < 5) {
+    throw new Error('Analiz için yeterli mum verisi bulunamadı.');
+  }
+
+  var s = Analiz.yap(m, t);
+  var y = Yorum.olustur(s, kal, Array.isArray(uyarilar) ? uyarilar : []);
+  var alan = document.getElementById('tuval-alan');
+  var sonuc = document.getElementById('sonuc');
+
+  if (!alan || !sonuc) {
+    throw new Error('Analiz ekranı bileşenleri bulunamadı.');
+  }
+
+  var rapor = document.getElementById('analiz-rapor');
+  if (rapor) rapor.hidden = true;
+
+  raporYaz(alan, s, kal, y, ekKartlar || []);
+  raporYaz(sonuc, s, kal, y, ekKartlar || [], 'Analiz Sonuçları');
+}
+
+function ekranGoster(id) {
+  document.querySelectorAll('.ekran').forEach(function(e) {
+    e.classList.remove('aktif');
+  });
+  document.querySelectorAll('nav button').forEach(function(b) {
+    b.classList.remove('aktif');
+  });
+  var hedef = document.getElementById(id);
+  var dugme = document.querySelector('nav button[data-git="' + id + '"]');
+  if (hedef) hedef.classList.add('aktif');
+  if (dugme) dugme.classList.add('aktif');
+  window.scrollTo(0, 0);
+}
+
+document.querySelectorAll('nav button[data-git]').forEach(function(b) {
+  b.addEventListener('click', function() {
+    ekranGoster(b.dataset.git);
+  });
+});
+
+document.getElementById('ara-btn').addEventListener('click', async function() {
+  var ad = document.getElementById('varlik-ara').value.trim();
+  var zaman = document.getElementById('zaman').value;
+  var dur = document.getElementById('ara-durum');
+  var btn = document.getElementById('ara-btn');
+
+  if (!ad) {
+    dur.textContent = 'Lütfen bir hisse veya coin sembolü gir.';
+    return;
+  }
+
   btn.disabled = true;
+  dur.textContent = 'Veri alınıyor ve analiz hazırlanıyor...';
+  sonucDurum('Analiz hazırlanıyor', ['Piyasa verileri alınıyor.'], '#2f81f7');
+
   try {
-    const v = await Veri.ara(ad, document.getElementById('ara-zd').value, x => { dur.textContent = x; });
-    const dn = Veri.donustur(v, 80);
-    const t = Goruntu.trend(dn.m);
-    goster(dn.m, t, dn.kal, [], [kartYap('Grafik bilgisi', Veri.bilgi(v, dn.d), '#2f81f7')]);
-document.getElementById('analiz-durum').textContent = 'Analiz tamamlandı: ' + v.ad;
-// ↓↓↓ BUNU EKLE ↓↓↓
-if (window.adminAnalizKaydet) window.adminAnalizKaydet(v.ad);
-    goster(m, t, kal, uyarilar, [kartYap(null, ['Grafik, görüntüden okunan mumlardan yeniden çizilmiştir.'])]);
-// ↓↓↓ BUNU EKLE ↓↓↓
-if (window.adminAnalizKaydet) window.adminAnalizKaydet('Ekran görüntüsü');
+    var v = await Veri.ara(ad, zaman);
+    if (!v) throw new Error('Bu sembol için veri bulunamadı.');
+
+    var dn = Veri.donustur(v, 80);
+    if (!dn || !Array.isArray(dn.m) || dn.m.length < 5) {
+      throw new Error('Grafik verisi eksik veya geçersiz.');
+    }
+
+    var t = Goruntu.trend(dn.m);
+    goster(dn.m, t, dn.kal, [], [
+      kartYap('Grafik bilgisi', Veri.bilgi(v, dn.d), '#2f81f7')
+    ]);
+
+    document.getElementById('analiz-durum').textContent =
+      'Analiz tamamlandı: ' + (v.ad || ad);
+    dur.textContent = 'Analiz tamamlandı: ' + (v.ad || ad);
+    ekranGoster('analiz');
   } catch (e) {
-    dur.textContent = '⚠️ ' + e.message + ' İnternetini ve yazımı kontrol et. Kodla da deneyebilirsin (örn. PGSUS.IS veya BTCUSDT).';
+    var hata = e && e.message ? e.message : String(e);
+    dur.textContent = 'Hata: ' + hata;
+    document.getElementById('analiz-durum').textContent = 'Analiz yapılamadı: ' + hata;
+    sonucDurum('Analiz yapılamadı', [hata], '#ef5350');
   } finally {
     btn.disabled = false;
   }
 });
 
-document.getElementById('ara-ad').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('ara-btn').click();
-});
+document.getElementById('resim-dosya').addEventListener('change', function(e) {
+  var dosya = e.target.files && e.target.files[0];
+  var onizleme = document.getElementById('resim-onizleme');
+  var btn = document.getElementById('analiz-btn');
+  var durum = document.getElementById('analiz-durum');
 
-/* ---------- Ekran görüntüsü modu ---------- */
-document.getElementById('dosya').addEventListener('change', e => {
-  const dosya = e.target.files[0];
   if (!dosya) return;
-  if (!dosya.type.startsWith('image/')) {
-    document.getElementById('dosya-bilgi').textContent = 'Lütfen bir resim dosyası seç.';
+
+  if (!dosya.type || !dosya.type.startsWith('image/')) {
+    GrafikAI.resim = null;
+    btn.disabled = true;
+    durum.textContent = 'Lütfen geçerli bir görsel dosyası seç.';
     return;
   }
+
+  if (onizlemeURL) URL.revokeObjectURL(onizlemeURL);
+  onizlemeURL = URL.createObjectURL(dosya);
   GrafikAI.resim = dosya;
-  const onizleme = document.getElementById('onizleme');
-  onizleme.src = URL.createObjectURL(dosya);
-  onizleme.hidden = false;
-  document.getElementById('dosya-bilgi').textContent = 'Grafik yüklendi. Alttaki Analiz sekmesine geç ve analiz et.';
-  document.getElementById('analiz-durum').textContent = 'Grafik hazır.';
-  document.getElementById('analiz-btn').disabled = false;
+  onizleme.src = onizlemeURL;
+  onizleme.style.display = 'block';
+  btn.disabled = false;
+  durum.textContent = 'Görsel yüklendi. Analiz Et butonuna bas.';
 });
 
-function sayi(id) {
-  const x = parseFloat(document.getElementById(id).value.trim().replace(',', '.'));
-  return isFinite(x) ? x : null;
-}
+document.getElementById('analiz-btn').addEventListener('click', async function() {
+  var durum = document.getElementById('analiz-durum');
+  var alan = document.getElementById('tuval-alan');
+  var btn = document.getElementById('analiz-btn');
 
-function kalibrasyon() {
-  const hi = sayi('fiyat-ust'), lo = sayi('fiyat-alt');
-  return (hi !== null && lo !== null && hi > lo) ? { hi, lo } : null;
-}
+  if (!GrafikAI.resim) {
+    durum.textContent = 'Önce bir grafik görseli yükle.';
+    return;
+  }
 
-document.getElementById('analiz-btn').addEventListener('click', async () => {
-  const durum = document.getElementById('analiz-durum');
-  const alan = document.getElementById('tuval-alan');
-  durum.textContent = 'Analiz ediliyor...';
-  alan.innerHTML = '';
+  btn.disabled = true;
+  durum.textContent = 'Grafik görüntüsü analiz ediliyor...';
+  sonucDurum('Analiz hazırlanıyor', ['Grafik görüntüsü inceleniyor.'], '#2f81f7');
+
   try {
-    const r = await Goruntu.yukle(GrafikAI.resim);
-    const uyarilar = Goruntu.kalite(r);
-    const m = Goruntu.mumlar(r);
-    const t = Goruntu.trend(m);
-    if (m.length < 5) {
-      alan.appendChild(kartYap('Sonuç', ['Yeterli mum bulunamadı.', '⚠️ Mum çubukları net seçilemedi. Daha net bir grafik dene.'].concat(uyarilar.map(u => '⚠️ ' + u)), '#f0b429'));
-      durum.textContent = 'Analiz tamamlandı.';
+    var m = await Goruntu.yukle(GrafikAI.resim);
+    if (!Array.isArray(m) || m.length < 5) {
+      alan.innerHTML = '';
+      var mesaj = kartYap('Yetersiz mum verisi', [
+        'Görselden yeterli mum verisi çıkarılamadı.',
+        'Daha net, mumların tamamının göründüğü bir grafik yükle.'
+      ], '#ef5350');
+      alan.appendChild(mesaj);
+      sonucDurum('Yetersiz mum verisi', [
+        'Görselden yeterli mum verisi çıkarılamadı.',
+        'Daha net bir grafik yüklemeyi dene.'
+      ], '#ef5350');
+      durum.textContent = 'Yetersiz mum verisi. Daha net bir grafik yükle.';
       return;
     }
-    let kal = kalibrasyon();
-    let bitis = 'Analiz tamamlandı.';
-    if (kal) {
-      bitis = 'Analiz tamamlandı. Fiyatlar senin yazdığın değerlerle hesaplandı.';
-    } else {
-      durum.textContent = 'Fiyat ekseni okunuyor... İlk seferde dosyalar indirilir, 1-2 dakika sürebilir.';
-      try {
-        const o = await OCR.oku(r, m);
-        if (o) {
-          kal = { hi: o.hi, lo: o.lo };
-          bitis = 'Analiz tamamlandı. Fiyatlar eksendeki ' + o.n + ' etiketten otomatik okundu. Eksenle karşılaştırıp kontrol et.';
-        } else {
-          uyarilar.push('Fiyat ekseni okunamadı. Seviyeler yüzde olarak gösteriliyor.');
-        }
-      } catch (e) {
-        uyarilar.push('Fiyat ekseni okunamadı: ' + e.message);
-      }
-    }
-    durum.textContent = 'Rapor hazırlanıyor...';
-    goster(m, t, kal, uyarilar, [kartYap(null, ['Grafik, görüntüden okunan mumlardan yeniden çizilmiştir.'])]);
-    durum.textContent = bitis;
+
+    var t = Goruntu.trend(m);
+    var kal = {
+      ust: parseFloat(document.getElementById('fiyat-ust').value) || 0,
+      alt: parseFloat(document.getElementById('fiyat-alt').value) || 0
+    };
+
+    goster(m, t, kal, [], [
+      kartYap(null, ['Grafik, görüntüden okunan mumlardan yeniden çizilmiştir.'])
+    ]);
+
+    durum.textContent = 'Görsel analiz tamamlandı. Analiz ve Sonuç sekmelerini kontrol et.';
+    ekranGoster('analiz');
   } catch (e) {
-    durum.textContent = 'Hata: ' + e.message;
+    var hata = e && e.message ? e.message : String(e);
+    durum.textContent = 'Hata: ' + hata;
+    sonucDurum('Görsel analiz yapılamadı', [hata], '#ef5350');
+  } finally {
+    btn.disabled = !GrafikAI.resim;
   }
 });
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
-} 
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js').catch(function(e) {
+      console.warn('Service Worker kaydedilemedi:', e);
+    });
+  });
+}
