@@ -37,21 +37,29 @@
   }
 
   async function jsonGet(url) {
-    var controller = new AbortController();
-    var timer = setTimeout(function () { controller.abort(); }, 22000);
-    try {
-      var response = await fetch(PROXY + encodeURIComponent(url), {
-        method: 'GET',
-        cache: 'no-store',
-        signal: controller.signal
-      });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      return await response.json();
-    } catch (e) {
-      throw new Error(e.name === 'AbortError' ? 'kaynak zaman aşımına uğradı' : e.message);
-    } finally {
-      clearTimeout(timer);
+    var routes = [
+      PROXY + encodeURIComponent(url),
+      'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
+    ];
+    var lastError;
+    for (var i = 0; i < routes.length; i++) {
+      var controller = new AbortController();
+      var timer = setTimeout(function () { controller.abort(); }, 18000);
+      try {
+        var response = await fetch(routes[i], {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return await response.json();
+      } catch (e) {
+        lastError = e && e.name === 'AbortError' ? new Error('kaynak zaman aşımına uğradı') : e;
+      } finally {
+        clearTimeout(timer);
+      }
     }
+    throw lastError || new Error('Ücretsiz haber kaynağına erişilemedi');
   }
 
   async function haberGetir(sembol) {
