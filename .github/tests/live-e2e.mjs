@@ -241,6 +241,10 @@ try {
       await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(flatPayload) });
       return;
     }
+    if (requested.includes('/v8/finance/chart/FLAT.IS')) {
+      await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(flatPayload) });
+      return;
+    }
     if (requested.includes('/v10/finance/quoteSummary/THYAO.IS')) {
       const quoteSummary = {
         quoteSummary: {
