@@ -270,12 +270,12 @@ try {
     if (requested.includes('/tr/Bildirim/123456')) {
       const html = `<!doctype html><html><body><h1>Finansal Rapor</h1><table>
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Hasılat</span></td><td class="taxonomy-context-value">1.234.567,00</td><td class="taxonomy-context-value">1.000.000,00</td></tr>
-        <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Dönem Kârı (Zararı)</span></td><td class="taxonomy-context-value">123.456,00</td><td class="taxonomy-context-value">100.000,00</td></tr>
+        <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Dönem Kârı (Zararı)</span></td><td class="taxonomy-context-value">(123.456,00)</td><td class="taxonomy-context-value">100.000,00</td></tr>
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Toplam Varlıklar</span></td><td class="taxonomy-context-value">5.000.000,00</td></tr>
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Toplam Özkaynaklar</span></td><td class="taxonomy-context-value">2.000.000,00</td></tr>
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Dönen Varlıklar</span></td><td class="taxonomy-context-value">1.500.000,00</td></tr>
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Kısa Vadeli Yükümlülükler</span></td><td class="taxonomy-context-value">1.000.000,00</td></tr>
-        <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Nakit ve Nakit Benzerleri</span></td><td class="taxonomy-context-value">250.000,00</td></tr>
+        <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Nakit ve Nakit Benzerleri</span></td><td class="taxonomy-context-value">250.000</td></tr>
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Kısa Vadeli Borçlanmalar</span></td><td class="taxonomy-context-value">300.000,00</td></tr>
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">Uzun Vadeli Borçlanmalar</span></td><td class="taxonomy-context-value">500.000,00</td></tr>
         <tr class="x_role_data-input-row y presentation-enabled"><td><span class="gwt-Label multi-language-content content-tr">İşletme Faaliyetlerinden Nakit Akışları</span></td><td class="taxonomy-context-value">200.000,00</td></tr>
@@ -345,13 +345,53 @@ try {
   const financialText = await page.locator('#finansal-sonuc').innerText();
   check('Ücretsiz piyasa ve teknik göstergeler', financialText.includes('RSI (14)') && financialText.includes('EMA 200') && financialText.includes('Son fiyat'), financialText.slice(0, 450));
   check('KAP finansal tablosundan temel oranlar', financialText.includes('Hasılat') && financialText.includes('Cari oran') && financialText.includes('1.234.567'), financialText.includes('Dönem net kârı') ? 'Hasılat, dönem kârı ve likidite oranı hesaplandı' : financialText.slice(0, 350));
+  const kapMetrics = await page.evaluate(() => {
+    const f = window.FinansalPanel?.sonRapor?.fundamentals || {};
+    return { netProfit: f.netProfit, cash: f.cash, profitMargin: f.profitMargin };
+  });
+  check('KAP parantezli negatif tutar doğru okundu', kapMetrics.netProfit === -123456, JSON.stringify(kapMetrics));
+  check('KAP ondalıksız binlik ayraç doğru okundu', kapMetrics.cash === 250000, JSON.stringify(kapMetrics));
   check('KAP bildirimleri ve haberler', financialText.includes('2026 ikinci çeyrek finansal raporu') && financialText.includes('THYAO ücretsiz test haber başlığı'), financialText.includes('Özel durum açıklaması') ? 'Finansal rapor, özel durum ve haber listelendi' : 'KAP veya haber eksik');
   const sharedSymbol = await page.evaluate(() => window.TahminAI?.temelAnaliz?.symbol || '');
   check('Ücretsiz araştırma diğer ajanlarla paylaşıldı', sharedSymbol === 'THYAO', sharedSymbol || 'Paylaşılan rapor bulunamadı');
   const apiKeyFields = await page.locator('#finansal-panel input[type="password"]').count();
   check('Ücretli API anahtarı alanı kaldırıldı', apiKeyFields === 0, apiKeyFields + ' parola alanı');
+  // Flat market fixture: RSI must be neutral (50), not overbought (100).
+  const flatRows = Array.from({ length: 220 }, (_, i) => ({
+    timestamp: Math.floor(Date.now() / 1000) - (220 - i) * 86400,
+    open: 100, high: 101, low: 99, close: 100, volume: 500000
+  }));
+  const flatPayload = {
+    chart: {
+      result: [{
+        meta: { symbol: 'FLAT.IS', currency: 'TRY' },
+        timestamp: flatRows.map(x => x.timestamp),
+        indicators: { quote: {
+          open: flatRows.map(x => x.open),
+          high: flatRows.map(x => x.high),
+          low: flatRows.map(x => x.low),
+          close: flatRows.map(x => x.close),
+          volume: flatRows.map(x => x.volume)
+        } }
+      }],
+      error: null
+    }
+  };
+  await page.route('https://query1.finance.yahoo.com/v8/finance/chart/FLAT.IS**', async route => {
+    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(flatPayload) });
+  });
+  const flatRsi = await page.evaluate(async () => {
+    const status = document.querySelector('#finansal-durum');
+    const result = document.querySelector('#finansal-sonuc');
+    const button = document.querySelector('#finansal-panel button');
+    await window.FinansalPanel.analizEt('FLAT', status, result, button);
+    return window.FinansalPanel.sonRapor.metrics.rsi14;
+  });
+  check('Yatay piyasada RSI nötr değerde', flatRsi === 50, 'RSI: ' + flatRsi);
+
   await page.unroute('https://grafik-vekil.hellomotherfck1.workers.dev/**');
   await page.unroute('https://query1.finance.yahoo.com/v8/finance/chart/THYAO.IS**');
+  await page.unroute('https://query1.finance.yahoo.com/v8/finance/chart/FLAT.IS**');
 
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileLayout = await page.evaluate(() => {
