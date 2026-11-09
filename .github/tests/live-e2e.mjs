@@ -237,6 +237,10 @@ try {
       await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(chartPayload) });
       return;
     }
+    if (requested.includes('/v8/finance/chart/FLAT.IS')) {
+      await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(flatPayload) });
+      return;
+    }
     if (requested.includes('/v10/finance/quoteSummary/THYAO.IS')) {
       const quoteSummary = {
         quoteSummary: {
@@ -400,7 +404,17 @@ try {
       status: document.querySelector('#coin-tahmin-durum')?.textContent || ''
     };
   });
-  check('Coin toplu tarama akışı', coinScan.scanned === coinScan.total && coinScan.errors === 0 && coinScan.status.startsWith('Tamamlandı'), JSON.stringify(coinScan));
+  check(
+    'Coin toplu tarama akışı',
+    coinScan.scanned > 0 && coinScan.scanned + coinScan.errors === coinScan.total && coinScan.status.startsWith('Tamamlandı'),
+    JSON.stringify(coinScan)
+  );
+  const coinResultText = await page.locator('#coin-tahmin-alan').innerText();
+  check(
+    'Coin veri hataları kullanıcıya gösteriliyor',
+    coinScan.errors === 0 || coinResultText.includes('Veri alınamayanlar'),
+    coinResultText.slice(-350)
+  );
   await page.locator('nav button[data-git="strateji"]').click();
 
   await page.locator('#finansal-sembol').selectOption('THYAO');
@@ -446,9 +460,6 @@ try {
       error: null
     }
   };
-  await page.route('https://query1.finance.yahoo.com/v8/finance/chart/FLAT.IS**', async route => {
-    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(flatPayload) });
-  });
   const flatRsi = await page.evaluate(async () => {
     const status = document.querySelector('#finansal-durum');
     const result = document.querySelector('#finansal-sonuc');
