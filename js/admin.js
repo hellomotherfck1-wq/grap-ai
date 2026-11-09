@@ -1,5 +1,5 @@
 // ====== SUPABASE AYARLARI ======
-const SUPABASE_URL = 'https://qkkhguyngmsddnkunyws.supabase.co';
+const SUPABASE_URL = 'https://qkkhguyngmsddnkunyws.supabase.co/';
 const SUPABASE_ANON_KEY = 'sb_publishable_21uKtVP_-Es7lWeTDefk7Q_r-pb8i0-';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
