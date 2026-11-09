@@ -54,50 +54,6 @@
     }
   }
 
-  async function finansalGetir(sembol) {
-    var url = YAHOO + '/v10/finance/quoteSummary/' + encodeURIComponent(sembol) +
-      '?modules=price%2CsummaryDetail%2CdefaultKeyStatistics%2CfinancialData%2CassetProfile';
-    var json = await jsonGet(url);
-    var q = json && json.quoteSummary && json.quoteSummary.result && json.quoteSummary.result[0];
-    if (!q) {
-      var message = json && json.quoteSummary && json.quoteSummary.error && json.quoteSummary.error.description;
-      throw new Error(message || 'Yahoo Finance temel veri döndürmedi');
-    }
-
-    var p = q.price || {};
-    var sd = q.summaryDetail || {};
-    var ks = q.defaultKeyStatistics || {};
-    var fd = q.financialData || {};
-    var ap = q.assetProfile || {};
-
-    return {
-      currency: p.currency || 'TRY',
-      currentPrice: raw(p.regularMarketPrice) || raw(fd.currentPrice),
-      marketCap: raw(p.marketCap),
-      trailingPE: raw(sd.trailingPE) || raw(ks.trailingPE),
-      forwardPE: raw(sd.forwardPE) || raw(ks.forwardPE),
-      priceToBook: raw(ks.priceToBook),
-      trailingEps: raw(ks.trailingEps) || raw(fd.epsTrailingTwelveMonths),
-      dividendYield: raw(sd.dividendYield),
-      roe: raw(fd.returnOnEquity),
-      roa: raw(fd.returnOnAssets),
-      profitMargins: raw(fd.profitMargins),
-      revenueGrowth: raw(fd.revenueGrowth),
-      earningsGrowth: raw(fd.earningsGrowth),
-      debtToEquity: raw(fd.debtToEquity),
-      currentRatio: raw(fd.currentRatio),
-      targetMeanPrice: raw(fd.targetMeanPrice),
-      targetHighPrice: raw(fd.targetHighPrice),
-      targetLowPrice: raw(fd.targetLowPrice),
-      analystCount: raw(fd.numberOfAnalystOpinions),
-      freeCashflow: raw(fd.freeCashflow),
-      totalDebt: raw(fd.totalDebt),
-      totalCash: raw(fd.totalCash),
-      sector: ap.sector || null,
-      industry: ap.industry || null
-    };
-  }
-
   async function haberGetir(sembol) {
     var url = YAHOO + '/v1/finance/search?q=' + encodeURIComponent(sembol) + '&quotesCount=0&newsCount=8';
     var json = await jsonGet(url);
@@ -290,18 +246,11 @@
   }
 
   async function research(v, dn, panel) {
-    var tasks = await Promise.allSettled([
-      finansalGetir(v.sembol),
-      haberGetir(v.sembol)
-    ]);
-    var f = tasks[0].status === 'fulfilled' ? tasks[0].value : null;
-    var news = tasks[1].status === 'fulfilled' ? tasks[1].value : [];
+    var tasks = await Promise.allSettled([haberGetir(v.sembol)]);
+    var news = tasks[0].status === 'fulfilled' ? tasks[0].value : [];
     var errors = [];
-    if (tasks[0].status === 'rejected' && !/HTTP 401|HTTP 403/.test(tasks[0].reason && tasks[0].reason.message || '')) {
-      errors.push('Temel finansallar: ' + tasks[0].reason.message);
-    }
-    if (tasks[1].status === 'rejected') errors.push('Haber akışı: ' + tasks[1].reason.message);
-    return raporOlustur(v, dn, panel, f, news, errors);
+    if (tasks[0].status === 'rejected') errors.push('Haber akışı: ' + tasks[0].reason.message);
+    return raporOlustur(v, dn, panel, null, news, errors);
   }
 
   async function grafikOzet(v, dn, sonuc, container) {
@@ -408,7 +357,6 @@
   window.BistArastirma = {
     grafikOzet: grafikOzet,
     derinArastir: derinArastir,
-    finansalGetir: finansalGetir,
     haberGetir: haberGetir
   };
 
