@@ -210,7 +210,9 @@ el('ara-btn').addEventListener('click', async () => {
       });
     }
 
-    el('analiz-durum').textContent = 'Analiz tamamlandı: ' + v.ad + ' (' + v.sembol + ').';
+    const tamam = 'Analiz tamamlandı: ' + v.ad + ' (' + v.sembol + ').';
+    el('analiz-durum').textContent = tamam;
+    dur.textContent = tamam;
     analizKaydet({
       ad: v.ad,
       sembol: v.sembol,
@@ -221,8 +223,10 @@ el('ara-btn').addEventListener('click', async () => {
     adminKaydi(v.ad);
     ekranGoster('analiz');
   } catch (e) {
-    dur.textContent = '⚠️ ' + (e && e.message ? e.message : String(e)) +
+    const hataMetni = e && e.message ? e.message : String(e);
+    dur.textContent = '⚠️ ' + hataMetni +
       ' İnternet bağlantını ve sembolü kontrol et. Örnek: PGSUS.IS veya BTCUSDT.';
+    el('analiz-durum').textContent = 'Analiz yapılamadı: ' + hataMetni;
   } finally {
     btn.disabled = false;
   }
@@ -233,15 +237,31 @@ el('ara-ad').addEventListener('keydown', e => {
 });
 
 /* ---------- Ekran görüntüsü modu ---------- */
+function resimTemizle() {
+  GrafikAI.resim = null;
+  if (GrafikAI.onizlemeUrl) URL.revokeObjectURL(GrafikAI.onizlemeUrl);
+  GrafikAI.onizlemeUrl = null;
+  const onizleme = el('onizleme');
+  onizleme.removeAttribute('src');
+  onizleme.hidden = true;
+  el('analiz-btn').disabled = true;
+}
+
 el('dosya').addEventListener('change', e => {
   const dosya = e.target.files && e.target.files[0];
   if (!dosya) return;
+
   if (!dosya.type || !dosya.type.startsWith('image/')) {
+    resimTemizle();
     el('dosya-bilgi').textContent = 'Lütfen geçerli bir görüntü dosyası seç.';
+    el('analiz-durum').textContent = 'Geçerli bir grafik görüntüsü yükle.';
+    e.target.value = '';
     return;
   }
   if (dosya.size > 15 * 1024 * 1024) {
+    resimTemizle();
     el('dosya-bilgi').textContent = 'Dosya 15 MB sınırını aşıyor. Daha küçük bir görüntü seç.';
+    el('analiz-durum').textContent = 'Dosya boyutu çok büyük.';
     e.target.value = '';
     return;
   }

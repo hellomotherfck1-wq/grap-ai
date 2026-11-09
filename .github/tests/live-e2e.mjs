@@ -82,6 +82,7 @@ try {
   const searchStatus = await page.locator('#ara-durum').innerText();
   const canvasCount = await page.locator('#tuval-alan canvas').count();
   check('THYAO.IS grafik araması', chartStatus.includes('Analiz tamamlandı'), chartStatus.includes('Analiz tamamlandı') ? chartStatus : searchStatus);
+  check('Arama durum mesajı tamamlandı', searchStatus.includes('Analiz tamamlandı'), searchStatus);
   check('Teknik grafik canvas çizimi', canvasCount > 0, canvasCount + ' canvas');
 
   if (chartStatus.includes('Analiz tamamlandı')) {
@@ -139,6 +140,22 @@ try {
   const imageCanvasCount = await page.locator('#tuval-alan canvas').count();
   check('Grafik görüntüsü yükleme ve mum tanıma', imageStatus.includes('Analiz tamamlandı'), imageStatus);
   check('Görüntü analiz grafiği çizimi', imageCanvasCount > 0, imageCanvasCount + ' canvas');
+
+  await page.locator('#dosya').setInputFiles({
+    name: 'gecersiz.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('bu bir grafik resmi değil')
+  });
+  const invalidImageState = await page.evaluate(() => ({
+    buttonDisabled: document.querySelector('#analiz-btn').disabled,
+    hasImage: Boolean(window.GrafikAI.resim),
+    previewHidden: document.querySelector('#onizleme').hidden
+  }));
+  check(
+    'Geçersiz görsel seçimi eski görseli temizler',
+    invalidImageState.buttonDisabled && !invalidImageState.hasImage && invalidImageState.previewHidden,
+    JSON.stringify(invalidImageState)
+  );
 
   // Exercise the full 100-symbol scan, not only the single-stock research path.
   await page.locator('nav button[data-git="strateji"]').click();
