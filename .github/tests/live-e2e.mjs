@@ -156,6 +156,15 @@ try {
     invalidImageState.buttonDisabled && !invalidImageState.hasImage && invalidImageState.previewHidden,
     JSON.stringify(invalidImageState)
   );
+  const ocrEngine = await page.evaluate(async () => {
+    try {
+      await OCR.motor();
+      return { loaded: !!window.Tesseract && typeof window.Tesseract.createWorker === 'function', version: window.Tesseract && window.Tesseract.version || '' };
+    } catch (error) {
+      return { loaded: false, error: error && error.message ? error.message : String(error) };
+    }
+  });
+  check('OCR motoru CDN yüklemesi', ocrEngine.loaded, JSON.stringify(ocrEngine));
 
   // Exercise the full 100-symbol scan, not only the single-stock research path.
   await page.locator('nav button[data-git="strateji"]').click();
