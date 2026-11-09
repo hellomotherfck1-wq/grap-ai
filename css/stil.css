@@ -125,3 +125,32 @@ button:focus-visible, summary:focus-visible, label:focus-visible { outline: 2px 
 .bist-research-news small { color: var(--soluk); font-size: 11px; }
 .bist-research-sources { margin-top: 12px; font-size: 12px; line-height: 1.6; }
 #bist-arastirma-kutusu { margin-top: 18px; }
+
+
+/* Standalone BIST fundamentals and financial research panel */
+.finansal-panel { margin-top: 22px; border: 1px solid #35506a; background: linear-gradient(160deg, rgba(29, 48, 66, .72), rgba(15, 23, 32, .96)); }
+.finansal-panel > h3 { margin-top: 0; }
+.finansal-kaynaklar, .finansal-aksiyonlar { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 12px 0; font-size: 12px; }
+.finansal-kaynaklar a, .finansal-aksiyonlar a { color: #8abaff; text-decoration: underline; }
+.finansal-guvenlik-notu { margin: 8px 0; padding: 10px 12px; border: 1px solid #69552c; border-radius: 10px; background: rgba(125, 91, 27, .12); color: #d7c49c; font-size: 12px; line-height: 1.5; }
+.finansal-rapor-baslik { margin-top: 18px; }
+.finansal-rapor-baslik h4, .finansal-yorum h4, .finansal-ozet-kart h4 { margin: 0 0 8px; color: #eef5fb; font-size: 15px; }
+.finansal-kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 12px 0; }
+.finansal-kpi { min-width: 0; padding: 11px; border: 1px solid var(--kenar); border-radius: 11px; background: rgba(10, 17, 25, .72); }
+.finansal-kpi-baslik, .finansal-kpi-ipucu { display: block; color: var(--soluk); font-size: 11px; line-height: 1.4; }
+.finansal-kpi-deger { display: block; margin: 5px 0 2px; color: #f3f7fb; font-size: 18px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.finansal-yorum, .finansal-ozet-kart { margin: 12px 0; padding: 13px; border: 1px solid var(--kenar); border-radius: 12px; background: rgba(10, 17, 25, .62); }
+.finansal-yorum p { margin: 7px 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.finansal-olumlu { color: #8bd7b0; }
+.finansal-risk { color: #f0b0a8; }
+.finansal-ozet-satir { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--kenar); font-size: 13px; }
+.finansal-ozet-satir:last-child { border-bottom: 0; }
+.finansal-ozet-satir span { color: #aebdca; }
+.finansal-ozet-satir strong { color: #f3f7fb; text-align: right; font-variant-numeric: tabular-nums; }
+.finansal-tablo-detay { margin: 10px 0; padding: 12px; border: 1px solid var(--kenar); border-radius: 11px; background: rgba(10, 17, 25, .62); }
+.finansal-tablo-kaydir { overflow-x: auto; margin-top: 10px; }
+.finansal-tablo { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 12px; }
+.finansal-tablo th, .finansal-tablo td { padding: 8px; border-bottom: 1px solid var(--kenar); text-align: right; white-space: nowrap; }
+.finansal-tablo th:first-child, .finansal-tablo td:first-child { text-align: left; white-space: normal; }
+.finansal-tablo th { color: #9db0c2; background: #1a2734; }
+@media (min-width: 600px) { .finansal-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
