@@ -338,7 +338,7 @@
     links.appendChild(link('Açık kaynak KAP-MCP', 'https://github.com/semudu/kap-client'));
     wrap.appendChild(links);
 
-    var footer = node('p', 'alt', 'Not: istfin temel veri uçları API anahtarı ve fundamentals:read yetkisi gerektirir. Anahtarın yoksa KAP bağlantılarından şirket raporlarını inceleyebilirsin. Kısa vadeli fiyat hareketi için üstteki grafik ve teknik analiz ajanlarını kullan.');
+    var footer = node('p', 'alt', 'Not: istfin temel veri uçları API anahtarı ve fundamentals:read yetkisi gerektirir; kullanım ücretli bir plan gerektirebilir. Anahtarın yoksa KAP bağlantılarından şirket raporlarını ücretsiz inceleyebilirsin. Kısa vadeli fiyat hareketi için üstteki grafik ve teknik analiz ajanlarını kullan.');
     wrap.appendChild(footer);
 
     button.addEventListener('click', function () {
