@@ -340,7 +340,7 @@
     // Coin taraması yalnızca Binance USDT çiftini kullanır.
     // Genel sembol eşleştiricisi aynı kodu bir BIST hissesiyle karıştırabilir.
     var code = String(item.q || '').toUpperCase().replace(/USDT$/, '');
-    if (!/^[A-Z0-9]{2,12}$/.test(code)) throw new Error('Geçersiz Binance coin sembolü');
+    if (!/^[A-Z0-9]{1,12}$/.test(code)) throw new Error('Geçersiz Binance coin sembolü');
     var symbol = code + 'USDT';
     var candles = await Veri.binance(symbol, zd);
     var v = {
