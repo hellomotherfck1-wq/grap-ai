@@ -351,6 +351,21 @@
     if (!f || rows.every(function (x) { return x[1] === '—'; })) {
       valuation.appendChild(el('p', 'alt', 'Yahoo Finance bu hisse için temel oranları ücretsiz uçtan sağlamadı. Bu nedenle F/K, PD/DD veya hedef fiyat uydurulmadı. KAP finansal raporları aşağıda listelenmiştir.'));
     }
+    if (f && f.trailingEps != null && f.trailingEps > 0 && m.price != null) {
+      var scenario = el('div', 'finansal-ozet-kart');
+      scenario.appendChild(el('h4', '', 'Varsayımsal EPS çarpanı senaryosu'));
+      var multiples = [8, 12, 16];
+      multiples.forEach(function (multiple) {
+        var estimate = f.trailingEps * multiple;
+        var difference = (estimate / m.price - 1) * 100;
+        var line = el('div', 'finansal-ozet-satir');
+        line.appendChild(el('span', '', 'EPS × ' + multiple));
+        line.appendChild(el('strong', '', money(estimate, m.currency) + ' · ' + (difference >= 0 ? '+' : '') + pct(difference)));
+        scenario.appendChild(line);
+      });
+      scenario.appendChild(el('p', 'alt', 'Bunlar sektör değerlemesi veya hedef fiyat değildir; yalnızca 8x/12x/16x varsayımsal F/K çarpanlarıyla yapılan senaryolardır. Şirketin sektör, borç, nakit akışı, enflasyon ve tek seferlik kalemleri ayrıca incelenmelidir.'));
+      result.appendChild(scenario);
+    }
     result.appendChild(valuation);
 
     if (report.kap) {
@@ -381,6 +396,14 @@
     }
     result.appendChild(newsBox);
 
+    if (report.errors && report.errors.length) {
+      var errorBox = el('div', 'finansal-veri-notu');
+      errorBox.appendChild(el('strong', '', 'Yanıt vermeyen kaynaklar'));
+      report.errors.forEach(function (message) {
+        errorBox.appendChild(el('p', '', message));
+      });
+      result.appendChild(errorBox);
+    }
     var sources = el('p', 'alt', 'Kaynaklar: Yahoo Finance herkese açık fiyat/haber uçları ve KAP kamuya açık şirket/bildirim sayfaları. Yahoo uçları resmî, garantili API değildir; kesilebilir veya gecikebilir. KAP kurumsal veri yayın servisi kullanılmıyor. Bu çıktı yatırım tavsiyesi değildir.');
     result.appendChild(sources);
   }
