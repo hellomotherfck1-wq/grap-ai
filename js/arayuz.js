@@ -75,9 +75,12 @@ document.getElementById('ara-btn').addEventListener('click', async () => {
     const dn = Veri.donustur(v, 80);
     const t = Goruntu.trend(dn.m);
     goster(dn.m, t, dn.kal, [], [kartYap('Grafik bilgisi', Veri.bilgi(v, dn.d), '#2f81f7')]);
-    document.getElementById('analiz-durum').textContent = 'Analiz tamamlandı: ' + v.ad;
-    dur.textContent = '';
-    ekranGoster('analiz');
+document.getElementById('analiz-durum').textContent = 'Analiz tamamlandı: ' + v.ad;
+// ↓↓↓ BUNU EKLE ↓↓↓
+if (window.adminAnalizKaydet) window.adminAnalizKaydet(v.ad);
+    goster(m, t, kal, uyarilar, [kartYap(null, ['Grafik, görüntüden okunan mumlardan yeniden çizilmiştir.'])]);
+// ↓↓↓ BUNU EKLE ↓↓↓
+if (window.adminAnalizKaydet) window.adminAnalizKaydet('Ekran görüntüsü');
   } catch (e) {
     dur.textContent = '⚠️ ' + e.message + ' İnternetini ve yazımı kontrol et. Kodla da deneyebilirsin (örn. PGSUS.IS veya BTCUSDT).';
   } finally {
