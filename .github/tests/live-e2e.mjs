@@ -92,6 +92,36 @@ try {
     check('Grafik sonrası araştırma özeti', chartAreaText.includes('Araştırma Ajanı') || chartAreaText.includes('Araştırma ajanı şu anda veri alamadı'), chartAreaText.slice(-600));
   }
 
+  // Exercise the full 100-symbol scan, not only the single-stock research path.
+  await page.locator('nav button[data-git="strateji"]').click();
+  await page.locator('#tahmin-zd').selectOption('1d');
+  await page.locator('#tahmin-btn').click();
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#tahmin-durum')?.textContent || '';
+    return status.startsWith('Tamamlandı') || status.startsWith('Hata:');
+  }, null, { timeout: 600000 });
+
+  const scanStatus = await page.locator('#tahmin-durum').innerText();
+  const scanSummary = await page.locator('#tahmin-alan details summary').first().innerText().catch(() => '');
+  const scanRows = await page.locator('#tahmin-alan .bist-table tbody tr').count();
+  const scanMatch = scanSummary.match(/BIST 100 tarama tablosu · (\d+) hisse(?: · (\d+) veri hatası)?/);
+  const successCount = scanMatch ? Number(scanMatch[1]) : 0;
+  const errorCount = scanMatch && scanMatch[2] ? Number(scanMatch[2]) : 0;
+  check('BIST 100 tam tarama akışı', scanStatus.startsWith('Tamamlandı'), scanStatus);
+  check('100 sembol için tarama sonucu', successCount + errorCount === 100, successCount + ' başarılı · ' + errorCount + ' veri hatası');
+  check('Tarama tablosu satırları', successCount > 0 && scanRows === successCount, scanRows + ' sonuç satırı');
+
+  if (scanRows > 0) {
+    const previousAnalysis = await page.evaluate(() => window.GrafikAI?.sonAnaliz?.tarih || '');
+    await page.locator('#tahmin-alan .bist-mini-btn').first().click();
+    await page.waitForFunction(previous => {
+      const current = window.GrafikAI?.sonAnaliz?.tarih || '';
+      return Boolean(current && current !== previous);
+    }, previousAnalysis, { timeout: 120000 });
+    const scanChartCount = await page.locator('#tuval-alan canvas').count();
+    check('Tarama tablosundan hisse grafiği açma', scanChartCount > 0, scanChartCount + ' canvas');
+  }
+
   check('Tarayıcı JavaScript hatası yok', report.pageErrors.length === 0, report.pageErrors.join(' | ') || 'Hata yakalanmadı');
   report.finalURL = page.url();
   report.finishedAt = new Date().toISOString();
