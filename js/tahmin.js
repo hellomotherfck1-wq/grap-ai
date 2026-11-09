@@ -406,7 +406,18 @@
     var s = Analiz.yap(dn.m, t);
     var panel = ajanlaraSor(s, dn.kal);
     var karar = (panel.nihai && panel.nihai.son) || s.karar || 'BEKLE';
-    var sonFiyat = (dn.d && dn.d.length) ? dn.d[dn.d.length - 1].c : null;
+    var mumlar = Array.isArray(dn.d) ? dn.d : [];
+    var sonMum = mumlar.length ? mumlar[mumlar.length - 1] : null;
+    var oncekiMum = mumlar.length > 1 ? mumlar[mumlar.length - 2] : null;
+    var sonFiyat = sonMum ? sonMum.c : null;
+    var sonMumDegisim = sonMum && oncekiMum && oncekiMum.c
+      ? ((sonMum.c / oncekiMum.c) - 1) * 100 : null;
+    var bazHacimler = mumlar.slice(Math.max(0, mumlar.length - 21), Math.max(0, mumlar.length - 1))
+      .map(function (m) { return Number(m.v) || 0; }).filter(function (x) { return x > 0; });
+    var ortHacim20 = bazHacimler.length
+      ? bazHacimler.reduce(function (a, b) { return a + b; }, 0) / bazHacimler.length : null;
+    var sonHacim = sonMum && Number(sonMum.v) > 0 ? Number(sonMum.v) : null;
+    var hacimOrani = sonHacim && ortHacim20 ? sonHacim / ortHacim20 : null;
 
     return {
       q: item.q,
@@ -431,6 +442,10 @@
         t2: s.plan.t2
       } : null,
       fiyat: sonFiyat,
+      sonMumDegisim: sonMumDegisim,
+      sonHacim: sonHacim,
+      ortHacim20: ortHacim20,
+      hacimOrani: hacimOrani,
       trend: t ? t.yon : null,
       rsi: s.rsi
     };
@@ -438,13 +453,21 @@
 
   function kisaOzet(r) {
     return {
+      q: r.q,
       ad: r.ad,
       sembol: r.sembol,
       karar: r.karar,
       skor: r.skor,
       teknik: r.teknikKarar,
       hacim: r.hacimSkor,
-      hata: r.hataPayi
+      hata: r.hataPayi,
+      fiyat: r.fiyat,
+      sonMumDegisim: r.sonMumDegisim,
+      sonHacim: r.sonHacim,
+      ortHacim20: r.ortHacim20,
+      hacimOrani: r.hacimOrani,
+      trend: r.trend,
+      rsi: r.rsi
     };
   }
 
@@ -566,6 +589,82 @@
     return d;
   }
 
+  function degerYaz(n, basamak) {
+    if (n === null || n === undefined || !isFinite(Number(n))) return '—';
+    return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: basamak == null ? 2 : basamak }).format(Number(n));
+  }
+
+  function hacimYaz(n) {
+    if (n === null || n === undefined || !isFinite(Number(n))) return '—';
+    return new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(n));
+  }
+
+  function renderTaramaTablosu(adaylar, hatalar) {
+    var details = document.createElement('details');
+    details.className = 'kart';
+    var summary = document.createElement('summary');
+    summary.textContent = 'BIST 100 tarama tablosu · ' + adaylar.length + ' hisse' +
+      ((hatalar && hatalar.length) ? ' · ' + hatalar.length + ' veri hatası' : '');
+    details.appendChild(summary);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'bist-table-wrap';
+    var table = document.createElement('table');
+    table.className = 'bist-table';
+    var thead = document.createElement('thead');
+    var trh = document.createElement('tr');
+    ['Hisse', 'Fiyat', 'Son mum %', 'Hacim', 'Ort. 20', 'Hacim x', 'RSI', 'Karar', 'Skor', 'Grafik'].forEach(function (label) {
+      var th = document.createElement('th');
+      th.textContent = label;
+      trh.appendChild(th);
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    adaylar.forEach(function (a) {
+      var tr = document.createElement('tr');
+      var ad = document.createElement('td');
+      ad.textContent = (a.ad || a.q || '—') + (a.sembol ? ' (' + a.sembol.replace(/\.IS$/i, '') + ')' : '');
+      tr.appendChild(ad);
+
+      [
+        degerYaz(a.fiyat, 3),
+        a.sonMumDegisim == null ? '—' : (degerYaz(a.sonMumDegisim, 2) + '%'),
+        hacimYaz(a.sonHacim),
+        hacimYaz(a.ortHacim20),
+        a.hacimOrani == null ? '—' : (degerYaz(a.hacimOrani, 2) + 'x'),
+        degerYaz(a.rsi, 1),
+        a.karar || 'BEKLE',
+        degerYaz(a.skor, 0)
+      ].forEach(function (value, idx) {
+        var td = document.createElement('td');
+        td.textContent = value;
+        if (idx === 6) td.style.fontWeight = '800';
+        if (idx === 6) td.style.color = a.karar === 'AL' ? '#26a69a' : a.karar === 'SAT' ? '#ef5350' : '#f0b429';
+        tr.appendChild(td);
+      });
+
+      var action = document.createElement('td');
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'bist-mini-btn';
+      button.textContent = 'Grafik';
+      button.addEventListener('click', function () {
+        if (window.GrafikAI && typeof window.GrafikAI.araVarlik === 'function') {
+          window.GrafikAI.araVarlik(a.q || a.sembol, '1d');
+        }
+      });
+      action.appendChild(button);
+      tr.appendChild(action);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    details.appendChild(wrap);
+    return details;
+  }
+
   function renderKayit(kayit, alan) {
     if (!alan) return;
     alan.innerHTML = '';
@@ -610,13 +709,7 @@
     }
 
     if (kayit.adaylar && kayit.adaylar.length) {
-      var satirlar = kayit.adaylar.slice(0, 15).map(function (a, idx) {
-        return (idx + 1) + '. ' + (a.ad || '?') + ' → ' + (a.karar || '?') +
-          ' (skor ' + (a.skor != null ? a.skor : '?') +
-          (a.teknik ? ', tek:' + a.teknik : '') +
-          (a.hata ? ', hata:' + a.hata : '') + ')';
-      });
-      alan.appendChild(kart('Taranan adaylar', satirlar));
+      alan.appendChild(renderTaramaTablosu(kayit.adaylar, kayit.hatalar || []));
     }
 
     if (kayit.hatalar && kayit.hatalar.length) {
@@ -652,15 +745,15 @@
       '<h2>Tahmin AI</h2>' +
       '<p class="alt">BIST 100’deki tüm hisseleri tarar; Teknik, Hacim ve Denetçi ajanlarına sorar; en yüksek skorlu kurulumu seçer. Hafıza bu cihazda saklanır.</p>' +
       '<select id="tahmin-zd" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">' +
-      '<option value="1h" selected>1 saatlik</option>' +
-      '<option value="1d">Günlük</option>' +
+      '<option value="1h">1 saatlik</option>' +
+      '<option value="1d" selected>Günlük</option>' +
       '<option value="15m">15 dakikalık</option>' +
       '</select>' +
       '<button type="button" id="tahmin-btn" class="buton">BUGÜNÜN TAHMİNİNİ ÜRET</button>' +
       '<p id="tahmin-durum" class="alt"></p>' +
       '<div id="tahmin-alan"></div>' +
       '<div id="tahmin-hafiza"></div>' +
-      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: BIST 100’ün tamamı taranır (~3–6 dk). Aynı gün tekrar üretirsen önceki kayıtın üzerine yazılır.</p>';
+      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: BIST 100’ün tamamı taranır. Fiyat ve hacim son mum verisidir; açık seansta son mum tamamlanmamış olabilir.</p>';
 
     var btn = document.getElementById('tahmin-btn');
     var durum = document.getElementById('tahmin-durum');
