@@ -101,18 +101,18 @@
 
   function parseTurkishNumber(value) {
     if (value == null) return null;
-    var text = String(value).replace(/\\s/g, '').replace(/%/g, '').replace(/[^0-9,.-]/g, '');
+    var text = String(value).replace(/\s/g, '').replace(/%/g, '').replace(/[^0-9,.-]/g, '');
     if (!text || text === '-' || text === ',') return null;
-    if (text.indexOf(',') >= 0) text = text.replace(/\\./g, '').replace(',', '.');
+    if (text.indexOf(',') >= 0) text = text.replace(/\./g, '').replace(',', '.');
     var number = Number(text);
     return isFinite(number) ? number : null;
   }
 
   function normalizeLabel(value) {
     return String(value || '').toLocaleLowerCase('tr-TR')
-      .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/ı/g, 'i').replace(/[^a-z0-9 ]/g, ' ')
-      .replace(/\\s+/g, ' ').trim();
+      .replace(/\s+/g, ' ').trim();
   }
 
   function kapFinancialRows(html) {
