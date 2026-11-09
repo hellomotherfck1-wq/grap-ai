@@ -226,7 +226,12 @@ try {
 
   await page.locator('#finansal-sembol').selectOption('THYAO');
   await page.locator('#finansal-panel button').click();
-  await page.waitForFunction(() => (document.querySelector('#finansal-durum')?.textContent || '').includes('Ücretsiz araştırma tamamlandı'));
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#finansal-durum')?.textContent || '';
+    return status.includes('Ücretsiz araştırma tamamlandı') || status.includes('Ücretsiz araştırma tamamlanamadı');
+  }, null, { timeout: 90000 });
+  const financialStatus = await page.locator('#finansal-durum').innerText();
+  check('Ücretsiz araştırma isteği tamamlandı', financialStatus.includes('Ücretsiz araştırma tamamlandı'), financialStatus);
   const financialText = await page.locator('#finansal-sonuc').innerText();
   check('Ücretsiz piyasa ve temel oran verileri', financialText.includes('F/K') && financialText.includes('RSI (14)') && financialText.includes('EMA 200'), financialText.slice(0, 450));
   check('KAP bildirimleri ve haberler', financialText.includes('2026 ikinci çeyrek finansal raporu') && financialText.includes('THYAO ücretsiz test haber başlığı'), financialText.includes('Özel durum açıklaması') ? 'Finansal rapor, özel durum ve haber listelendi' : 'KAP veya haber eksik');
@@ -247,7 +252,10 @@ try {
   }
 } catch (error) {
   report.fatalError = error.stack || error.message || String(error);
-  console.error('E2E fatal error:', report.fatalError);
+  report.financialStatus = await page.locator('#finansal-durum').textContent().catch(() => '');
+  report.financialResult = await page.locator('#finansal-sonuc').innerText().catch(() => '');
+  await page.screenshot({ path: 'live-e2e-failure.png', fullPage: true }).catch(() => {});
+  console.error('E2E fatal error:', report.fatalError, '· Financial status:', report.financialStatus);
 } finally {
   if (browser) await browser.close().catch(() => {});
   report.finishedAt = report.finishedAt || new Date().toISOString();
