@@ -4,7 +4,8 @@ const Yorum = {
   olustur(s, kal, uyarilar) {
     const f = x => Analiz.fiyat(x, kal);
     const D = s.sv.destekler, R = s.sv.direncler;
-    const son = s.c[s.c.length - 1].c;
+    const mumlar = Array.isArray(s.analysisC) && s.analysisC.length ? s.analysisC : s.c;
+    const son = mumlar[mumlar.length - 1].c;
     const poz = s.oylar.filter(o => o.puan > 0).length;
     const neg = s.oylar.filter(o => o.puan < 0).length;
     const nt = s.oylar.length - poz - neg;
