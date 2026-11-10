@@ -197,7 +197,6 @@ el('ara-btn').addEventListener('click', async () => {
     const dn = Veri.donustur(v, 80);
     if (!dn || !Array.isArray(dn.m) || dn.m.length < 15) throw new Error('Analiz için yeterli piyasa verisi alınamadı.');
 
-    const t = Goruntu.trend(dn.m);
     const sonMum = dn.d[dn.d.length - 1];
     const aralikMs = v.zd === '15m' ? 15 * 60 * 1000
       : v.zd === '1h' ? 60 * 60 * 1000
@@ -205,6 +204,8 @@ el('ara-btn').addEventListener('click', async () => {
         : (/\.IS$/i.test(v.sembol || '') && new Date(sonMum.t).getUTCHours() <= 2
           ? 15 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000));
     const sonMumAcik = !!(sonMum && Number.isFinite(sonMum.t) && Date.now() < sonMum.t + aralikMs);
+    const trendMumlari = sonMumAcik ? dn.m.slice(0, -1) : dn.m;
+    const t = Goruntu.trend(trendMumlari);
     const meta = {
       ad: v.ad, sembol: v.sembol, tur: v.tur, zd: v.zd, kaynak: v.kaynak,
       sonMumZamani: sonMum ? sonMum.t : null,
