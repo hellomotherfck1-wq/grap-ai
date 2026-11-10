@@ -675,7 +675,7 @@
     table.appendChild(body); wrap.appendChild(table); card.appendChild(wrap);
 
     card.appendChild(el('p', 'backtest-not',
-      'AL/SAT işlem simülasyonu sonraki mum açılışından başlar. Maliyet her sinyal için kaydedilir; yeni sinyallerin maliyeti yukarıdan değiştirilebilir. BEKLE kararları kazanma oranına katılmaz. Ajan yön isabeti, sinyalden sonraki 10 kapanmış mumun fiyat yönüyle ölçülür. Farklı varlıklardaki eş zamanlı pozisyonlar tek portföy gibi simüle edilmez. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
+      'AL/SAT işlem simülasyonu sonraki mum açılışından başlar. Maliyet her sinyal için kaydedilir; yeni sinyallerin maliyeti yukarıdan değiştirilebilir. BEKLE kararları kazanma oranına katılmaz. Ajan yön isabeti, sinyalden sonraki 10 kapanmış mumun fiyat yönüyle ölçülür. İşlemler bağımsız sinyal bazında değerlendirilir; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar Sonuç ekranını açınca ücretsiz kaynaktan güncellenir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
     root.appendChild(card);
 
     refresh.addEventListener('click', function () { updateResults(); });
