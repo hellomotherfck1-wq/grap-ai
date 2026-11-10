@@ -122,7 +122,7 @@ try {
       sembol: 'E2ESCANUSDT', ad: 'Tarama test coin', zd: '1h',
       signalAt: Date.now() - 12 * 60 * 60 * 1000, fiyat: 50,
       karar: 'AL', genelKarar: 'AL', teknikKarar: 'AL',
-      hacimKarar: 'AL', hacimSkor: 2, hataPayi: 'Düşük',
+      hacimKarar: 'AL', hacimSkor: 2, hataPayi: 'Düşük', denetciSorunSayisi: 2,
       skor: 80, stopFiyat: 45, hedefFiyat: 60, rr: 2
     }], { source: 'E2E tarama', market: 'Kripto', timeframe: '1h' });
     await new Promise(resolve => setTimeout(resolve, 120));
@@ -130,7 +130,8 @@ try {
     const all = await P.listele();
     const stored = all.filter(item => item.id === id);
     const scanStored = all.some(item => item.symbol === 'E2ESCANUSDT' &&
-      item.source === 'E2E tarama' && item.decision === 'AL');
+      item.source === 'E2E tarama' && item.decision === 'AL' &&
+      item.auditorError === 'Düşük' && item.auditorWarningCount === 2);
     const fkUpdated = stored.length === 1 && stored[0].decision === 'BEKLE' &&
       stored[0].fundamentalStatus === 'available' && stored[0].fkVeto === true;
     const record = {
