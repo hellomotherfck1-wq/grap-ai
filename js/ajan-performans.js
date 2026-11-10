@@ -143,7 +143,8 @@
   function safeRecord(input) {
     var symbol = norm(input.symbol);
     var tf = input.timeframe || input.zd;
-    var at = Number(input.signalAt);
+    var at = input.signalAt === null || input.signalAt === undefined || input.signalAt === ''
+      ? NaN : Number(input.signalAt);
     var price = Number(input.price);
     var decision = input.decision;
     if (!symbol || !interval(tf) || !num(at) || !num(price) || price <= 0 ||
