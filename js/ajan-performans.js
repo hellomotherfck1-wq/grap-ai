@@ -89,7 +89,7 @@
               [
                 'name', 'market', 'timeframe', 'signalAt', 'price', 'stop', 'target', 'rr',
                 'decision', 'generalDecision', 'technicalDecision', 'volumeDecision',
-                'volumeScore', 'auditorError', 'score', 'trend', 'rsi', 'fundamentalStatus',
+                'volumeScore', 'auditorError', 'auditorWarningCount', 'score', 'trend', 'rsi', 'fundamentalStatus',
                 'fkPE', 'fkValuation', 'fkVeto', 'costPct', 'horizon', 'agentVersion'
               ].forEach(function (key) {
                 if (record[key] !== undefined) finalRecord[key] = record[key];
@@ -182,6 +182,7 @@
       volumeDecision: input.volumeDecision || null,
       volumeScore: num(input.volumeScore) ? input.volumeScore : null,
       auditorError: input.auditorError || null,
+      auditorWarningCount: num(input.auditorWarningCount) ? Math.max(0, input.auditorWarningCount) : null,
       score: num(input.score) ? input.score : null,
       trend: input.trend || null,
       rsi: num(input.rsi) ? input.rsi : null,
@@ -237,11 +238,20 @@
       }
     } catch (e) {}
 
+    var auditCard = Array.isArray(y.kartlar) ? y.kartlar.find(function (card) {
+      return card && String(card.baslik || '').indexOf('🟧 Denetçi Ajan') === 0;
+    }) : null;
+    var auditTitle = auditCard ? String(auditCard.baslik || '') : '';
+    var auditMatch = /hata payı:\s*(düşük|orta|yüksek)/i.exec(auditTitle);
+    var auditCountMatch = auditCard && Array.isArray(auditCard.satirlar)
+      ? /,\s*(\d+)\s+sorun bulundu/i.exec(String(auditCard.satirlar[0] || '')) : null;
     var votes = {
       generalDecision: s.karar || 'BEKLE',
       technicalDecision: tech && tech.karar ? tech.karar : null,
       volumeDecision: voteFromVolume(volumeScore, !!(volume && volume.var)),
-      volumeScore: volumeScore
+      volumeScore: volumeScore,
+      auditorError: auditMatch ? auditMatch[1].charAt(0).toLocaleUpperCase('tr-TR') + auditMatch[1].slice(1).toLocaleLowerCase('tr-TR') : null,
+      auditorWarningCount: auditCountMatch ? Number(auditCountMatch[1]) : null
     };
     var symbol = input.symbol;
     var signalAt = Number(input.signalAt);
@@ -263,7 +273,8 @@
       technicalDecision: votes.technicalDecision,
       volumeDecision: votes.volumeDecision,
       volumeScore: votes.volumeScore,
-      auditorError: input.auditorError,
+      auditorError: input.auditorError || votes.auditorError,
+      auditorWarningCount: input.auditorWarningCount != null ? input.auditorWarningCount : votes.auditorWarningCount,
       score: y.uyum,
       trend: s.trend && s.trend.yon,
       rsi: s.rsi,
@@ -300,6 +311,7 @@
         volumeDecision: c.hacimKarar || voteFromVolume(c.hacimSkor, c.hacimSkor !== null && c.hacimSkor !== undefined),
         volumeScore: c.hacimSkor,
         auditorError: c.hataPayi,
+        auditorWarningCount: c.denetciSorunSayisi,
         score: c.skor,
         trend: c.trend,
         rsi: c.rsi,
@@ -527,6 +539,28 @@
     return wrap;
   }
 
+  function renderAuditorTable(records) {
+    var wrap = el('div', 'backtest-table-wrap');
+    var table = el('table', 'backtest-trade-table');
+    var head = el('thead'), hr = el('tr');
+    ['Denetçi seviyesi', 'Sinyal', 'Düşüş', 'Yükseliş', 'Yatay'].forEach(function (x) { hr.appendChild(el('th', '', x)); });
+    head.appendChild(hr); table.appendChild(head);
+    var body = el('tbody');
+    ['Düşük', 'Orta', 'Yüksek'].forEach(function (level) {
+      var rows = records.filter(function (r) {
+        return r.directionStatus === 'completed' && r.auditorError === level && num(r.forwardPct);
+      });
+      var down = rows.filter(function (r) { return r.forwardPct < -r.costPct; }).length;
+      var up = rows.filter(function (r) { return r.forwardPct > r.costPct; }).length;
+      var flat = rows.length - down - up;
+      var tr = el('tr');
+      [level, String(rows.length), String(down), String(up), String(flat)].forEach(function (x) { tr.appendChild(el('td', '', x)); });
+      body.appendChild(tr);
+    });
+    table.appendChild(body); wrap.appendChild(table);
+    return wrap;
+  }
+
   function renderBreakdown(records) {
     var groups = Object.create(null);
     records.forEach(function (r) {
@@ -634,6 +668,8 @@
       ['BEKLE değerlendirildi', String(observedWait.length)],
       ['Düşüşten kaçınma', String(avoided)],
       ['Yükseliş kaçırma', String(missed)],
+      ['Denetçi yüksek risk', String(all.filter(function (r) { return r.auditorError === 'Yüksek'; }).length)],
+      ['Denetçi bulgusu', String(all.reduce(function (sum, r) { return sum + (r.auditorWarningCount || 0); }, 0))],
       ['Veri aralığı dışında', String(expired)]
     ].forEach(function (x) { grid.appendChild(kpi(x[0], x[1])); });
     card.appendChild(grid);
@@ -648,6 +684,8 @@
     card.appendChild(renderAgentTable(all));
     card.appendChild(el('h4', 'backtest-trades-title', 'Piyasa ve zaman dilimi ayrımı'));
     card.appendChild(renderBreakdown(all));
+    card.appendChild(el('h4', 'backtest-trades-title', 'Denetçi risk seviyesi sonrası 10 mum sonucu'));
+    card.appendChild(renderAuditorTable(all));
 
     var fkRows = all.filter(function (r) { return r.fkVeto && r.directionStatus === 'completed'; });
     if (fkRows.length) {
@@ -661,7 +699,7 @@
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), row = el('tr');
-    ['Tarih', 'Varlık', 'Periyot', 'Karar', 'F/K', 'Durum', 'Net sonuç'].forEach(function (x) { row.appendChild(el('th', '', x)); });
+    ['Tarih', 'Varlık', 'Periyot', 'Karar', 'Denetçi', 'F/K', 'Durum', 'Net sonuç'].forEach(function (x) { row.appendChild(el('th', '', x)); });
     head.appendChild(row); table.appendChild(head);
     var body = el('tbody');
     all.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 15).forEach(function (r) {
@@ -674,7 +712,7 @@
         : r.fundamentalStatus === 'unavailable' ? 'Veri yok'
         : r.fundamentalStatus === 'not-included' ? 'Tarama dışı' : 'Uygulanmaz';
       [new Date(r.signalAt).toLocaleDateString('tr-TR'), r.name || r.symbol, r.timeframe,
-        r.decision, fkLabel, statusText(r), net].forEach(function (x) { tr.appendChild(el('td', '', x)); });
+        r.decision, r.auditorError || '—', fkLabel, statusText(r), net].forEach(function (x) { tr.appendChild(el('td', '', x)); });
       body.appendChild(tr);
     });
     table.appendChild(body); wrap.appendChild(table); card.appendChild(wrap);
@@ -700,14 +738,14 @@
 
   function exportCSV(records) {
     var columns = ['signalAt', 'symbol', 'name', 'market', 'timeframe', 'decision', 'generalDecision',
-      'technicalDecision', 'volumeDecision', 'fundamentalStatus', 'price', 'stop', 'target',
+      'technicalDecision', 'volumeDecision', 'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
       'costPct', 'tradeStatus', 'tradeOutcome', 'netPct', 'forwardPct', 'waitResult', 'source'];
     var rows = [columns.join(';')];
     records.slice().sort(function (a, b) { return a.signalAt - b.signalAt; }).forEach(function (r) {
       var values = [
         new Date(r.signalAt).toISOString(), r.symbol, r.name, r.market, r.timeframe, r.decision,
-        r.generalDecision, r.technicalDecision, r.volumeDecision, r.fundamentalStatus,
-        r.price, r.stop, r.target, r.costPct, r.tradeStatus,
+        r.generalDecision, r.technicalDecision, r.volumeDecision, r.auditorError, r.auditorWarningCount,
+        r.fundamentalStatus, r.price, r.stop, r.target, r.costPct, r.tradeStatus,
         r.tradeResult ? r.tradeResult.outcome : '',
         r.tradeResult ? r.tradeResult.netPct : '',
         r.forwardPct == null ? '' : r.forwardPct, r.waitResult || '', (r.sources || [r.source]).join('+')
