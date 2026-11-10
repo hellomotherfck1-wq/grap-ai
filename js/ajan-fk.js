@@ -411,13 +411,14 @@
     return karar === 'AL' ? '#26a69a' : karar === 'SAT' ? '#ef5350' : '#f0b429';
   }
 
-  function kartDOMGuncelle(card) {
+  function kartDOMGuncelle(card, eslesenBaslik) {
     try {
       var root = document.getElementById('tuval-alan');
       if (!root) return;
       var basliklar = root.querySelectorAll('.kart h3');
+      var onEk = eslesenBaslik || KART_BASLIK;
       for (var i = 0; i < basliklar.length; i++) {
-        if (String(basliklar[i].textContent || '').indexOf(KART_BASLIK) !== 0) continue;
+        if (String(basliklar[i].textContent || '').indexOf(onEk) !== 0) continue;
         var box = basliklar[i].parentNode;
         if (!box) return;
         box.replaceChildren();
@@ -493,6 +494,7 @@
       if (window.localStorage && g.anahtar) {
         localStorage.setItem(g.anahtar, JSON.stringify(g.gecmis || []));
       }
+      if (typeof sonucGuncelle === 'function') sonucGuncelle();
     } catch (e) {}
   }
 
@@ -503,6 +505,45 @@
     var eski = Array.isArray(y.ozet) ? y.ozet.slice() : [];
     y.ozet = ['Ajan kurulunun F/K sonrası kararı: ' + sonuc.son + ' — ' + sonuc.neden]
       .concat(eski).slice(0, 3);
+
+    var nihaiKart = null;
+    if (Array.isArray(y.kartlar)) {
+      for (var i = 0; i < y.kartlar.length; i++) {
+        if (y.kartlar[i] && String(y.kartlar[i].baslik || '').indexOf('⚖️ Nihai Karar (Denetçi):') === 0) {
+          nihaiKart = y.kartlar[i];
+          break;
+        }
+      }
+    }
+    if (nihaiKart) {
+      nihaiKart.baslik = '⚖️ Nihai Karar (Denetçi): ' + sonuc.son;
+      var fkSatiri = sonuc.pe !== null
+        ? 'F/K denetimi: ' + fmt(sonuc.pe, 2) + 'x (' + sonuc.durum + ').'
+        : 'F/K denetimi: doğrulanabilir oran bulunamadı.';
+      nihaiKart.satirlar = [
+        'Karar: ' + sonuc.son + ' (F/K denetimi sonrası)',
+        sonuc.neden,
+        'Teknik kurulun ilk kararı: ' + sonuc.base + '. ' + fkSatiri
+      ];
+      kartDOMGuncelle(nihaiKart, '⚖️ Nihai Karar (Denetçi):');
+    }
+
+    var tartisma = null;
+    if (Array.isArray(y.kartlar)) {
+      for (var j = 0; j < y.kartlar.length; j++) {
+        if (y.kartlar[j] && String(y.kartlar[j].baslik || '').indexOf('💬 Ajanların Tartışması') === 0) {
+          tartisma = y.kartlar[j];
+          break;
+        }
+      }
+    }
+    if (tartisma && Array.isArray(tartisma.satirlar)) {
+      tartisma.satirlar.push('🟪 F/K Ajanı: ' + (sonuc.pe !== null
+        ? fmt(sonuc.pe, 2) + 'x F/K ile değerleme ' + sonuc.durum + '.'
+        : 'F/K verisi doğrulanamadı; teknik kararı bu veriyle değiştirmiyorum.'));
+      tartisma.satirlar.push('🟪 Denetçi: ' + sonuc.son + ' kararı F/K değerlendirmesi sonrasında verildi.');
+    }
+
     kararDOMGuncelle(y);
     gecmisiGuncelle(sembol, sonuc, data);
   }
