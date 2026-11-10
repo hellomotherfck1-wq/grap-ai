@@ -352,9 +352,16 @@
       mumlar: candles,
       cekim: new Date()
     };
-    var dn = Veri.donustur(v, 80);
-    if (!dn || !dn.m || dn.m.length < 5) {
-      throw new Error('Yeterli mum yok');
+    var aralikMs = zd === '15m' ? 15 * 60 * 1000 : zd === '1h' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+    var kapanmisHam = candles.slice();
+    var sonHam = kapanmisHam.length ? kapanmisHam[kapanmisHam.length - 1] : null;
+    var sonMumAcik = !!(sonHam && Number.isFinite(Number(sonHam.t)) && Date.now() < Number(sonHam.t) + aralikMs);
+    if (sonMumAcik) kapanmisHam.pop();
+    if (kapanmisHam.length < 20) throw new Error('Kapanmış mum sayısı yetersiz.');
+    var vKapanmis = Object.assign({}, v, { mumlar: kapanmisHam });
+    var dn = Veri.donustur(vKapanmis, 80);
+    if (!dn || !dn.m || dn.m.length < 5 || !dn.d.length) {
+      throw new Error('Yeterli kapanmış mum yok');
     }
     var t = Goruntu.trend(dn.m);
     var s = Analiz.yap(dn.m, t);
@@ -374,6 +381,8 @@
       genelKarar: s.karar,
       teknikKarar: panel.teknik ? panel.teknik.karar : null,
       hacimSkor: panel.hacim ? panel.hacim.skor : null,
+      hacimKarar: panel.hacim && panel.hacim.var
+        ? (panel.hacim.skor > 0 ? 'AL' : panel.hacim.skor < 0 ? 'SAT' : 'BEKLE') : 'BEKLE',
       hataPayi: panel.denetci ? panel.denetci.hata : null,
       ozet: panel.ozet,
       tartisma: panel.tartisma,
@@ -385,6 +394,10 @@
         t2: s.plan.t2
       } : null,
       fiyat: sonFiyat,
+      signalAt: dn.d.length ? Number(dn.d[dn.d.length - 1].t) + aralikMs : null,
+      stopFiyat: s.plan ? dn.kal.lo + s.plan.stop * (dn.kal.hi - dn.kal.lo) : null,
+      hedefFiyat: s.plan ? dn.kal.lo + s.plan.t1 * (dn.kal.hi - dn.kal.lo) : null,
+      rr: s.plan && isFinite(s.plan.rr) ? s.plan.rr : null,
       trend: t ? t.yon : null,
       rsi: s.rsi
     };
@@ -398,7 +411,19 @@
       skor: r.skor,
       teknik: r.teknikKarar,
       hacim: r.hacimSkor,
-      hata: r.hataPayi
+      hacimKarar: r.hacimKarar,
+      hata: r.hataPayi,
+      signalAt: r.signalAt,
+      fiyat: r.fiyat,
+      stopFiyat: r.stopFiyat,
+      hedefFiyat: r.hedefFiyat,
+      rr: r.rr,
+      zd: r.zd,
+      genelKarar: r.genelKarar,
+      teknikKarar: r.teknikKarar,
+      hacimSkor: r.hacimSkor,
+      trend: r.trend,
+      rsi: r.rsi
     };
   }
 
@@ -424,6 +449,15 @@
       var bNet = b.karar === 'BEKLE' ? -20 : 0;
       return (b.skor + bNet) - (a.skor + aNet);
     });
+
+    if (window.AjanPerformans && typeof window.AjanPerformans.kaydetTarama === 'function') {
+      window.AjanPerformans.kaydetTarama(adaylar, {
+        source: 'Coin tarama',
+        market: 'Kripto',
+        timeframe: zd,
+        agentVersion: 'coin-tahmin-v1.2'
+      });
+    }
 
     var enIyi = adaylar.length ? adaylar[0] : null;
 
@@ -614,7 +648,7 @@
       '<p id="coin-tahmin-durum" class="alt"></p>' +
       '<div id="coin-tahmin-alan"></div>' +
       '<div id="coin-tahmin-hafiza"></div>' +
-      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: 200 Binance coin taranır (~3–7 dk). Aynı gün tekrar üretirsen önceki kayıtın üzerine yazılır.</p>';
+      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: 200 Binance coin taranır. Açık mumlar hesaplamaya alınmaz. AL/SAT sinyalleri (en fazla 40) veya AL/SAT yoksa en güçlü BEKLE adayı performans karnesine kaydedilir.</p>';
 
     var btn = document.getElementById('coin-tahmin-btn');
     var durum = document.getElementById('coin-tahmin-durum');
