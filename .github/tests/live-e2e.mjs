@@ -87,6 +87,40 @@ try {
     stopPriority && stopPriority.exit === 95 && stopPriority.reason === 'Stop' && stopPriority.net < 0,
     JSON.stringify(stopPriority));
 
+  const backtestEngine = await page.evaluate(() => {
+    const oldAnaliz = window.Analiz.yap;
+    const oldAjanlar = window.TahminAI.ajanlaraSor;
+    try {
+      window.Analiz.yap = function (m, trend) {
+        const result = oldAnaliz.call(this, m, trend);
+        result.plan = { stop: 0, t1: 1.5, rr: 2 };
+        return result;
+      };
+      window.TahminAI.ajanlaraSor = function () {
+        return { nihai: { son: 'AL' } };
+      };
+      const rows = Array.from({ length: 120 }, (_, i) => {
+        const close = 100 + i * 0.5;
+        return {
+          t: Date.now() - (120 - i) * 86400000,
+          o: close - 0.2, h: close + 1, l: close - 1, c: close, v: 1000 + i * 10
+        };
+      });
+      const result = window.BacktestAI.analizEt(rows, '1d', 0.20, 1);
+      return {
+        trades: result.islemSayisi,
+        entriesAfterSignal: result.islemler.every(trade => trade.girisZamani > trade.sinyalZamani),
+        portfolioReturn: result.toplamGetiri
+      };
+    } finally {
+      window.Analiz.yap = oldAnaliz;
+      window.TahminAI.ajanlaraSor = oldAjanlar;
+    }
+  });
+  check('Backtest sinyali sonraki mum açılışında işleme dönüştürüyor',
+    backtestEngine.trades > 0 && backtestEngine.entriesAfterSignal,
+    JSON.stringify(backtestEngine));
+
   const candleAlignment = await page.evaluate(() => {
     const rows = Array.from({ length: 40 }, (_, i) => {
       const mid = 100 + i * 0.25 + Math.sin(i / 3) * 1.5;
