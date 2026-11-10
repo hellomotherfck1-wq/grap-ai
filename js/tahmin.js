@@ -613,7 +613,8 @@
     table.className = 'bist-table';
     var thead = document.createElement('thead');
     var trh = document.createElement('tr');
-    ['Hisse', 'Fiyat', 'Son mum %', 'Hacim', 'Ort. 20', 'Hacim x', 'RSI', 'Karar', 'Skor', 'Grafik'].forEach(function (label) {
+    var basliklar = ['Hisse', 'Fiyat', 'Son mum %', 'Hacim', 'Ort. 20', 'Hacim x', 'RSI', 'Karar', 'Skor', 'Grafik'];
+    basliklar.forEach(function (label) {
       var th = document.createElement('th');
       th.textContent = label;
       trh.appendChild(th);
@@ -625,6 +626,7 @@
     adaylar.forEach(function (a) {
       var tr = document.createElement('tr');
       var ad = document.createElement('td');
+      ad.setAttribute('data-label', 'Hisse');
       ad.textContent = (a.ad || a.q || '—') + (a.sembol ? ' (' + a.sembol.replace(/\.IS$/i, '') + ')' : '');
       tr.appendChild(ad);
 
@@ -639,6 +641,7 @@
         degerYaz(a.skor, 0)
       ].forEach(function (value, idx) {
         var td = document.createElement('td');
+        td.setAttribute('data-label', basliklar[idx + 1]);
         td.textContent = value;
         if (idx === 6) td.style.fontWeight = '800';
         if (idx === 6) td.style.color = a.karar === 'AL' ? '#26a69a' : a.karar === 'SAT' ? '#ef5350' : '#f0b429';
@@ -646,6 +649,7 @@
       });
 
       var action = document.createElement('td');
+      action.setAttribute('data-label', 'Grafik');
       var button = document.createElement('button');
       button.type = 'button';
       button.className = 'bist-mini-btn';
