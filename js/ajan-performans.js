@@ -193,7 +193,9 @@
   function save(input) {
     var record = safeRecord(input || {});
     if (!record) return null;
-    putRecord(record).then(render).catch(function (e) {
+    putRecord(record).then(function () {
+      return allRecords().then(render);
+    }).catch(function (e) {
       setStatus('Sinyal kaydedilemedi: ' + (e && e.message ? e.message : String(e)), true);
     });
     return record.id;
@@ -269,8 +271,9 @@
       return c && c.karar === 'BEKLE' && c.sembol && c.sembol !== '—';
     }).slice(0, 1);
     var count = 0;
+    var writes = [];
     chosen.forEach(function (c) {
-      var id = save({
+      var record = safeRecord({
         source: meta.source || 'Tarama',
         symbol: c.sembol,
         name: c.ad,
@@ -293,7 +296,10 @@
         fundamentalStatus: 'not-included',
         agentVersion: meta.agentVersion || 'graph-ai-scan-v1'
       });
-      if (id) count++;
+      if (record) { count++; writes.push(putRecord(record)); }
+    });
+    Promise.all(writes).then(allRecords).then(render).catch(function (e) {
+      setStatus('Tarama sinyalleri kaydedilemedi: ' + (e && e.message ? e.message : String(e)), true);
     });
     return count;
   }
@@ -303,7 +309,12 @@
     var patch = Object.assign({}, extra || {}, { decision: decision });
     patch.tradeStatus = decision === 'BEKLE' ? 'not-applicable' : 'pending';
     patch.directionStatus = 'pending';
-    return patchRecord(id, patch).then(render).catch(function (e) {
+    return patchRecord(id, patch).then(function (updated) {
+      return allRecords().then(function (records) {
+        render(records);
+        return updated;
+      });
+    }).catch(function (e) {
       setStatus('Ajan kararı güncellenemedi: ' + (e && e.message ? e.message : String(e)), true);
       return null;
     });
@@ -476,7 +487,8 @@
       else if ((r[key] === 'AL' && r.forwardPct > 0) || (r[key] === 'SAT' && r.forwardPct < 0)) correct++;
       else wrong++;
     });
-    return { count: calls.length, correct: correct, wrong: wrong, flat: flat, rate: calls.length ? correct / (correct + wrong) * 100 : null };
+    var directional = correct + wrong;
+    return { count: calls.length, correct: correct, wrong: wrong, flat: flat, rate: directional ? correct / directional * 100 : null };
   }
 
   function renderAgentTable(records) {
@@ -663,8 +675,10 @@
       });
       var list = Object.keys(groups).map(function (key) { return groups[key]; });
       if (!list.length) {
-        setStatus('Güncellenecek sinyal yok. Yeni sinyaller geldikçe burada birikecek.');
-        return allRecords().then(render);
+        return allRecords().then(function (fresh) {
+          render(fresh);
+          setStatus('Güncellenecek sinyal yok. Yeni sinyaller geldikçe burada birikecek.');
+        });
       }
       var index = 0, completed = 0, failures = 0;
       function worker() {
