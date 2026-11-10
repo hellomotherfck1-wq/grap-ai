@@ -124,6 +124,12 @@ try {
       karar: 'AL', genelKarar: 'AL', teknikKarar: 'AL',
       hacimKarar: 'AL', hacimSkor: 2, hataPayi: 'Düşük', denetciSorunSayisi: 2,
       skor: 80, stopFiyat: 45, hedefFiyat: 60, rr: 2
+    }, {
+      sembol: 'E2EWAITUSDT', ad: 'Bekle test coin', zd: '1h',
+      signalAt: Date.now() - 12 * 60 * 60 * 1000, fiyat: 25,
+      karar: 'BEKLE', genelKarar: 'BEKLE', teknikKarar: 'BEKLE',
+      hacimKarar: 'BEKLE', hacimSkor: 0, hataPayi: 'Yüksek',
+      denetciSorunSayisi: 4, skor: 20
     }], { source: 'E2E tarama', market: 'Kripto', timeframe: '1h' });
     await new Promise(resolve => setTimeout(resolve, 120));
     await P.guncelleKarar(id, 'BEKLE', { fundamentalStatus: 'available', fkVeto: true });
@@ -132,6 +138,8 @@ try {
     const scanStored = all.some(item => item.symbol === 'E2ESCANUSDT' &&
       item.source === 'E2E tarama' && item.decision === 'AL' &&
       item.auditorError === 'Düşük' && item.auditorWarningCount === 2);
+    const waitStored = all.some(item => item.symbol === 'E2EWAITUSDT' &&
+      item.decision === 'BEKLE' && item.auditorError === 'Yüksek');
     const fkUpdated = stored.length === 1 && stored[0].decision === 'BEKLE' &&
       stored[0].fundamentalStatus === 'available' && stored[0].fkVeto === true;
     const record = {
@@ -159,6 +167,7 @@ try {
       rawCandlesNotStored: stored.length === 1 && !Array.isArray(stored[0].mumlar),
       scanCount: scanCount,
       scanStored: scanStored,
+      waitStored: waitStored,
       fkUpdated: fkUpdated,
       retentionDays: P.ayarlar.saklamaGun,
       defaultCostPct: P.maliyetOku(),
@@ -172,8 +181,9 @@ try {
   });
   check('Performans hafızası sinyalleri tekilleştiriyor, taramaları kaydediyor ve 365 gün tutuyor',
     performanceChecks.storedOnce && performanceChecks.rawCandlesNotStored &&
-    performanceChecks.scanCount === 1 && performanceChecks.scanStored &&
-    performanceChecks.fkUpdated && performanceChecks.retentionDays === 365 &&
+    performanceChecks.scanCount === 2 && performanceChecks.scanStored &&
+    performanceChecks.waitStored && performanceChecks.fkUpdated &&
+    performanceChecks.retentionDays === 365 &&
     performanceChecks.defaultCostPct === 0.20,
     JSON.stringify(performanceChecks));
   check('Canlı sinyal değerlendirmesi sonraki mum açılışını kullanıyor',
