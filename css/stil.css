@@ -238,3 +238,11 @@ button:focus-visible, summary:focus-visible, label:focus-visible { outline: 2px 
   .performans-eylemler .buton { flex: 1 1 130px; }
   .ajan-performans .backtest-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.performans-maliyet { display: flex; align-items: end; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.performans-maliyet label { display: block; width: 100%; margin: 0; color: #aebdca; font-size: 11px; }
+.performans-maliyet input {
+  width: 90px; min-height: 36px; padding: 7px 9px; border: 1px solid var(--kenar);
+  border-radius: 8px; background: #0e1721; color: var(--yazi); font: inherit;
+}
+.performans-maliyet .buton { min-height: 36px; padding: 7px 10px; font-size: 11px; }
