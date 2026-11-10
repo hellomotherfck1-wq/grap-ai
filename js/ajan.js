@@ -481,6 +481,87 @@
       return out;
     };
 
+    // Backtest için daha uzun geçmiş: Yahoo Finance herkese açık chart ucu / Binance public klines.
+    // Ücretli API anahtarı kullanılmaz. Güncel tarama uçları değiştirilmeden ayrı tutulur.
+    Veri.gecmis = async function (girdi, zd) {
+      var adaylar = this.coz(girdi);
+      if (!adaylar.length) throw new Error('Varlık sembolü anlaşılamadı.');
+      var aralik = {
+        '15m': { yahoo: ['15m', '30d'], binance: '15m' },
+        '1h': { yahoo: ['60m', '3mo'], binance: '1h' },
+        '1d': { yahoo: ['1d', '2y'], binance: '1d' }
+      }[zd || '1d'];
+      if (!aralik) throw new Error('Desteklenmeyen zaman dilimi.');
+      var sonHata = null;
+
+      for (var a = 0; a < adaylar.length; a++) {
+        var aday = adaylar[a];
+        try {
+          var mumlar = [];
+          if (aday.kaynak === 'b') {
+            var hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
+            var binanceHata = null;
+            for (var h = 0; h < hosts.length; h++) {
+              try {
+                var rows = await this.getir(
+                  hosts[h] + '/api/v3/klines?symbol=' + encodeURIComponent(aday.sembol) +
+                  '&interval=' + aralik.binance + '&limit=1000',
+                  30000
+                );
+                if (!Array.isArray(rows) || rows.length < 80) throw new Error('Yeterli Binance geçmiş verisi yok.');
+                mumlar = rows.map(function (row) {
+                  return { t: Number(row[0]), o: Number(row[1]), h: Number(row[2]), l: Number(row[3]), c: Number(row[4]), v: Number(row[5]) };
+                });
+                break;
+              } catch (eBinance) { binanceHata = eBinance; }
+            }
+            if (!mumlar.length) throw binanceHata || new Error('Binance geçmiş verisi alınamadı.');
+          } else {
+            var yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
+              encodeURIComponent(aday.sembol) + '?interval=' + aralik.yahoo[0] + '&range=' + aralik.yahoo[1];
+            var controller = new AbortController();
+            var timeout = setTimeout(function () { controller.abort(); }, 30000);
+            var payload;
+            try {
+              var response = await fetch(VEKIL + encodeURIComponent(yahooUrl), { signal: controller.signal });
+              if (!response.ok) throw new Error('Yahoo geçmiş veri HTTP ' + response.status);
+              payload = await response.json();
+            } finally {
+              clearTimeout(timeout);
+            }
+            var chart = payload && payload.chart && payload.chart.result && payload.chart.result[0];
+            if (!chart || !Array.isArray(chart.timestamp)) throw new Error('Yahoo Finance geçmiş verisi bulunamadı.');
+            var quote = chart.indicators && chart.indicators.quote && chart.indicators.quote[0];
+            if (!quote) throw new Error('Yahoo Finance mum alanları eksik.');
+            chart.timestamp.forEach(function (time, index) {
+              var o = quote.open && quote.open[index];
+              var h = quote.high && quote.high[index];
+              var l = quote.low && quote.low[index];
+              var c = quote.close && quote.close[index];
+              if (o != null && h != null && l != null && c != null) {
+                mumlar.push({
+                  t: Number(time) * 1000,
+                  o: Number(o), h: Number(h), l: Number(l), c: Number(c),
+                  v: quote.volume && quote.volume[index] != null ? Number(quote.volume[index]) : 0
+                });
+              }
+            });
+          }
+
+          if (mumlar.length < 80) throw new Error('Geçmiş veri kısa (' + mumlar.length + ' mum).');
+          return Object.assign({}, aday, {
+            mumlar: mumlar,
+            zd: zd || '1d',
+            cekim: new Date(),
+            gecmisAraligi: aralik.yahoo ? aralik.yahoo[1] : 'Binance son 1000 mum'
+          });
+        } catch (e) {
+          sonHata = e;
+        }
+      }
+      throw new Error('Ücretsiz geçmiş veri alınamadı' + (sonHata ? ': ' + (sonHata.message || sonHata) : '.'));
+    };
+
     if (typeof Veri.donustur === 'function') {
       var eskiD = Veri.donustur;
       Veri.donustur = function (v, adet) {
