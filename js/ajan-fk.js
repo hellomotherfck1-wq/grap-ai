@@ -30,4 +30,4 @@
     return /(-USD|-USDT|-EUR|=X|=F)$/i.test(sembol) || sembol.charAt(0) === '^';
   }
 
-  /* ---------- Temel veriyi çek (hiçbir zaman reddetmez) ---------- */
+  /* ---------- Temel veriyi çek (hiçbir zaman reddetmez) ---------- */ 
