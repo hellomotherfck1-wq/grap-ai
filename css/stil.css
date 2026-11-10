@@ -221,3 +221,20 @@ button:focus-visible, summary:focus-visible, label:focus-visible { outline: 2px 
   .backtest-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .backtest-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Agent performance dashboard */
+.ajan-performans-alani { margin: 0 0 14px; }
+.ajan-performans { margin: 0; }
+.performans-baslik { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.performans-baslik h3 { margin: 0 0 5px; font-size: 17px; }
+.performans-eylemler { display: flex; gap: 7px; flex-wrap: wrap; }
+.performans-eylemler .buton { min-height: 38px; padding: 8px 11px; font-size: 12px; }
+.ajan-performans .backtest-trade-table { min-width: 610px; }
+.ajan-performans .backtest-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 600px) {
+  .performans-baslik { display: block; }
+  .performans-eylemler { margin-top: 9px; }
+  .performans-eylemler .buton { flex: 1 1 130px; }
+  .ajan-performans .backtest-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
