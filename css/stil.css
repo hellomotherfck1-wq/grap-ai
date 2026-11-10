@@ -162,3 +162,62 @@ button:focus-visible, summary:focus-visible, label:focus-visible { outline: 2px 
 .finansal-kap-satir a { color: #8abaff; text-decoration: underline; }
 .finansal-kap-satir small { display: block; color: var(--soluk); font-size: 11px; }
 .finansal-kap-ozet { margin-top: 3px; }
+
+
+/* Mobile-first BIST scan cards: no 860px table spilling outside the phone viewport. */
+.bist-table-wrap { max-width: 100%; min-width: 0; }
+@media (max-width: 600px) {
+  .bist-table-wrap { overflow: visible; }
+  .bist-table { display: block; width: 100%; min-width: 0; font-size: 12px; }
+  .bist-table thead {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  .bist-table tbody { display: grid; gap: 9px; }
+  .bist-table tbody tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 10px;
+    min-width: 0; padding: 10px; border: 1px solid var(--kenar);
+    border-radius: 12px; background: rgba(10, 17, 25, .42);
+  }
+  .bist-table td {
+    display: block; min-width: 0; padding: 4px 2px; border: 0;
+    text-align: left; white-space: normal; overflow-wrap: anywhere;
+  }
+  .bist-table td::before {
+    content: attr(data-label); display: block; margin-bottom: 2px;
+    color: var(--soluk); font-size: 10px; font-weight: 650;
+  }
+  .bist-table td:first-child {
+    grid-column: 1 / -1; padding-bottom: 8px; border-bottom: 1px solid var(--kenar);
+    color: #f1f5f9; font-size: 13px; font-weight: 800;
+  }
+  .bist-table td:first-child::before { display: none; }
+  .bist-table td:last-child { align-self: center; }
+  .bist-table .bist-mini-btn { width: 100%; min-height: 34px; }
+}
+
+/* Free historical backtest panel. */
+.backtest-panel { margin-top: 16px; }
+.backtest-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
+.backtest-field { min-width: 0; }
+.backtest-field label { margin: 3px 0 5px; font-size: 12px; }
+.backtest-field input, .backtest-field select {
+  display: block; width: 100%; min-width: 0; min-height: 43px; padding: 9px;
+  border: 1px solid var(--kenar); border-radius: 9px; background: #0e1721;
+  color: var(--yazi); font: inherit; font-size: 14px;
+}
+.backtest-kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.backtest-kpi { min-width: 0; padding: 10px; border: 1px solid var(--kenar); border-radius: 10px; background: rgba(10, 17, 25, .65); }
+.backtest-kpi span { display: block; color: var(--soluk); font-size: 11px; line-height: 1.35; }
+.backtest-kpi strong { display: block; margin-top: 4px; color: #f3f7fb; font-size: 17px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.backtest-not { margin: 8px 0; color: #aebdca; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.backtest-trades-title { margin: 16px 0 8px; font-size: 14px; }
+.backtest-table-wrap { max-width: 100%; overflow-x: auto; }
+.backtest-trade-table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 12px; }
+.backtest-trade-table th, .backtest-trade-table td { padding: 8px 7px; border-bottom: 1px solid var(--kenar); text-align: right; white-space: nowrap; }
+.backtest-trade-table th { color: #9db0c2; background: #1a2734; }
+.backtest-trade-table th:first-child, .backtest-trade-table td:first-child { text-align: left; }
+@media (max-width: 600px) {
+  .backtest-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .backtest-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
