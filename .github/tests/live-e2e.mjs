@@ -87,19 +87,24 @@ try {
     stopPriority && stopPriority.exit === 95 && stopPriority.reason === 'Stop' && stopPriority.net < 0,
     JSON.stringify(stopPriority));
 
+  await page.locator('nav button[data-git="sonuc"]').click();
   await page.locator('#ajan-performans-guncelle').waitFor({ state: 'attached', timeout: 15000 });
+  await page.setViewportSize({ width: 390, height: 844 });
   const performanceUI = await page.evaluate(() => ({
     panel: !!document.querySelector('#ajan-performans-panel .ajan-performans'),
     csv: !!document.getElementById('ajan-performans-csv'),
     costInput: document.getElementById('ajan-performans-maliyet')?.value || null,
     panelWidth: Math.round(document.getElementById('ajan-performans-panel').getBoundingClientRect().width),
+    panelScrollWidth: document.getElementById('ajan-performans-panel').scrollWidth,
     viewport: document.documentElement.clientWidth
   }));
   check('Ajan performans paneli, CSV ve maliyet ayarı görünür',
     performanceUI.panel && performanceUI.csv && performanceUI.costInput === '0.20',
     JSON.stringify(performanceUI));
   check('Ajan performans paneli mobil ekrana sığıyor',
-    performanceUI.panelWidth <= performanceUI.viewport + 1, JSON.stringify(performanceUI));
+    performanceUI.panelWidth > 0 && performanceUI.panelWidth <= performanceUI.viewport + 1 &&
+    performanceUI.panelScrollWidth <= performanceUI.viewport + 1, JSON.stringify(performanceUI));
+  await page.setViewportSize({ width: 1440, height: 900 });
   const performanceChecks = await page.evaluate(async () => {
     const P = window.AjanPerformans;
     const signal = {
