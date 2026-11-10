@@ -288,9 +288,13 @@
     if (!Array.isArray(candidates) || !candidates.length) return 0;
     meta = meta || {};
     var actionable = candidates.filter(function (c) { return c && (c.karar === 'AL' || c.karar === 'SAT'); });
-    var chosen = actionable.length ? actionable.slice(0, 40) : candidates.filter(function (c) {
+    var chosen = actionable.slice(0, 40);
+    var bestWait = candidates.find(function (c) {
       return c && c.karar === 'BEKLE' && c.sembol && c.sembol !== '—';
-    }).slice(0, 1);
+    });
+    if (bestWait && !chosen.some(function (c) {
+      return c.sembol === bestWait.sembol && c.signalAt === bestWait.signalAt;
+    })) chosen.push(bestWait);
     var count = 0;
     var writes = [];
     chosen.forEach(function (c) {
