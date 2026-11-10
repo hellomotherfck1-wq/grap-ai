@@ -650,7 +650,7 @@
       '<p id="coin-tahmin-durum" class="alt"></p>' +
       '<div id="coin-tahmin-alan"></div>' +
       '<div id="coin-tahmin-hafiza"></div>' +
-      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: 200 Binance coin taranır. Açık mumlar hesaplamaya alınmaz. AL/SAT sinyalleri (en fazla 40) veya AL/SAT yoksa en güçlü BEKLE adayı performans karnesine kaydedilir.</p>';
+      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: 200 Binance coin taranır. Açık mumlar hesaplamaya alınmaz. AL/SAT sinyalleri (en fazla 40) ve ayrıca en güçlü BEKLE adayı performans karnesine kaydedilir.</p>';
 
     var btn = document.getElementById('coin-tahmin-btn');
     var durum = document.getElementById('coin-tahmin-durum');
