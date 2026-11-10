@@ -43,7 +43,8 @@ try {
   );
   check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma ajanı');
 
-  check('F/K ajanı modülü yüklendi', Boolean(window.Ajan && window.Ajan.fk && typeof window.Ajan.fk.degerlendir === 'function'), 'F/K değerleme ve karar denetimi hazır');
+  const fkAgentLoaded = await page.evaluate(() => Boolean(window.Ajan && window.Ajan.fk && typeof window.Ajan.fk.degerlendir === 'function'));
+  check('F/K ajanı modülü yüklendi', fkAgentLoaded, 'F/K değerleme ve karar denetimi hazır');
   const fkRules = await page.evaluate(() => {
     const fk = window.Ajan.fk;
     const high = fk.degerlendir({
@@ -539,7 +540,7 @@ try {
     const card = cards.find(h => h.textContent.startsWith('📊 F/K Değerleme ve Ajanlar Arası Tartışma'));
     return card && card.parentElement.textContent.includes('Son 12 ay F/K: 5,2');
   }, null, { timeout: 30000 });
-  const fkCardText = await page.locator('#tuval-alan .kart').filter({ has: page.locator('h3', { hasText: 'F/K Değerleme ve Ajanlar Arası Tartışma' }) }).innerText();
+  const fkCardText = await page.locator('#tuval-alan .kart').filter({ hasText: 'F/K Değerleme ve Ajanlar Arası Tartışma' }).innerText();
   check('Grafik analizine gerçek F/K değeri aktarılıyor', fkCardText.includes('5,2x') || fkCardText.includes('5,2'), fkCardText.slice(0, 450));
   check('F/K ajanları tartışma ve nihai kararı gösteriyor', fkCardText.includes('F/K Ajanı:') && fkCardText.includes('Kurulun nihai kararı:'), fkCardText.slice(-500));
 
