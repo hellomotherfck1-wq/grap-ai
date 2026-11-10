@@ -739,6 +739,7 @@
       records.forEach(function (r) {
         if (r.tradeStatus !== 'pending' && r.directionStatus !== 'pending') return;
         if (Date.now() < r.signalAt + interval(r.timeframe)) return;
+        if (num(r.nextCheckAt) && Date.now() < r.nextCheckAt) return;
         var key = r.symbol + '|' + r.timeframe;
         if (!groups[key]) groups[key] = { symbol: r.symbol, timeframe: r.timeframe, records: [] };
         groups[key].records.push(r);
@@ -771,7 +772,11 @@
               return;
             }
             var evaluated = evaluateSignal(record, bars);
-            var patch = { lastCheckedAt: Date.now(), lastError: null };
+            var patch = {
+              lastCheckedAt: Date.now(),
+              nextCheckAt: Date.now() + step,
+              lastError: null
+            };
             if (evaluated.trade && record.tradeStatus === 'pending') {
               patch.tradeStatus = evaluated.trade.status;
               patch.tradeResult = evaluated.trade;
@@ -796,6 +801,7 @@
           return Promise.all(group.records.map(function (r) {
             return saveEvaluation(r.id, {
               lastCheckedAt: Date.now(),
+              nextCheckAt: Date.now() + 6 * 60 * 60 * 1000,
               lastError: e && e.message ? e.message : String(e)
             });
           }));
