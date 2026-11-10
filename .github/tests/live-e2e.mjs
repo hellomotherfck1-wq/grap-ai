@@ -106,9 +106,18 @@ try {
     };
     const id = P.kaydet(signal);
     P.kaydet(signal);
-    await new Promise(resolve => setTimeout(resolve, 80));
+    const scanCount = P.kaydetTarama([{
+      sembol: 'E2ESCANUSDT', ad: 'Tarama test coin', zd: '1h',
+      signalAt: Date.now() - 12 * 60 * 60 * 1000, fiyat: 50,
+      karar: 'AL', genelKarar: 'AL', teknikKarar: 'AL',
+      hacimKarar: 'AL', hacimSkor: 2, hataPayi: 'Düşük',
+      skor: 80, stopFiyat: 45, hedefFiyat: 60, rr: 2
+    }], { source: 'E2E tarama', market: 'Kripto', timeframe: '1h' });
+    await new Promise(resolve => setTimeout(resolve, 120));
     const all = await P.listele();
     const stored = all.filter(item => item.id === id);
+    const scanStored = all.some(item => item.symbol === 'E2ESCANUSDT' &&
+      item.source === 'E2E tarama' && item.decision === 'AL');
     const record = {
       decision: 'AL', signalAt: 1000, price: 100, stop: 95, target: 110,
       timeframe: '1h', horizon: 2, costPct: 0.2
@@ -132,6 +141,8 @@ try {
     return {
       storedOnce: stored.length === 1,
       rawCandlesNotStored: stored.length === 1 && !Array.isArray(stored[0].mumlar),
+      scanCount: scanCount,
+      scanStored: scanStored,
       retentionDays: P.ayarlar.saklamaGun,
       targetAtNextOpen: target.trade && target.trade.status === 'completed' &&
         target.trade.entry === 100 && target.trade.exit === 110 && target.trade.outcome === 'win',
@@ -141,8 +152,10 @@ try {
         wait.direction.classification === 'up' && wait.direction.forwardPct > 0
     };
   });
-  check('Performans hafızası aynı sinyali tekilleştiriyor ve 365 gün tutuyor',
-    performanceChecks.storedOnce && performanceChecks.rawCandlesNotStored && performanceChecks.retentionDays === 365,
+  check('Performans hafızası sinyalleri tekilleştiriyor, taramaları kaydediyor ve 365 gün tutuyor',
+    performanceChecks.storedOnce && performanceChecks.rawCandlesNotStored &&
+    performanceChecks.scanCount === 1 && performanceChecks.scanStored &&
+    performanceChecks.retentionDays === 365,
     JSON.stringify(performanceChecks));
   check('Canlı sinyal değerlendirmesi sonraki mum açılışını kullanıyor',
     performanceChecks.targetAtNextOpen, JSON.stringify(performanceChecks));
