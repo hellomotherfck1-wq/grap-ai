@@ -465,6 +465,7 @@ try {
   // The backtest must use free public history and execute only after the signal candle closes.
   await page.locator('nav button[data-git="strateji"]').click();
   await page.locator('#backtest-panel').waitFor({ state: 'attached', timeout: 15000 });
+  await page.locator('#backtest-panel summary').click();
   const historyCheck = await page.evaluate(async () => {
     const data = await Veri.gecmis('THYAO', '1d');
     return { symbol: data.sembol, count: data.mumlar.length, source: data.kaynak };
