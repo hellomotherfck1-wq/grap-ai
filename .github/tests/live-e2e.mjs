@@ -36,7 +36,7 @@ try {
   check('Canlı site HTTP yanıtı', Boolean(response && response.ok()), response ? String(response.status()) : 'Yanıt alınamadı');
 
   await page.waitForFunction(() =>
-    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI) &&
+    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.BacktestAI) &&
     typeof Veri !== 'undefined' && typeof Analiz !== 'undefined' && typeof Cizim !== 'undefined',
     null,
     { timeout: 45000 }
@@ -75,6 +75,17 @@ try {
   check('Ajanlar, hacim ve risk/kazanç aynı yöndeyse karar veriyor', decisionRules.confirmed === 'AL', JSON.stringify(decisionRules));
   check('Hacim verisi yoksa nihai karar BEKLE', decisionRules.noVolume === 'BEKLE', JSON.stringify(decisionRules));
   check('Risk/kazanç 1:1,5 altındaysa BEKLE', decisionRules.weakRR === 'BEKLE', JSON.stringify(decisionRules));
+  const stopPriority = await page.evaluate(() => {
+    const trade = window.BacktestAI.simuleIslem(
+      'AL', 100, 95, 110,
+      [{ t: 1, o: 100, h: 112, l: 94, c: 108 }],
+      0, 1, 0.20
+    );
+    return trade && { exit: trade.cikis, reason: trade.neden, net: trade.netYuzde };
+  });
+  check('Aynı mumda stop ve hedef görülürse stop önce sayılıyor',
+    stopPriority && stopPriority.exit === 95 && stopPriority.reason === 'Stop' && stopPriority.net < 0,
+    JSON.stringify(stopPriority));
 
   const candleAlignment = await page.evaluate(() => {
     const rows = Array.from({ length: 40 }, (_, i) => {
@@ -451,6 +462,31 @@ try {
     await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(binanceRows) });
   });
 
+  // The backtest must use free public history and execute only after the signal candle closes.
+  await page.locator('nav button[data-git="strateji"]').click();
+  await page.locator('#backtest-panel').waitFor({ state: 'attached', timeout: 15000 });
+  const historyCheck = await page.evaluate(async () => {
+    const data = await Veri.gecmis('THYAO', '1d');
+    return { symbol: data.sembol, count: data.mumlar.length, source: data.kaynak };
+  });
+  check('Ücretsiz Yahoo Finance geçmiş verisi alınıyor',
+    historyCheck.symbol === 'THYAO.IS' && historyCheck.count >= 80 && historyCheck.source === 'y',
+    JSON.stringify(historyCheck));
+
+  await page.locator('#backtest-sembol').fill('THYAO');
+  await page.locator('#backtest-zd').selectOption('1d');
+  await page.locator('#backtest-btn').click();
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#backtest-durum')?.textContent || '';
+    return status.startsWith('Test tamamlandı') || status.startsWith('Test tamamlanamadı:');
+  }, null, { timeout: 90000 });
+  const backtestStatus = await page.locator('#backtest-durum').innerText();
+  const backtestText = await page.locator('#backtest-sonuc').innerText();
+  check('Ücretsiz geçmiş sinyal testi arayüzü çalışıyor',
+    backtestStatus.startsWith('Test tamamlandı') && backtestText.includes('Yahoo Finance') && backtestText.includes('Son mum test dışında'),
+    backtestStatus + ' · ' + backtestText.slice(0, 350));
+
+
   const yahooVolume = await page.evaluate(async () => {
     const rows = await Veri.yahoo('THYAO.IS', '1d');
     return { count: rows.length, lastVolume: rows[rows.length - 1].v };
@@ -612,6 +648,24 @@ try {
     return { viewport, page: document.documentElement.scrollWidth, navVisible: Array.from(document.querySelectorAll('nav button')).every(button => { const rect = button.getBoundingClientRect(); return rect.width > 0 && rect.height > 0; }), offenders };
   });
   check('Mobil ekran taşma ve menü kontrolü', mobileLayout.page <= mobileLayout.viewport + 1 && mobileLayout.navVisible, JSON.stringify(mobileLayout));
+  const mobileTable = await page.evaluate(() => {
+    const table = document.querySelector('.bist-table');
+    const details = table && table.closest('details');
+    if (details) details.open = true;
+    if (!table) return null;
+    const rect = table.getBoundingClientRect();
+    return {
+      width: Math.round(rect.width),
+      viewport: document.documentElement.clientWidth,
+      scrollWidth: table.scrollWidth,
+      clientWidth: table.clientWidth,
+      labels: Array.from(table.querySelectorAll('tbody td')).every(td => td.hasAttribute('data-label'))
+    };
+  });
+  check('BIST tablosu telefonda kart düzenine geçiyor',
+    mobileTable && mobileTable.width <= mobileTable.viewport + 1 &&
+    mobileTable.scrollWidth <= mobileTable.clientWidth + 1 && mobileTable.labels,
+    JSON.stringify(mobileTable));
 
   check('Tarayıcı JavaScript hatası yok', report.pageErrors.length === 0, report.pageErrors.join(' | ') || 'Hata yakalanmadı');
   report.finalURL = page.url();
