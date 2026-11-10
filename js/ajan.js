@@ -314,7 +314,8 @@
     /* ---- Hacim teyidi ---- */
     var teyit = 'yok', teyitMetni = 'Teyit edilecek hacim yorumu yok.', yon2 = 0, oran2 = 0;
     if (H && H.var && v) {
-      var son2 = n - 2, obv = 0, top = 0;
+      // c dizisi açık mumdan arındırılmıştır; OBV son kapanmış muma kadar hesaplanır.
+      var son2 = n - 1, obv = 0, top = 0;
       for (i = son2 - 9; i <= son2; i++) {
         if (i < 1) continue;
         var d = c[i].c - c[i - 1].c;
