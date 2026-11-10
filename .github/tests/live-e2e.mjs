@@ -43,6 +43,51 @@ try {
   );
   check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma ajanı');
 
+  const decisionRules = await page.evaluate(() => {
+    const A = window.Ajan;
+    const lowConsensus = A.nihai(
+      { karar: 'AL', plan: { rr: 2 } },
+      { var: true, skor: 1 },
+      { var: true, karar: 'BEKLE', guven: 'yüksek' },
+      { hata: 'Düşük' }
+    );
+    const confirmed = A.nihai(
+      { karar: 'AL', plan: { rr: 2 } },
+      { var: true, skor: 2 },
+      { var: true, karar: 'AL', guven: 'yüksek' },
+      { hata: 'Düşük' }
+    );
+    const noVolume = A.nihai(
+      { karar: 'AL', plan: { rr: 2 } },
+      { var: false },
+      { var: true, karar: 'AL', guven: 'yüksek' },
+      { hata: 'Düşük' }
+    );
+    const weakRR = A.nihai(
+      { karar: 'AL', plan: { rr: 1.1 } },
+      { var: true, skor: 2 },
+      { var: true, karar: 'AL', guven: 'yüksek' },
+      { hata: 'Düşük' }
+    );
+    return { lowConsensus: lowConsensus.son, confirmed: confirmed.son, noVolume: noVolume.son, weakRR: weakRR.son };
+  });
+  check('Tek ajan ve hacim tek başına AL üretemiyor', decisionRules.lowConsensus === 'BEKLE', JSON.stringify(decisionRules));
+  check('Ajanlar, hacim ve risk/kazanç aynı yöndeyse karar veriyor', decisionRules.confirmed === 'AL', JSON.stringify(decisionRules));
+  check('Hacim verisi yoksa nihai karar BEKLE', decisionRules.noVolume === 'BEKLE', JSON.stringify(decisionRules));
+  check('Risk/kazanç 1:1,5 altındaysa BEKLE', decisionRules.weakRR === 'BEKLE', JSON.stringify(decisionRules));
+
+  const candleAlignment = await page.evaluate(() => {
+    const rows = Array.from({ length: 40 }, (_, i) => {
+      const mid = 100 + i * 0.25 + Math.sin(i / 3) * 1.5;
+      const y = value => 1000 - value * 5;
+      const open = mid - 0.2, close = mid + 0.2;
+      return { renk: 1, ust: y(mid + 0.8), alt: y(mid - 0.8), ga: y(open), gu: y(close) };
+    });
+    const result = Analiz.yap(rows, { yon: 'Yükseliş', guc: 70 }, { excludeLast: true });
+    return { all: result.c.length, used: result.analysisC.length };
+  });
+  check('Açık mum grafikte kalırken analizden çıkarılıyor', candleAlignment.all === 40 && candleAlignment.used === 39, JSON.stringify(candleAlignment));
+
   const fkAgentLoaded = await page.evaluate(() => Boolean(window.Ajan && window.Ajan.fk && typeof window.Ajan.fk.degerlendir === 'function'));
   check('F/K ajanı modülü yüklendi', fkAgentLoaded, 'F/K değerleme ve karar denetimi hazır');
   const fkRules = await page.evaluate(() => {
