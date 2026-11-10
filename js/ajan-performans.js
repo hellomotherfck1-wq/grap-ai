@@ -12,6 +12,12 @@
   var RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
   var HORIZON = 10;
   var DEFAULT_COST = 0.20;
+  var COST_KEY = 'graphai-agent-performance-cost-v1';
+  var currentCostPct = DEFAULT_COST;
+  try {
+    var savedCost = Number(localStorage.getItem(COST_KEY));
+    if (isFinite(savedCost) && savedCost >= 0 && savedCost <= 5) currentCostPct = savedCost;
+  } catch (e) {}
   var dbPromise = null;
   var updating = false;
 
@@ -180,7 +186,7 @@
       fkPE: num(input.fkPE) ? input.fkPE : null,
       fkValuation: input.fkValuation || null,
       fkVeto: Boolean(input.fkVeto),
-      costPct: num(input.costPct) ? Math.max(0, Math.min(5, input.costPct)) : DEFAULT_COST,
+      costPct: num(input.costPct) ? Math.max(0, Math.min(5, input.costPct)) : currentCostPct,
       horizon: Math.max(2, Math.min(30, Number(input.horizon) || HORIZON)),
       tradeStatus: decision === 'BEKLE' ? 'not-applicable' : 'pending',
       directionStatus: 'pending',
@@ -568,6 +574,23 @@
     exportBtn.id = 'ajan-performans-csv';
     actions.appendChild(refresh);
     actions.appendChild(exportBtn);
+    var costField = el('div', 'performans-maliyet');
+    var costLabel = el('label', '', 'Yeni sinyaller için toplam maliyet (%)');
+    costLabel.htmlFor = 'ajan-performans-maliyet';
+    var costInput = el('input');
+    costInput.type = 'number';
+    costInput.id = 'ajan-performans-maliyet';
+    costInput.min = '0';
+    costInput.max = '5';
+    costInput.step = '0.01';
+    costInput.value = currentCostPct.toFixed(2);
+    var costSave = el('button', 'buton ikincil-buton', 'MALİYETİ KAYDET');
+    costSave.type = 'button';
+    costSave.id = 'ajan-performans-maliyet-kaydet';
+    costField.appendChild(costLabel);
+    costField.appendChild(costInput);
+    costField.appendChild(costSave);
+    actions.appendChild(costField);
     header.appendChild(actions);
     card.appendChild(header);
 
@@ -606,7 +629,8 @@
       ['Sonuç bekleyen', String(pending)],
       ['BEKLE değerlendirildi', String(observedWait.length)],
       ['Düşüşten kaçınma', String(avoided)],
-      ['Yükseliş kaçırma', String(missed)]
+      ['Yükseliş kaçırma', String(missed)],
+      ['Veri aralığı dışında', String(expired)]
     ].forEach(function (x) { grid.appendChild(kpi(x[0], x[1])); });
     card.appendChild(grid);
 
@@ -647,23 +671,34 @@
     table.appendChild(body); wrap.appendChild(table); card.appendChild(wrap);
 
     card.appendChild(el('p', 'backtest-not',
-      'AL/SAT işlem simülasyonu sonraki mum açılışından başlar; maliyet varsayılan toplam %0,20’dir. BEKLE kararları kazanma oranına katılmaz. Ajan yön isabeti, sinyalden sonraki 10 kapanmış mumun fiyat yönüyle ölçülür. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
+      'AL/SAT işlem simülasyonu sonraki mum açılışından başlar. Maliyet her sinyal için kaydedilir; yeni sinyallerin maliyeti yukarıdan değiştirilebilir. BEKLE kararları kazanma oranına katılmaz. Ajan yön isabeti, sinyalden sonraki 10 kapanmış mumun fiyat yönüyle ölçülür. Farklı varlıklardaki eş zamanlı pozisyonlar tek portföy gibi simüle edilmez. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
     root.appendChild(card);
 
     refresh.addEventListener('click', function () { updateResults(); });
     exportBtn.addEventListener('click', function () { exportCSV(all); });
+    costSave.addEventListener('click', function () {
+      var value = Number(costInput.value);
+      if (!num(value) || value < 0 || value > 5) {
+        setStatus('Toplam maliyet %0 ile %5 arasında olmalı.', true);
+        return;
+      }
+      currentCostPct = value;
+      try { localStorage.setItem(COST_KEY, String(value)); } catch (e) {}
+      setStatus('Yeni sinyaller için toplam maliyet %' + value.toFixed(2).replace('.', ',') +
+        ' olarak kaydedildi. Önceki sinyaller kendi kayıtlı maliyetleriyle kalır.');
+    });
   }
 
   function exportCSV(records) {
     var columns = ['signalAt', 'symbol', 'name', 'market', 'timeframe', 'decision', 'generalDecision',
       'technicalDecision', 'volumeDecision', 'fundamentalStatus', 'price', 'stop', 'target',
-      'tradeStatus', 'tradeOutcome', 'netPct', 'forwardPct', 'waitResult', 'source'];
+      'costPct', 'tradeStatus', 'tradeOutcome', 'netPct', 'forwardPct', 'waitResult', 'source'];
     var rows = [columns.join(';')];
     records.slice().sort(function (a, b) { return a.signalAt - b.signalAt; }).forEach(function (r) {
       var values = [
         new Date(r.signalAt).toISOString(), r.symbol, r.name, r.market, r.timeframe, r.decision,
         r.generalDecision, r.technicalDecision, r.volumeDecision, r.fundamentalStatus,
-        r.price, r.stop, r.target, r.tradeStatus,
+        r.price, r.stop, r.target, r.costPct, r.tradeStatus,
         r.tradeResult ? r.tradeResult.outcome : '',
         r.tradeResult ? r.tradeResult.netPct : '',
         r.forwardPct == null ? '' : r.forwardPct, r.waitResult || '', (r.sources || [r.source]).join('+')
