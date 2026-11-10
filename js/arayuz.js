@@ -152,7 +152,8 @@ function analizKaydet(meta, sonuc) {
     sembol: meta.sembol || '',
     kaynak: meta.kaynak || 'Görüntü',
     zd: meta.zd || '',
-    fiyat: typeof meta.fiyat === 'number' ? meta.fiyat : null,
+    fiyat: typeof meta.sinyalFiyati === 'number' ? meta.sinyalFiyati :
+      (typeof meta.fiyat === 'number' ? meta.fiyat : null),
     karar: y.karar || s.karar || 'BEKLE',
     uyum: Number.isFinite(y.uyum) ? y.uyum : s.uyum,
     trend: s.trend ? s.trend.yon : 'Belirsiz',
@@ -161,6 +162,24 @@ function analizKaydet(meta, sonuc) {
     sonMumAcik: Boolean(s.meta && s.meta.sonMumAcik),
     mumSayisi: Array.isArray(s.analysisC) ? s.analysisC.length : s.c.length
   };
+  if (window.AjanPerformans && typeof window.AjanPerformans.kaydetAnaliz === 'function' &&
+      meta.sembol && Number.isFinite(meta.sinyalMumuZamani) &&
+      Number.isFinite(meta.sinyalAralikMs) && Number.isFinite(meta.sinyalFiyati)) {
+    kayit.performansId = window.AjanPerformans.kaydetAnaliz({
+      symbol: meta.sembol,
+      name: meta.ad,
+      market: meta.market,
+      timeframe: meta.zd,
+      signalAt: meta.sinyalMumuZamani + meta.sinyalAralikMs,
+      price: meta.sinyalFiyati,
+      stop: meta.stopFiyat,
+      target: meta.hedefFiyat,
+      rr: meta.rr,
+      fundamentalStatus: meta.fundamentalStatus,
+      s: s,
+      y: y
+    });
+  }
   GrafikAI.sonAnaliz = kayit;
   GrafikAI.gecmis.unshift(kayit);
   GrafikAI.gecmis = GrafikAI.gecmis.slice(0, 30);
@@ -206,16 +225,35 @@ el('ara-btn').addEventListener('click', async () => {
     const sonMumAcik = !!(sonMum && Number.isFinite(sonMum.t) && Date.now() < sonMum.t + aralikMs);
     const trendMumlari = sonMumAcik ? dn.m.slice(0, -1) : dn.m;
     const t = Goruntu.trend(trendMumlari);
+    const sinyalMumu = dn.d[dn.d.length - (sonMumAcik ? 2 : 1)] || null;
     const meta = {
       ad: v.ad, sembol: v.sembol, tur: v.tur, zd: v.zd, kaynak: v.kaynak,
       sonMumZamani: sonMum ? sonMum.t : null,
       sonMumAcik: sonMumAcik,
+      sinyalMumuZamani: sinyalMumu ? sinyalMumu.t : null,
+      sinyalFiyati: sinyalMumu ? sinyalMumu.c : null,
+      sinyalAralikMs: aralikMs,
+      market: /USDT$/i.test(v.sembol || '') ? 'Kripto' : /\.IS$/i.test(v.sembol || '') ? 'BIST' : 'Diğer',
+      fundamentalStatus: (v.kaynak !== 'b' &&
+        !/(kripto|coin|crypto|forex|emtia|endeks)/i.test(String(v.tur || '')) &&
+        !/(?:-USD|-USDT|-EUR|=X|=F)$/i.test(v.sembol || '') &&
+        String(v.sembol || '').charAt(0) !== '^') ? 'pending' : 'not-applicable',
       veriAlimZamani: v.cekim instanceof Date ? v.cekim.getTime() : Date.now(),
       mumSayisi: dn.d.length
     };
     const sonuc = goster(dn.m, t, dn.kal, [], [
       kartYap('Grafik bilgisi', Veri.bilgi(v, dn.d), '#3988f7')
     ], meta);
+    const fiyatAraligi = dn.kal.hi - dn.kal.lo;
+    if (sonuc.s.plan && Number.isFinite(fiyatAraligi) && fiyatAraligi > 0) {
+      meta.stopFiyat = dn.kal.lo + sonuc.s.plan.stop * fiyatAraligi;
+      meta.hedefFiyat = dn.kal.lo + sonuc.s.plan.t1 * fiyatAraligi;
+      meta.rr = sonuc.s.plan.rr;
+    } else {
+      meta.stopFiyat = null;
+      meta.hedefFiyat = null;
+      meta.rr = null;
+    }
 
     if (window.BistArastirma && typeof window.BistArastirma.grafikOzet === 'function' &&
         String(v.sembol || '').toUpperCase().endsWith('.IS')) {
@@ -236,7 +274,15 @@ el('ara-btn').addEventListener('click', async () => {
       sembol: v.sembol,
       kaynak: v.kaynak === 'b' ? 'Binance' : 'Yahoo Finance',
       zd: v.zd,
-      fiyat: dn.d.length ? dn.d[dn.d.length - 1].c : null
+      fiyat: dn.d.length ? dn.d[dn.d.length - 1].c : null,
+      sinyalMumuZamani: meta.sinyalMumuZamani,
+      sinyalFiyati: meta.sinyalFiyati,
+      sinyalAralikMs: meta.sinyalAralikMs,
+      stopFiyat: meta.stopFiyat,
+      hedefFiyat: meta.hedefFiyat,
+      rr: meta.rr,
+      market: meta.market,
+      fundamentalStatus: meta.fundamentalStatus
     }, sonuc);
     adminKaydi(v.ad);
     ekranGoster('analiz');
