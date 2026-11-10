@@ -36,7 +36,7 @@ try {
   check('Canlı site HTTP yanıtı', Boolean(response && response.ok()), response ? String(response.status()) : 'Yanıt alınamadı');
 
   await page.waitForFunction(() =>
-    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.BacktestAI) &&
+    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.BacktestAI && window.AjanPerformans) &&
     typeof Veri !== 'undefined' && typeof Analiz !== 'undefined' && typeof Cizim !== 'undefined',
     null,
     { timeout: 45000 }
@@ -86,6 +86,71 @@ try {
   check('Aynı mumda stop ve hedef görülürse stop önce sayılıyor',
     stopPriority && stopPriority.exit === 95 && stopPriority.reason === 'Stop' && stopPriority.net < 0,
     JSON.stringify(stopPriority));
+
+  await page.locator('#ajan-performans-guncelle').waitFor({ state: 'attached', timeout: 15000 });
+  const performanceChecks = await page.evaluate(async () => {
+    const P = window.AjanPerformans;
+    const signal = {
+      symbol: 'E2EPERFUSDT',
+      name: 'Performans test coin',
+      timeframe: '1h',
+      signalAt: Date.now() - 12 * 60 * 60 * 1000,
+      price: 100,
+      stop: 95,
+      target: 110,
+      decision: 'AL',
+      generalDecision: 'AL',
+      technicalDecision: 'AL',
+      volumeDecision: 'AL',
+      source: 'E2E test'
+    };
+    const id = P.kaydet(signal);
+    P.kaydet(signal);
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const all = await P.listele();
+    const stored = all.filter(item => item.id === id);
+    const record = {
+      decision: 'AL', signalAt: 1000, price: 100, stop: 95, target: 110,
+      timeframe: '1h', horizon: 2, costPct: 0.2
+    };
+    const bars = [
+      { t: 1000, o: 100, h: 112, l: 96, c: 110 },
+      { t: 3601000, o: 110, h: 112, l: 109, c: 111 }
+    ];
+    const target = P.sonucHesapla(record, bars);
+    const stop = P.sonucHesapla(record, [
+      { t: 1000, o: 100, h: 112, l: 94, c: 108 },
+      { t: 3601000, o: 108, h: 109, l: 107, c: 108 }
+    ]);
+    const wait = P.sonucHesapla({
+      decision: 'BEKLE', signalAt: 1000, price: 100,
+      timeframe: '1h', horizon: 2, costPct: 0.2
+    }, [
+      { t: 1000, o: 100, h: 102, l: 99, c: 101 },
+      { t: 3601000, o: 101, h: 102, l: 100, c: 101.5 }
+    ]);
+    return {
+      storedOnce: stored.length === 1,
+      rawCandlesNotStored: stored.length === 1 && !Array.isArray(stored[0].mumlar),
+      retentionDays: P.ayarlar.saklamaGun,
+      targetAtNextOpen: target.trade && target.trade.status === 'completed' &&
+        target.trade.entry === 100 && target.trade.exit === 110 && target.trade.outcome === 'win',
+      stopWinsSameCandleConflict: stop.trade && stop.trade.exit === 95 &&
+        stop.trade.reason === 'Stop' && stop.trade.outcome === 'loss',
+      waitSeparateFromWinRate: wait.trade === null && wait.direction &&
+        wait.direction.classification === 'up' && wait.direction.forwardPct > 0
+    };
+  });
+  check('Performans hafızası aynı sinyali tekilleştiriyor ve 365 gün tutuyor',
+    performanceChecks.storedOnce && performanceChecks.rawCandlesNotStored && performanceChecks.retentionDays === 365,
+    JSON.stringify(performanceChecks));
+  check('Canlı sinyal değerlendirmesi sonraki mum açılışını kullanıyor',
+    performanceChecks.targetAtNextOpen, JSON.stringify(performanceChecks));
+  check('Performans testinde aynı mum stop/hedef çakışmasında stop öncelikli',
+    performanceChecks.stopWinsSameCandleConflict, JSON.stringify(performanceChecks));
+  check('BEKLE sinyali işlem kazanma oranından ayrı değerlendiriliyor',
+    performanceChecks.waitSeparateFromWinRate, JSON.stringify(performanceChecks));
+
 
   const backtestEngine = await page.evaluate(() => {
     const oldAnaliz = Analiz.yap;
