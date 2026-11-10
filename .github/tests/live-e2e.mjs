@@ -148,6 +148,7 @@ try {
       scanStored: scanStored,
       fkUpdated: fkUpdated,
       retentionDays: P.ayarlar.saklamaGun,
+      defaultCostPct: P.maliyetOku(),
       targetAtNextOpen: target.trade && target.trade.status === 'completed' &&
         target.trade.entry === 100 && target.trade.exit === 110 && target.trade.outcome === 'win',
       stopWinsSameCandleConflict: stop.trade && stop.trade.exit === 95 &&
@@ -159,7 +160,8 @@ try {
   check('Performans hafızası sinyalleri tekilleştiriyor, taramaları kaydediyor ve 365 gün tutuyor',
     performanceChecks.storedOnce && performanceChecks.rawCandlesNotStored &&
     performanceChecks.scanCount === 1 && performanceChecks.scanStored &&
-    performanceChecks.fkUpdated && performanceChecks.retentionDays === 365,
+    performanceChecks.fkUpdated && performanceChecks.retentionDays === 365 &&
+    performanceChecks.defaultCostPct === 0.20,
     JSON.stringify(performanceChecks));
   check('Canlı sinyal değerlendirmesi sonraki mum açılışını kullanıyor',
     performanceChecks.targetAtNextOpen, JSON.stringify(performanceChecks));
