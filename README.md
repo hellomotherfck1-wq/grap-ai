@@ -10,6 +10,7 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 - `js/cizim.js`: analiz grafiğini canvas üzerinde çizme
 - `js/ajan.js`, `js/ajan2.js`: hacim, teknik ve denetçi değerlendirmeleri
 - `js/tahmin.js`, `js/coin-tahmin.js`: BIST ve kripto tarama ekranları
+- `js/backtest.js`: ücretsiz geçmiş sinyal testi (teknik + hacim ajanları)
 - `js/admin.js`: Supabase oturumu, yönetici yetkisi ve olay istatistikleri
 
 ## Yayınlama
@@ -33,6 +34,19 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 - Değerleme: ücretsiz kaynaktan F/K, PD/DD veya EPS gelmiyorsa sayı uydurulmaz; adil değer hesaplanmış gibi gösterilmez.
 
 **Veri ve güven sınırları:** BIST 100 üyeliği zamanla değişir; sembol listesi güncel tutulmalıdır. Ücretsiz fiyat ve haber uçları gecikmeli, eksik veya geçici olarak erişilemez olabilir. KAP bildirim listesi şirketin finansal tablosunun tamamını tarayıcıya indirmez; rapor bağlantıları kullanıcıyı KAP'a götürür. Veri gelmediğinde ilgili alan boş/uyarı olarak gösterilir. Otomatik çıktılar yatırım tavsiyesi değildir. Ücretli API anahtarı veya kullanıcı aboneliği gerekmez.
+
+## Ücretsiz geçmiş sinyal testi
+
+BIST ekranının altındaki **Ücretsiz geçmiş sinyal testi** paneli, hisse ve coin sembollerinde ücretli API anahtarı olmadan çalışır.
+
+- Fiyat/hacim geçmişi Yahoo Finance herkese açık chart uçlarından veya Binance public klines uçlarından alınır.
+- Günlük testte Yahoo Finance için 2 yıllık aralık istenir; Binance'ten en fazla 1.000 mum alınır. Ücretsiz servislerin erişim ve hız sınırları olabilir.
+- Her sinyal yalnızca o ana kadar kapanmış mumlarla hesaplanır; işlem bir sonraki mumun açılış fiyatından başlatılır. Son mum olası tamamlanmamış olabileceği için testten çıkarılır.
+- Testte mevcut teknik ve hacim ajanlarının nihai kararı, stop ve ilk hedef seviyesi kullanılır. Aynı mumda stop ve hedefe birlikte dokunulursa temkinli biçimde stop önce sayılır; pozisyon en fazla 10 mum tutulur.
+- Komisyon + kayma için toplam gidiş-dönüş maliyeti ve işlem başına risk kullanıcı tarafından değiştirilebilir. Portföy simülasyonu başlangıç 100 birim, kaldıraçsız ve aynı anda tek pozisyon varsayar.
+- Tarihsel F/K, KAP finansalları ve haberler bu teste dahil değildir; geçmiş tarihli temel veri tutarlı biçimde sağlanmadığından teknik + hacim stratejisi ayrı ölçülür. SAT işlemleri kısa pozisyon varsayar; spot piyasada short mümkün olmayabilir.
+
+Sonuçlar yalnızca tarayıcıda hesaplanır ve yerel depolamaya kaydedilmez. Geçmiş performans gelecekteki getiriyi garanti etmez; simülasyon yatırım tavsiyesi değildir.
 
 ## Supabase yönetici paneli
 
