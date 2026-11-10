@@ -88,6 +88,18 @@ try {
     JSON.stringify(stopPriority));
 
   await page.locator('#ajan-performans-guncelle').waitFor({ state: 'attached', timeout: 15000 });
+  const performanceUI = await page.evaluate(() => ({
+    panel: !!document.querySelector('#ajan-performans-panel .ajan-performans'),
+    csv: !!document.getElementById('ajan-performans-csv'),
+    costInput: document.getElementById('ajan-performans-maliyet')?.value || null,
+    panelWidth: Math.round(document.getElementById('ajan-performans-panel').getBoundingClientRect().width),
+    viewport: document.documentElement.clientWidth
+  }));
+  check('Ajan performans paneli, CSV ve maliyet ayarı görünür',
+    performanceUI.panel && performanceUI.csv && performanceUI.costInput === '0.20',
+    JSON.stringify(performanceUI));
+  check('Ajan performans paneli mobil ekrana sığıyor',
+    performanceUI.panelWidth <= performanceUI.viewport + 1, JSON.stringify(performanceUI));
   const performanceChecks = await page.evaluate(async () => {
     const P = window.AjanPerformans;
     const signal = {
