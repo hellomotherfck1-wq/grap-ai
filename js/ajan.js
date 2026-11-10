@@ -553,7 +553,7 @@
             mumlar: mumlar,
             zd: zd || '1d',
             cekim: new Date(),
-            gecmisAraligi: aralik.yahoo ? aralik.yahoo[1] : 'Binance son 1000 mum'
+            gecmisAraligi: aday.kaynak === 'b' ? 'Binance son 1000 mum' : aralik.yahoo[1]
           });
         } catch (e) {
           sonHata = e;
