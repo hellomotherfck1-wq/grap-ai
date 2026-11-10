@@ -546,6 +546,15 @@
 
     kararDOMGuncelle(y);
     gecmisiGuncelle(sembol, sonuc, data);
+    var grafik = window.GrafikAI;
+    if (window.AjanPerformans && grafik && grafik.sonAnaliz && grafik.sonAnaliz.performansId) {
+      window.AjanPerformans.guncelleKarar(grafik.sonAnaliz.performansId, sonuc.son, {
+        fundamentalStatus: 'available',
+        fkPE: sonuc.pe,
+        fkValuation: sonuc.durum,
+        fkVeto: sonuc.base === 'AL' && sonuc.son === 'BEKLE'
+      });
+    }
   }
 
   async function analizEt(sembol, s, y, kal, card, jeton) {
@@ -577,6 +586,13 @@
       FK.sonuc = bos;
       card.satirlar = kartSatirlari(bos, null, FK.hata, s);
       kartDOMGuncelle(card);
+      var grafik = window.GrafikAI;
+      if (window.AjanPerformans && grafik && grafik.sonAnaliz && grafik.sonAnaliz.performansId) {
+        window.AjanPerformans.guncelleKarar(grafik.sonAnaliz.performansId, base, {
+          fundamentalStatus: 'unavailable',
+          fkVeto: false
+        });
+      }
       return null;
     }
   }
