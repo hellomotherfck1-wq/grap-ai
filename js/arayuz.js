@@ -60,7 +60,7 @@ function karar(y) {
   return d;
 }
 
-function goster(m, t, kal, uyarilar, ekKartlar) {
+function goster(m, t, kal, uyarilar, ekKartlar, meta) {
   if (!Array.isArray(m) || m.length < 5) throw new Error('Grafik oluşturmak için en az 5 mum gerekli.');
   if (typeof Analiz === 'undefined' || typeof Yorum === 'undefined' || typeof Cizim === 'undefined') throw new Error('Analiz veya grafik modülü yüklenemedi.');
 
@@ -68,7 +68,8 @@ function goster(m, t, kal, uyarilar, ekKartlar) {
   if (!alan) throw new Error('Grafik alanı bulunamadı.');
   alan.replaceChildren();
 
-  const s = Analiz.yap(m, t);
+  const s = Analiz.yap(m, t, meta && meta.sonMumAcik ? { excludeLast: true } : null);
+  s.meta = meta || null;
   const y = Yorum.olustur(s, kal, uyarilar || []);
   alan.appendChild(karar(y));
 
@@ -156,7 +157,9 @@ function analizKaydet(meta, sonuc) {
     uyum: Number.isFinite(y.uyum) ? y.uyum : s.uyum,
     trend: s.trend ? s.trend.yon : 'Belirsiz',
     rsi: s.rsi,
-    ozet: Array.isArray(y.ozet) ? y.ozet.join(' ') : ''
+    ozet: Array.isArray(y.ozet) ? y.ozet.join(' ') : '',
+    sonMumAcik: Boolean(s.meta && s.meta.sonMumAcik),
+    mumSayisi: Array.isArray(s.analysisC) ? s.analysisC.length : s.c.length
   };
   GrafikAI.sonAnaliz = kayit;
   GrafikAI.gecmis.unshift(kayit);
@@ -195,9 +198,23 @@ el('ara-btn').addEventListener('click', async () => {
     if (!dn || !Array.isArray(dn.m) || dn.m.length < 15) throw new Error('Analiz için yeterli piyasa verisi alınamadı.');
 
     const t = Goruntu.trend(dn.m);
+    const sonMum = dn.d[dn.d.length - 1];
+    const aralikMs = v.zd === '15m' ? 15 * 60 * 1000
+      : v.zd === '1h' ? 60 * 60 * 1000
+      : (v.kaynak === 'b' ? 24 * 60 * 60 * 1000
+        : (/\.IS$/i.test(v.sembol || '') && new Date(sonMum.t).getUTCHours() <= 2
+          ? 15 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000));
+    const sonMumAcik = !!(sonMum && Number.isFinite(sonMum.t) && Date.now() < sonMum.t + aralikMs);
+    const meta = {
+      ad: v.ad, sembol: v.sembol, tur: v.tur, zd: v.zd, kaynak: v.kaynak,
+      sonMumZamani: sonMum ? sonMum.t : null,
+      sonMumAcik: sonMumAcik,
+      veriAlimZamani: v.cekim instanceof Date ? v.cekim.getTime() : Date.now(),
+      mumSayisi: dn.d.length
+    };
     const sonuc = goster(dn.m, t, dn.kal, [], [
       kartYap('Grafik bilgisi', Veri.bilgi(v, dn.d), '#3988f7')
-    ]);
+    ], meta);
 
     if (window.BistArastirma && typeof window.BistArastirma.grafikOzet === 'function' &&
         String(v.sembol || '').toUpperCase().endsWith('.IS')) {
