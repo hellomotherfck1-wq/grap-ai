@@ -434,6 +434,7 @@
 
   function statusText(record) {
     if (record.directionStatus === 'expired' || record.tradeStatus === 'expired') return 'Veri aralığı dışında';
+    if (record.lastError) return 'Veri alınamadı';
     if (record.tradeStatus === 'skipped') return 'İşlem açılmadı';
     if (record.decision === 'BEKLE' && record.directionStatus === 'completed') {
       return record.waitResult === 'avoid-down' ? 'Düşüşten kaçınma'
