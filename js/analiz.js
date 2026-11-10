@@ -17,13 +17,23 @@ const Analiz = {
   },
 
   rsi(kap, n) {
-    if (kap.length < n + 1) return null;
+    if (!Array.isArray(kap) || kap.length < n + 1) return null;
     let g = 0, z = 0;
-    for (let i = kap.length - n; i < kap.length; i++) {
+    for (let i = 1; i <= n; i++) {
       const d = kap[i] - kap[i - 1];
-      if (d > 0) g += d; else z -= d;
+      if (d > 0) g += d;
+      else z -= d;
+    }
+    g /= n;
+    z /= n;
+    for (let i = n + 1; i < kap.length; i++) {
+      const d = kap[i] - kap[i - 1];
+      g = (g * (n - 1) + (d > 0 ? d : 0)) / n;
+      z = (z * (n - 1) + (d < 0 ? -d : 0)) / n;
     }
     if (g + z === 0) return 50;
+    if (z === 0) return 100;
+    if (g === 0) return 0;
     return Math.round(100 * g / (g + z));
   },
 
@@ -102,17 +112,20 @@ const Analiz = {
     return 0;
   },
 
-  yap(m, trend) {
-    const n = m.length;
+  yap(m, trend, options) {
     const { c, yB, R } = this.hazirla(m);
-    const kap = c.map(k => k.c);
+    // Canlı grafikte henüz kapanmamış son mum sinyalleri bozmasın.
+    // Grafik çizimi için tüm mumlar korunur; göstergeler yalnızca kapanan mumları kullanır.
+    const analysisC = options && options.excludeLast && c.length > 1 ? c.slice(0, -1) : c;
+    const n = analysisC.length;
+    const kap = analysisC.map(k => k.c);
     const son = kap[n - 1];
-    const p = this.pivotlar(c);
-    const sv = this.seviyeler(c, p);
+    const p = this.pivotlar(analysisC);
+    const sv = this.seviyeler(analysisC, p);
     const rsi = this.rsi(kap, 14);
 
     let ga = 0, gk = 0;
-    c.slice(-10).forEach(k => {
+    analysisC.slice(-10).forEach(k => {
       const g = Math.abs(k.c - k.o) + 0.001;
       if (k.yes) ga += g; else gk += g;
     });
@@ -127,7 +140,7 @@ const Analiz = {
       oy('Ortalamalar (10/20)', d > 0.01 ? 1 : d < -0.01 ? -1 : 0,
         d > 0.01 ? 'kısa ortalama üstte' : d < -0.01 ? 'kısa ortalama altta' : 'yatay');
     } else oy('Ortalamalar (10/20)', 0, 'yeterli mum yok');
-    const ys = this.yapi(c, p);
+    const ys = this.yapi(analysisC, p);
     oy('Fiyat yapısı', ys, ys > 0 ? 'yükselen tepe ve dipler' : ys < 0 ? 'alçalan tepe ve dipler' : 'net yapı yok');
     let rp = 0, ry = 'belirsiz';
     if (rsi !== null) {
@@ -139,7 +152,7 @@ const Analiz = {
     }
     oy('RSI (yaklaşık)', rp, ry);
     oy('Alıcı/satıcı baskısı', alici >= 60 ? 1 : alici <= 40 ? -1 : 0, '%' + alici + ' alıcı');
-    const form = Formasyon.hepsi(c, p);
+    const form = Formasyon.hepsi(analysisC, p);
     const fs = form.reduce((a, x) => a + x.yon, 0);
     oy('Formasyonlar', Math.sign(fs), form.length ? form.map(x => x.ad).join(', ') : 'belirgin yok');
 
@@ -179,7 +192,7 @@ const Analiz = {
         }
       }
     }
-    return { c, p, yB, R, sv, trend, rsi, alici, oylar, form, score, karar, not, plan,
+    return { c, analysisC, p, yB, R, sv, trend, rsi, alici, oylar, form, score, karar, not, plan,
              uyum: Math.round(Math.abs(score) / 6 * 100) };
   },
 
@@ -214,9 +227,19 @@ const Analiz = {
     const f = x => this.fiyat(x, kal);
     const D = s.sv.destekler, Rr = s.sv.direncler;
     const L = [];
-    L.push('Piyasa, varlık, zaman dilimi: henüz okunmuyor (sonraki aşama)');
+    if (s.meta && s.meta.sembol) {
+      L.push('Varlık: ' + (s.meta.ad || s.meta.sembol) + ' (' + s.meta.sembol + ') · ' +
+        (s.meta.zd || 'zaman dilimi bilinmiyor') + ' · ' + (s.meta.kaynak || 'kaynak bilinmiyor'));
+      if (s.meta.sonMumZamani) {
+        L.push('Son mum zamanı: ' + new Date(s.meta.sonMumZamani).toLocaleString('tr-TR') +
+          (s.meta.sonMumAcik ? ' · henüz kapanmadı, göstergelerden çıkarıldı.' : ' · kapanmış mum.'));
+      }
+    } else {
+      L.push('Varlık: ekran görüntüsü · sembol ve zaman dilimi doğrulanamadı.');
+    }
     L.push('Mum sayısı: ' + n);
     L.push('Trend: ' + (s.trend ? s.trend.yon + ' (güç %' + s.trend.guc + ')' : 'belirsiz'));
+    L.push('Analizde kullanılan kapanmış mum sayısı: ' + (Array.isArray(s.analysisC) ? s.analysisC.length : n));
     L.push('');
     L.push('Destek: ' + (D.slice(0, 2).map(d => f(d.seviye) + ' (güç ' + d.guc + ')').join(', ') || 'bulunamadı'));
     L.push('Direnç: ' + (Rr.slice(0, 2).map(d => f(d.seviye) + ' (güç ' + d.guc + ')').join(', ') || 'bulunamadı'));
