@@ -384,6 +384,7 @@
       hacimKarar: panel.hacim && panel.hacim.var
         ? (panel.hacim.skor > 0 ? 'AL' : panel.hacim.skor < 0 ? 'SAT' : 'BEKLE') : 'BEKLE',
       hataPayi: panel.denetci ? panel.denetci.hata : null,
+      denetciSorunSayisi: panel.denetci ? panel.denetci.sorunSayisi : null,
       ozet: panel.ozet,
       tartisma: panel.tartisma,
       plan: s.plan && isFinite(s.plan.rr) ? {
@@ -413,6 +414,7 @@
       hacim: r.hacimSkor,
       hacimKarar: r.hacimKarar,
       hata: r.hataPayi,
+      denetciSorunSayisi: r.denetciSorunSayisi,
       signalAt: r.signalAt,
       fiyat: r.fiyat,
       stopFiyat: r.stopFiyat,
