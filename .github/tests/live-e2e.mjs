@@ -43,6 +43,26 @@ try {
   );
   check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma ajanı');
 
+  check('F/K ajanı modülü yüklendi', Boolean(window.Ajan && window.Ajan.fk && typeof window.Ajan.fk.degerlendir === 'function'), 'F/K değerleme ve karar denetimi hazır');
+  const fkRules = await page.evaluate(() => {
+    const fk = window.Ajan.fk;
+    const high = fk.degerlendir({
+      pe: 45, peType: 'Son 12 ay F/K', trailingPE: 45, forwardPE: null,
+      trailingEps: 2, earningsGrowth: -0.15, roe: 0.03, profitMargins: -0.02,
+      debtToEquity: 250, sector: 'Industrials', industry: 'Airlines'
+    }, { karar: 'AL' }, { kartlar: [{ baslik: '⚖️ Nihai Karar (Denetçi): AL' }] }, 'THYAO.IS');
+    const cheapSell = fk.degerlendir({
+      pe: 5, peType: 'Son 12 ay F/K', trailingPE: 5, forwardPE: null,
+      trailingEps: 1, earningsGrowth: 0.10, roe: 0.15, profitMargins: 0.12,
+      debtToEquity: 80, sector: 'Industrials'
+    }, { karar: 'SAT' }, { kartlar: [{ baslik: '⚖️ Nihai Karar (Denetçi): SAT' }] }, 'THYAO.IS');
+    const missing = fk.degerlendir(null, { karar: 'AL' }, { kartlar: [{ baslik: '⚖️ Nihai Karar (Denetçi): AL' }] }, 'THYAO.IS');
+    return { high: high.son, cheapSell: cheapSell.son, missing: missing.son };
+  });
+  check('Yüksek F/K ve zayıf kârlılık AL kararını BEKLE yapıyor', fkRules.high === 'BEKLE', JSON.stringify(fkRules));
+  check('Düşük F/K teknik SAT kararını tek başına bozmuyor', fkRules.cheapSell === 'SAT', JSON.stringify(fkRules));
+  check('F/K verisi yoksa sayı uydurulmadan teknik karar korunuyor', fkRules.missing === 'AL', JSON.stringify(fkRules));
+
   await page.waitForSelector('#bist-arastirma-kutusu', { state: 'attached', timeout: 30000 });
   const optionCount = await page.locator('#bist-arastirma-sembol option').count();
   check('BIST araştırma paneli ve sembol listesi', optionCount === 100, optionCount + ' hisse seçeneği');
@@ -507,6 +527,21 @@ try {
     return window.FinansalPanel.sonRapor.metrics.rsi14;
   });
   check('Yatay piyasada RSI nötr değerde', flatRsi === 50, 'RSI: ' + flatRsi);
+
+  // Confirm that a chart search receives free F/K data and renders the agent debate.
+  await page.evaluate(() => window.GrafikAI.araVarlik('THYAO.IS', '1d'));
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#analiz-durum')?.textContent || '';
+    return status.includes('Analiz tamamlandı') || status.startsWith('Hata:');
+  }, null, { timeout: 120000 });
+  await page.waitForFunction(() => {
+    const cards = Array.from(document.querySelectorAll('#tuval-alan .kart h3'));
+    const card = cards.find(h => h.textContent.startsWith('📊 F/K Değerleme ve Ajanlar Arası Tartışma'));
+    return card && card.parentElement.textContent.includes('Son 12 ay F/K: 5,2');
+  }, null, { timeout: 30000 });
+  const fkCardText = await page.locator('#tuval-alan .kart').filter({ has: page.locator('h3', { hasText: 'F/K Değerleme ve Ajanlar Arası Tartışma' }) }).innerText();
+  check('Grafik analizine gerçek F/K değeri aktarılıyor', fkCardText.includes('5,2x') || fkCardText.includes('5,2'), fkCardText.slice(0, 450));
+  check('F/K ajanları tartışma ve nihai kararı gösteriyor', fkCardText.includes('F/K Ajanı:') && fkCardText.includes('Kurulun nihai kararı:'), fkCardText.slice(-500));
 
   await page.unroute('https://grafik-vekil.hellomotherfck1.workers.dev/**');
   await page.unroute('https://query1.finance.yahoo.com/v8/finance/chart/THYAO.IS**');
