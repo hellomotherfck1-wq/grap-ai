@@ -516,6 +516,37 @@
     return wrap;
   }
 
+  function renderBreakdown(records) {
+    var groups = Object.create(null);
+    records.forEach(function (r) {
+      var key = (r.market || 'Diğer') + '|' + (r.timeframe || '—');
+      if (!groups[key]) groups[key] = { market: r.market || 'Diğer', timeframe: r.timeframe || '—', rows: [] };
+      groups[key].rows.push(r);
+    });
+    var wrap = el('div', 'backtest-table-wrap');
+    var table = el('table', 'backtest-trade-table');
+    var head = el('thead'), hr = el('tr');
+    ['Piyasa', 'Periyot', 'Sinyal', 'İşlem', 'Kazanma', 'Ort. net'].forEach(function (x) { hr.appendChild(el('th', '', x)); });
+    head.appendChild(hr); table.appendChild(head);
+    var body = el('tbody');
+    Object.keys(groups).sort().forEach(function (key) {
+      var group = groups[key];
+      var trades = group.rows.filter(function (r) { return r.tradeStatus === 'completed' && r.tradeResult; });
+      var wins = trades.filter(function (r) { return r.tradeResult.outcome === 'win'; }).length;
+      var average = trades.length
+        ? trades.reduce(function (sum, r) { return sum + r.tradeResult.netPct; }, 0) / trades.length : null;
+      var row = el('tr');
+      [
+        group.market, group.timeframe, String(group.rows.length), String(trades.length),
+        trades.length ? '%' + (wins / trades.length * 100).toFixed(1).replace('.', ',') : '—',
+        pct(average)
+      ].forEach(function (x) { row.appendChild(el('td', '', x)); });
+      body.appendChild(row);
+    });
+    table.appendChild(body); wrap.appendChild(table);
+    return wrap;
+  }
+
   function render(records) {
     var root = document.getElementById('ajan-performans-panel');
     if (!root) return;
@@ -586,6 +617,8 @@
     card.appendChild(el('p', 'backtest-not', quality));
     card.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · sinyalden 10 mum sonra'));
     card.appendChild(renderAgentTable(all));
+    card.appendChild(el('h4', 'backtest-trades-title', 'Piyasa ve zaman dilimi ayrımı'));
+    card.appendChild(renderBreakdown(all));
 
     var fkRows = all.filter(function (r) { return r.fkVeto && r.directionStatus === 'completed'; });
     if (fkRows.length) {
@@ -758,6 +791,10 @@
       setStatus('Yerel performans hafızası hazır · son 365 gün.');
     }).catch(function (e) {
       setStatus('Performans hafızası açılamadı: ' + (e && e.message ? e.message : String(e)), true);
+    });
+    var resultNav = document.querySelector('nav button[data-git="sonuc"]');
+    if (resultNav) resultNav.addEventListener('click', function () {
+      updateResults();
     });
   }
 
