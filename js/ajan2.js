@@ -48,7 +48,23 @@
       l = (l * (p - 1) + (d < 0 ? -d : 0)) / p;
     }
     if (g + l === 0) return 50;
+    if (l === 0) return 100;
+    if (g === 0) return 0;
     return 100 * g / (g + l);
+  }
+
+  function atr(c, p) {
+    if (!Array.isArray(c) || c.length < 2) return null;
+    var tr = [];
+    for (var i = 1; i < c.length; i++) {
+      var range = c[i].h - c[i].l;
+      var gapUp = Math.abs(c[i].h - c[i - 1].c);
+      var gapDown = Math.abs(c[i].l - c[i - 1].c);
+      var value = Math.max(range, gapUp, gapDown);
+      if (sayi(value) && value >= 0) tr.push(value);
+    }
+    if (!tr.length) return null;
+    return ort(tr.slice(-Math.max(1, p || 14)));
   }
 
   /* ---------- 3. AJAN: TEKNİK AJAN ---------- */
@@ -120,8 +136,10 @@
     var sv = s.sv || { destekler: [], direncler: [] };
     var d0 = sv.direncler && sv.direncler[0] ? sv.direncler[0].seviye : null;
     var s0 = sv.destekler && sv.destekler[0] ? sv.destekler[0].seviye : null;
-    var yakinD = d0 !== null && isFinite(d0) && Math.abs(d0 - son) <= 0.05;
-    var yakinS = s0 !== null && isFinite(s0) && Math.abs(son - s0) <= 0.05;
+    var atrDeger = atr(c, 14);
+    var yakinlik = Math.max((atrDeger || 0) * 0.6, 0.006);
+    var yakinD = d0 !== null && isFinite(d0) && Math.abs(d0 - son) <= yakinlik;
+    var yakinS = s0 !== null && isFinite(s0) && Math.abs(son - s0) <= yakinlik;
     if (yakinD && !yakinS) ekle('Destek/direnç', -1, 'Fiyat dirence yakın: geri dönüş riski var.');
     else if (yakinS && !yakinD) ekle('Destek/direnç', 1, 'Fiyat desteğe yakın: tepki yükselişi gelebilir.');
     else ekle('Destek/direnç', 0, 'Fiyat destek ve dirence yakın değil.');
@@ -142,24 +160,48 @@
 
     var sc = 0, pro = 0, con = 0;
     oy.forEach(function (o) { sc += o.puan; if (o.puan > 0) pro++; else if (o.puan < 0) con++; });
+
+    // Birbirine çok benzeyen göstergeler ayrı ayrı oy sayılmasın:
+    // trend/EMA, momentum, fiyat yapısı/formasyon ve alıcı baskısı dört gruptur.
+    var trendOy = isaret((oy[0] ? oy[0].puan : 0) + (oy[1] ? oy[1].puan : 0));
+    var momentumOy = isaret((oy[2] ? oy[2].puan : 0) + (oy[3] ? oy[3].puan : 0) + (oy[4] ? oy[4].puan : 0));
+    var yapiOy = isaret((oy[5] ? oy[5].puan : 0) + (oy[6] ? oy[6].puan : 0));
+    var katilimOy = isaret(oy[7] ? oy[7].puan : 0);
+    var gruplar = [
+      { ad: 'Trend', yon: trendOy },
+      { ad: 'Momentum', yon: momentumOy },
+      { ad: 'Fiyat yapısı', yon: yapiOy },
+      { ad: 'Alıcı baskısı', yon: katilimOy }
+    ];
+    var up = gruplar.filter(function (g) { return g.yon > 0; }).length;
+    var down = gruplar.filter(function (g) { return g.yon < 0; }).length;
+    var agirlikli = trendOy * 1.5 + momentumOy + yapiOy + katilimOy * 0.5;
+    var aday = agirlikli >= 2.5 ? 1 : agirlikli <= -2.5 ? -1 : 0;
+    var mutabakat = aday > 0 ? up : aday < 0 ? down : 0;
+
     T.oylar = oy;
-    T.skor = sc;
-    T.egilim = sc >= 2 ? 1 : sc <= -2 ? -1 : 0;
-    var aday = sc >= 3 ? 1 : sc <= -3 ? -1 : 0;
-    var trendOy = oy[0].puan;
-    T.karar = (aday === 1 && trendOy === 1) ? 'AL' : (aday === -1 && trendOy === -1) ? 'SAT' : 'BEKLE';
+    T.kategoriler = gruplar;
+    T.skor = agirlikli;
+    T.egilim = agirlikli >= 1.5 ? 1 : agirlikli <= -1.5 ? -1 : 0;
+    T.karar = (n >= 35 && aday !== 0 && trendOy === aday && mutabakat >= 3)
+      ? (aday > 0 ? 'AL' : 'SAT') : 'BEKLE';
     T.trendBlok = aday !== 0 && trendOy !== aday;
-    var dom = Math.abs(pro - con) / Math.max(1, pro + con);
-    T.guven = (dom >= 0.7 && pro + con >= 4) ? 'yüksek' : dom >= 0.4 ? 'orta' : 'düşük';
-    if (n < 35 && T.guven === 'yüksek') T.guven = 'orta';
-    T.nedenler = oy.filter(function (o) { return o.puan !== 0 && (T.egilim === 0 || o.puan === T.egilim); }).slice(0, 2).map(function (o) { return o.yazi; });
+    T.guven = (mutabakat >= 3 && n >= 60) ? 'yüksek'
+      : (mutabakat >= 2 && n >= 35) ? 'orta' : 'düşük';
+    T.nedenler = oy.filter(function (o) { return o.puan !== 0 && (T.egilim === 0 || o.puan === T.egilim); })
+      .slice(0, 2).map(function (o) { return o.yazi; });
     T.satirlar = oy.map(function (o) { return (o.puan > 0 ? '🟢 ' : o.puan < 0 ? '🔴 ' : '⚪ ') + o.yazi; });
-    var etiket = T.trendBlok ? 'Göstergeler ' + (aday > 0 ? 'yukarı' : 'aşağı') + ' yönlü ama genel trend bunu teyit etmiyor (BEKLE)'
-      : T.karar === 'AL' ? 'Teknik görünüm yükseliş yönlü (AL)' : T.karar === 'SAT' ? 'Teknik görünüm düşüş yönlü (SAT)'
-      : T.egilim > 0 ? 'Teknik görünüm hafif yükseliş eğilimli ama net değil (BEKLE)' : T.egilim < 0 ? 'Teknik görünüm hafif düşüş eğilimli ama net değil (BEKLE)'
+    T.satirlar.push('Bağımsız grup teyidi: ' + gruplar.map(function (g) {
+      return g.ad + ' ' + (g.yon > 0 ? 'yukarı' : g.yon < 0 ? 'aşağı' : 'nötr');
+    }).join(' · ') + '.');
+    var etiket = T.trendBlok ? 'Göstergeler ' + (aday > 0 ? 'yukarı' : 'aşağı') + ' yönlü ama trend grubu bunu teyit etmiyor (BEKLE)'
+      : T.karar === 'AL' ? 'Bağımsız gösterge grupları yükselişi destekliyor (AL)'
+      : T.karar === 'SAT' ? 'Bağımsız gösterge grupları düşüşü destekliyor (SAT)'
+      : T.egilim > 0 ? 'Yükseliş eğilimi var ancak grup teyidi yeterli değil (BEKLE)'
+      : T.egilim < 0 ? 'Düşüş eğilimi var ancak grup teyidi yeterli değil (BEKLE)'
       : 'Teknik görünüm net değil (BEKLE)';
     T.ozet = etiket + '.';
-    T.satirlar.push('Sonuç: ' + etiket + '. ' + pro + ' gösterge yukarı, ' + con + ' gösterge aşağı. (güven: ' + T.guven + ')');
+    T.satirlar.push('Sonuç: ' + etiket + '. ' + up + ' bağımsız grup yukarı, ' + down + ' grup aşağı. (güven: ' + T.guven + ')');
     return T;
   }
 
@@ -167,6 +209,7 @@
   function denetle(s, kal, uy, c, v, H, T) {
     var D = A.denetci(s, kal, uy, c, v, H);
     function e(a, x) { D.sorunlar.push({ a: a, t: x }); }
+    if (c.length < 35) e(2, 'Kapanmış mum sayısı 35’in altında; güçlü sinyal üretmek için veri yetersiz.');
     var yA = dir(s.karar), yT = dir(T.karar);
     var teknikTeyit;
     if (!T.var) { teknikTeyit = 'yok'; e(2, 'Teknik ajan yeterli veriye sahip değil.'); }
@@ -191,53 +234,59 @@
 
   /* ---------- Nihai karar (Denetçi verir) ---------- */
   function nihai(s, H, T, D) {
-    var a = dir(s.karar), t = T && T.var ? dir(T.karar) : 0;
-    var vv = (H && H.var) ? isaret(H.skor) : 0;
-    var hacimVar = !!(H && H.var);
-    var son = 'BEKLE', durum = '', neden = '';
-    if (D.hata === 'Yüksek') {
-      durum = 'temkinli';
-      neden = 'Denetçi birden fazla sorun buldu, bu yüzden acele edilmemeli.';
-    } else if (a * t < 0) {
-      durum = 'çelişki';
-      neden = 'Genel analiz ve teknik ajan ters yönde.';
-    } else if (a === 0 && t === 0) {
-      durum = 'net sinyal yok';
-      neden = 'Ne genel analiz ne teknik ajan net bir yön gösteriyor.';
-      if (hacimVar && vv !== 0) neden += ' Hacim ' + (vv > 0 ? 'yükselişe' : 'düşüşe') + ' meyilli ama tek başına yeterli değil.';
+    var a = dir(s && s.karar), t = T && T.var ? dir(T.karar) : 0;
+    var vv = H && H.var ? isaret(H.skor) : 0;
+    var yon = a || t;
+    var yonAd = yon > 0 ? 'yükseliş' : yon < 0 ? 'düşüş' : 'belirsiz';
+    var plan = s && s.plan;
+    var rr = plan && sayi(plan.rr) ? plan.rr : null;
+    var son = 'BEKLE', durum = 'yetersiz teyit', neden = '';
+
+    if (D && D.hata === 'Yüksek') {
+      durum = 'yüksek risk';
+      neden = 'Denetçi yüksek risk buldu; işlem sinyali verilmedi.';
+    } else if (!T || !T.var || !a || !t) {
+      durum = 'eksik teyit';
+      neden = 'Genel analiz ve teknik ajan aynı yönde açık sinyal üretmedi.';
+    } else if (a !== t) {
+      durum = 'ajanlar çelişiyor';
+      neden = 'Genel analiz ile teknik ajan farklı yönlerde; karar BEKLE.';
+    } else if (T.guven !== 'yüksek') {
+      durum = 'teknik güven düşük';
+      neden = 'Teknik ajan bağımsız gösterge gruplarından yüksek güvenli teyit alamadı.';
+    } else if (!H || !H.var) {
+      durum = 'hacim verisi yok';
+      neden = 'Hacim teyidi bulunmadığı için AL/SAT kararı verilmedi.';
+    } else if (vv !== a) {
+      durum = vv === 0 ? 'hacim nötr' : 'hacim ters yönde';
+      neden = vv === 0
+        ? 'Hacim sinyali yönü doğrulamıyor; BEKLE.'
+        : 'Hacim, genel analiz ve teknik ajanın ' + yonAd + ' sinyaliyle çelişiyor; BEKLE.';
+    } else if (rr === null || rr < 1.5) {
+      durum = rr === null
+        ? 'risk/kazanç planı yok' : 'risk/kazanç yetersiz';
+      neden = rr === null
+        ? 'Geçerli stop ve hedef içeren işlem planı oluşturulamadı.'
+        : 'Risk/kazanç oranı 1:1,5 altında (' + f1(rr) + '); işlem cazip değil.';
     } else {
-      var d = a !== 0 ? a : t;
-      var yonAd = d > 0 ? 'yükseliş' : 'düşüş';
-      var ikisi = (a === d && t === d);
-      if (hacimVar && vv === -d) {
-        durum = 'hacim ters yönde';
-        neden = 'Grafik ' + yonAd + ' gösteriyor ama hacim bunu desteklemiyor.';
-      } else if (ikisi) {
-        son = d > 0 ? 'AL' : 'SAT';
-        if (hacimVar && vv === d) {
-          durum = D.hata === 'Düşük' ? 'güçlü teyit' : 'teyitli';
-          neden = 'Genel analiz, teknik ajan ve hacim aynı ' + yonAd + ' yönünde.';
-        } else {
-          durum = 'temkinli';
-          neden = 'Genel analiz ve teknik ajan ' + yonAd + ' diyor; ' + (hacimVar ? 'hacim net teyit vermiyor.' : 'hacim verisi olmadığı için hacim teyidi yok.');
-        }
-      } else if (hacimVar && vv === d) {
-        son = d > 0 ? 'AL' : 'SAT';
-        durum = 'temkinli';
-        neden = 'Yalnızca ' + (a !== 0 ? 'genel analiz' : 'teknik ajan') + ' ' + yonAd + ' diyor, hacim de destekliyor.';
-      } else {
-        durum = 'yetersiz teyit';
-        neden = 'Yalnızca ' + (a !== 0 ? 'genel analiz' : 'teknik ajan') + ' ' + yonAd + ' diyor ve hacim bunu teyit etmiyor.';
-      }
+      son = a > 0 ? 'AL' : 'SAT';
+      durum = D && D.hata === 'Düşük' ? 'yüksek teyit' : 'teyitli';
+      neden = 'Genel analiz, yüksek güvenli teknik ajan, hacim ve en az 1:1,5 risk/kazanç planı aynı ' +
+        yonAd + ' yönünde birleşti.';
     }
-    return { son: son, durum: durum, neden: neden };
+    return { son: son, durum: durum, neden: neden, riskKazanc: rr };
   }
 
   function kartlar3(sHam, kal, uy) {
     var s = temizS(sHam);
-    var c = s.c;
+    var tamC = s.c;
+    var c = Array.isArray(s.analysisC) && s.analysisC.length ? s.analysisC : tamC;
     if (!Array.isArray(c) || c.length < 5) return null;
-    var v = hacimHazirla(A.hacim, c.length);
+    var hamHacim = Array.isArray(A.hacim) ? A.hacim : null;
+    if (hamHacim && Array.isArray(tamC) && hamHacim.length === tamC.length && c.length < tamC.length) {
+      hamHacim = hamHacim.slice(0, c.length);
+    }
+    var v = hacimHazirla(hamHacim, c.length);
     var H = A.hacimAjani(c, v);
     var T = teknikAjani(s, c);
     var D = denetle(s, kal, uy, c, v, H, T);
@@ -249,8 +298,11 @@
       'Karar: ' + N.son + ' (' + N.durum + ')',
       N.neden,
       oyLine,
+      'Teknik güven: ' + T.guven + ' · Bağımsız grup teyidi: ' +
+        (T.kategoriler || []).map(function (g) { return g.ad + ': ' + (g.yon > 0 ? 'yukarı' : g.yon < 0 ? 'aşağı' : 'nötr'); }).join(' / '),
       'Hata payı: ' + D.hata + '. Hata payı sıfır değildir; bu bir yatırım tavsiyesi değildir.'
     ];
+    if (s.meta && s.meta.sonMumAcik) nh.push('Devam eden son mum analize alınmadı; yalnızca kapanmış mumlar kullanıldı.');
 
     var dn = [];
     dn.push(D.kontrol + ' kontrol yapıldı, ' + D.sorunlar.length + ' sorun bulundu. Hata payı: ' + D.hata + '.');
@@ -260,6 +312,7 @@
 
     var tt = [];
     tt.push('🟩 Teknik Ajan: ' + T.ozet + (T.nedenler.length ? ' Nedenleri: ' + T.nedenler.join(' ') : ''));
+    tt.push('🟩 Teknik Ajan: Benzer göstergeleri ayrı ayrı saymadım; trend, momentum, fiyat yapısı ve katılım gruplarını karşılaştırdım.');
     if (!H.var) tt.push('🟦 Hacim Ajanı: Hacim verisi yok, teknik yoruma katkı veremiyorum.');
     else if (T.egilim === 0) tt.push('🟦 Hacim Ajanı: ' + (vv !== 0 ? 'Teknik net değil ama hacim ' + (vv > 0 ? 'yükselişe' : 'düşüşe') + ' meyilli.' : 'Hacim de net bir yön vermiyor.'));
     else if (vv === T.egilim) tt.push('🟦 Hacim Ajanı: Hacim teknik yorumu destekliyor.');
