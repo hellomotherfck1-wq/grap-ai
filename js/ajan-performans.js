@@ -661,21 +661,26 @@
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), row = el('tr');
-    ['Tarih', 'Varlık', 'Periyot', 'Karar', 'Durum', 'Net sonuç'].forEach(function (x) { row.appendChild(el('th', '', x)); });
+    ['Tarih', 'Varlık', 'Periyot', 'Karar', 'F/K', 'Durum', 'Net sonuç'].forEach(function (x) { row.appendChild(el('th', '', x)); });
     head.appendChild(row); table.appendChild(head);
     var body = el('tbody');
     all.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 15).forEach(function (r) {
       var tr = el('tr');
       var net = r.tradeResult && num(r.tradeResult.netPct) ? pct(r.tradeResult.netPct)
         : r.directionStatus === 'completed' && num(r.forwardPct) ? pct(r.forwardPct) + ' (yön)' : '—';
+      var fkLabel = r.fundamentalStatus === 'available'
+        ? (num(r.fkPE) ? 'Var · ' + r.fkPE.toFixed(2) + 'x' : 'Veri var')
+        : r.fundamentalStatus === 'pending' ? 'Bekliyor'
+        : r.fundamentalStatus === 'unavailable' ? 'Veri yok'
+        : r.fundamentalStatus === 'not-included' ? 'Tarama dışı' : 'Uygulanmaz';
       [new Date(r.signalAt).toLocaleDateString('tr-TR'), r.name || r.symbol, r.timeframe,
-        r.decision, statusText(r), net].forEach(function (x) { tr.appendChild(el('td', '', x)); });
+        r.decision, fkLabel, statusText(r), net].forEach(function (x) { tr.appendChild(el('td', '', x)); });
       body.appendChild(tr);
     });
     table.appendChild(body); wrap.appendChild(table); card.appendChild(wrap);
 
     card.appendChild(el('p', 'backtest-not',
-      'AL/SAT işlem simülasyonu sonraki mum açılışından başlar. Maliyet her sinyal için kaydedilir; yeni sinyallerin maliyeti yukarıdan değiştirilebilir. BEKLE kararları kazanma oranına katılmaz. Ajan yön isabeti, sinyalden sonraki 10 kapanmış mumun fiyat yönüyle ölçülür. İşlemler bağımsız sinyal bazında değerlendirilir; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar Sonuç ekranını açınca ücretsiz kaynaktan güncellenir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
+      'AL/SAT işlem simülasyonu sonraki mum açılışından başlar. SAT işlemi kısa pozisyon varsayımıdır; spot piyasada short mümkün olmayabilir. Maliyet her sinyal için kaydedilir; yeni sinyallerin maliyeti yukarıdan değiştirilebilir. BEKLE kararları kazanma oranına katılmaz. Ajan yön isabeti, sinyalden sonraki 10 kapanmış mumun fiyat yönüyle ölçülür. İşlemler bağımsız sinyal bazında değerlendirilir; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar Sonuç ekranını açınca ücretsiz kaynaktan güncellenir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
     root.appendChild(card);
 
     refresh.addEventListener('click', function () { updateResults(); });
