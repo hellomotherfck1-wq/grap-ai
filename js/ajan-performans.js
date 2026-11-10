@@ -234,7 +234,7 @@
     var symbol = input.symbol;
     var signalAt = Number(input.signalAt);
     var market = input.market || marketOf(symbol);
-    var applicable = market === 'BIST' || market === 'Diğer';
+    var fundamentalStatus = input.fundamentalStatus || (market === 'BIST' ? 'pending' : 'not-applicable');
     var id = save({
       source: 'Grafik analizi',
       symbol: symbol,
@@ -255,7 +255,7 @@
       score: y.uyum,
       trend: s.trend && s.trend.yon,
       rsi: s.rsi,
-      fundamentalStatus: applicable ? 'pending' : 'not-applicable',
+      fundamentalStatus: fundamentalStatus,
       agentVersion: 'graph-ai-live-v1'
     });
     return id;
