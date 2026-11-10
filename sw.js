@@ -1,4 +1,4 @@
-const SURUM = 'graph-ai-v29';
+const SURUM = 'graph-ai-v30';
 const DOSYALAR = [
   './',
   './index.html',
