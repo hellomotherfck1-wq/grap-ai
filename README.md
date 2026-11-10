@@ -35,6 +35,19 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 
 **Veri ve güven sınırları:** BIST 100 üyeliği zamanla değişir; sembol listesi güncel tutulmalıdır. Ücretsiz fiyat ve haber uçları gecikmeli, eksik veya geçici olarak erişilemez olabilir. KAP bildirim listesi şirketin finansal tablosunun tamamını tarayıcıya indirmez; rapor bağlantıları kullanıcıyı KAP'a götürür. Veri gelmediğinde ilgili alan boş/uyarı olarak gösterilir. Otomatik çıktılar yatırım tavsiyesi değildir. Ücretli API anahtarı veya kullanıcı aboneliği gerekmez.
 
+## Ajan performans karnesi
+
+**Sonuç** ekranındaki ajan performans paneli, gerçek analiz ve BIST/coin taramalarından gelen sinyalleri tarayıcının IndexedDB alanında 365 gün saklar.
+
+- Ham fiyat mumları depolanmaz; sonuç kontrol edilirken ücretsiz Yahoo Finance / Binance herkese açık geçmiş verisi yeniden çekilir.
+- Aynı sembol, zaman dilimi ve kapanmış mum için tekrar eden sinyaller tek kayıtta birleştirilir.
+- BIST/coin taramalarında AL/SAT adayları (en fazla 40) veya hiç AL/SAT yoksa en yüksek skorlu tek BEKLE adayı kaydedilir.
+- AL/SAT işlemi sonraki mum açılışından simüle edilir; varsayılan toplam maliyet %0,20, hedef/stop aynı mumda görülürse stop önceliklidir.
+- Genel analiz, teknik, hacim ve nihai kurulun yön isabeti ayrıca 10 kapanmış mum sonraki fiyat yönüyle ölçülür. BEKLE kararları kazanma oranına eklenmez; düşüşten kaçınma / yükseliş kaçırma olarak raporlanır.
+- Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu eksik açıkça belirtilir. Grafik analizinde F/K sonucu sonradan kararı değiştirirse aynı sinyal kaydı güncellenir.
+- 30 işlemden önce başarı oranı örneklem yetersiz olarak işaretlenir; Wilson güven aralığı gösterilir.
+- Kayıtlar yalnızca bu cihaz/tarayıcıda bulunur. Tarayıcı verisi temizlenirse kaybolabilir; CSV dışa aktarımı vardır. 365 günden eski kayıtlar otomatik silinir.
+
 ## Ücretsiz geçmiş sinyal testi
 
 BIST ekranının altındaki **Ücretsiz geçmiş sinyal testi** paneli, hisse ve coin sembollerinde ücretli API anahtarı olmadan çalışır.
