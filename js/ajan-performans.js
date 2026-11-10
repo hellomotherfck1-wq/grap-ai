@@ -15,8 +15,11 @@
   var COST_KEY = 'graphai-agent-performance-cost-v1';
   var currentCostPct = DEFAULT_COST;
   try {
-    var savedCost = Number(localStorage.getItem(COST_KEY));
-    if (isFinite(savedCost) && savedCost >= 0 && savedCost <= 5) currentCostPct = savedCost;
+    var savedCostRaw = localStorage.getItem(COST_KEY);
+    if (savedCostRaw !== null && savedCostRaw !== '') {
+      var savedCost = Number(savedCostRaw);
+      if (isFinite(savedCost) && savedCost >= 0 && savedCost <= 5) currentCostPct = savedCost;
+    }
   } catch (e) {}
   var dbPromise = null;
   var updating = false;
@@ -849,6 +852,7 @@
     listele: allRecords,
     sonucHesapla: evaluateSignal,
     guncelleSonuclar: updateResults,
+    maliyetOku: function () { return currentCostPct; },
     ayarlar: { saklamaGun: 365, ufukMumu: HORIZON, varsayilanMaliyetYuzde: DEFAULT_COST }
   };
 
