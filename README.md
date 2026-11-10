@@ -44,6 +44,7 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 - BIST/coin taramalarında AL/SAT adayları (en fazla 40) veya hiç AL/SAT yoksa en yüksek skorlu tek BEKLE adayı kaydedilir.
 - AL/SAT işlemi sonraki mum açılışından simüle edilir; varsayılan toplam maliyet %0,20, hedef/stop aynı mumda görülürse stop önceliklidir.
 - Genel analiz, teknik, hacim ve nihai kurulun yön isabeti ayrıca 10 kapanmış mum sonraki fiyat yönüyle ölçülür. BEKLE kararları kazanma oranına eklenmez; düşüşten kaçınma / yükseliş kaçırma olarak raporlanır.
+- Denetçi ajanının Düşük/Orta/Yüksek risk seviyesi ve bulgu sayısı saklanır; her risk seviyesinden sonra 10 mumdaki düşüş/yükseliş dağılımı ayrı gösterilir. F/K ajanının AL → BEKLE veto kararları da sonraki fiyat hareketiyle karşılaştırılır.
 - Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu eksik açıkça belirtilir. Grafik analizinde F/K sonucu sonradan kararı değiştirirse aynı sinyal kaydı güncellenir.
 - 30 işlemden önce başarı oranı örneklem yetersiz olarak işaretlenir; Wilson güven aralığı gösterilir.
 - Kayıtlar yalnızca bu cihaz/tarayıcıda bulunur. Tarayıcı verisi temizlenirse kaybolabilir; CSV dışa aktarımı vardır. 365 günden eski kayıtlar otomatik silinir.
