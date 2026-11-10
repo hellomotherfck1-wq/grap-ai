@@ -544,8 +544,17 @@
     if (typeof Veri === 'undefined' || !Veri || typeof Veri.ara !== 'function' || Veri.ara.__fkWrapped) return;
     var eskiAra = Veri.ara;
     var yeniAra = async function () {
+      /* Veri.ara BIST/finansal taramalarda da kullanılır. Yalnızca grafik arama
+         ekranından başlatılan isteği F/K ajanına bağla; taramalar state'i ezmesin. */
+      var yukle = document.getElementById('yukle');
+      var grafikAramasi = !!(yukle && yukle.classList.contains('aktif'));
+      if (!grafikAramasi) return eskiAra.apply(this, arguments);
+
       sifirla();
+      var jeton = FK.jeton;
       var v = await eskiAra.apply(this, arguments);
+      if (jeton !== FK.jeton) return v;
+
       FK.sembol = sembolNorm(v && v.sembol);
       FK.kaynak = v && v.kaynak || '';
       FK.tur = v && v.tur || '';
