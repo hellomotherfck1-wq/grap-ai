@@ -114,10 +114,13 @@ try {
       skor: 80, stopFiyat: 45, hedefFiyat: 60, rr: 2
     }], { source: 'E2E tarama', market: 'Kripto', timeframe: '1h' });
     await new Promise(resolve => setTimeout(resolve, 120));
+    await P.guncelleKarar(id, 'BEKLE', { fundamentalStatus: 'available', fkVeto: true });
     const all = await P.listele();
     const stored = all.filter(item => item.id === id);
     const scanStored = all.some(item => item.symbol === 'E2ESCANUSDT' &&
       item.source === 'E2E tarama' && item.decision === 'AL');
+    const fkUpdated = stored.length === 1 && stored[0].decision === 'BEKLE' &&
+      stored[0].fundamentalStatus === 'available' && stored[0].fkVeto === true;
     const record = {
       decision: 'AL', signalAt: 1000, price: 100, stop: 95, target: 110,
       timeframe: '1h', horizon: 2, costPct: 0.2
@@ -143,6 +146,7 @@ try {
       rawCandlesNotStored: stored.length === 1 && !Array.isArray(stored[0].mumlar),
       scanCount: scanCount,
       scanStored: scanStored,
+      fkUpdated: fkUpdated,
       retentionDays: P.ayarlar.saklamaGun,
       targetAtNextOpen: target.trade && target.trade.status === 'completed' &&
         target.trade.entry === 100 && target.trade.exit === 110 && target.trade.outcome === 'win',
@@ -155,7 +159,7 @@ try {
   check('Performans hafızası sinyalleri tekilleştiriyor, taramaları kaydediyor ve 365 gün tutuyor',
     performanceChecks.storedOnce && performanceChecks.rawCandlesNotStored &&
     performanceChecks.scanCount === 1 && performanceChecks.scanStored &&
-    performanceChecks.retentionDays === 365,
+    performanceChecks.fkUpdated && performanceChecks.retentionDays === 365,
     JSON.stringify(performanceChecks));
   check('Canlı sinyal değerlendirmesi sonraki mum açılışını kullanıyor',
     performanceChecks.targetAtNextOpen, JSON.stringify(performanceChecks));
