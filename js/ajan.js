@@ -39,7 +39,8 @@
       R.iddia = 'Mum sayısı az, hacim yorumu yapamadım.';
       return R;
     }
-    var son = n - 2;
+    // Çağıran modül açık mumu ayıklayarak yalnızca kapanmış mumları gönderir.
+    var son = n - 1;
     var baz = medyan(v.slice(Math.max(0, son - 29), son - 4));
     if (!(baz > 0)) {
       R.satirlar = ['Hacim verisi yetersiz, yorum yapamıyorum.'];
