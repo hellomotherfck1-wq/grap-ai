@@ -88,10 +88,10 @@ try {
     JSON.stringify(stopPriority));
 
   const backtestEngine = await page.evaluate(() => {
-    const oldAnaliz = window.Analiz.yap;
+    const oldAnaliz = Analiz.yap;
     const oldAjanlar = window.TahminAI.ajanlaraSor;
     try {
-      window.Analiz.yap = function (m, trend) {
+      Analiz.yap = function (m, trend) {
         const result = oldAnaliz.call(this, m, trend);
         result.plan = { stop: 0, t1: 1.5, rr: 2 };
         return result;
@@ -113,7 +113,7 @@ try {
         portfolioReturn: result.toplamGetiri
       };
     } finally {
-      window.Analiz.yap = oldAnaliz;
+      Analiz.yap = oldAnaliz;
       window.TahminAI.ajanlaraSor = oldAjanlar;
     }
   });
