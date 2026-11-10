@@ -398,9 +398,16 @@
     }
 
     var v = await Veri.ara(item.q, zd, function () {});
-    var dn = Veri.donustur(v, 80);
-    if (!dn || !dn.m || dn.m.length < 5) {
-      throw new Error('Yeterli mum yok');
+    var aralikMs = zd === '15m' ? 15 * 60 * 1000 : zd === '1h' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+    var kapanmisHam = Array.isArray(v.mumlar) ? v.mumlar.slice() : [];
+    var sonHam = kapanmisHam.length ? kapanmisHam[kapanmisHam.length - 1] : null;
+    var sonMumAcik = !!(sonHam && Number.isFinite(Number(sonHam.t)) && Date.now() < Number(sonHam.t) + aralikMs);
+    if (sonMumAcik) kapanmisHam.pop();
+    if (kapanmisHam.length < 20) throw new Error('Kapanmış mum sayısı yetersiz.');
+    var vKapanmis = Object.assign({}, v, { mumlar: kapanmisHam });
+    var dn = Veri.donustur(vKapanmis, 80);
+    if (!dn || !dn.m || dn.m.length < 5 || !dn.d.length) {
+      throw new Error('Yeterli kapanmış mum yok');
     }
     var t = Goruntu.trend(dn.m);
     var s = Analiz.yap(dn.m, t);
@@ -431,6 +438,8 @@
       genelKarar: s.karar,
       teknikKarar: panel.teknik ? panel.teknik.karar : null,
       hacimSkor: panel.hacim ? panel.hacim.skor : null,
+      hacimKarar: panel.hacim && panel.hacim.var
+        ? (panel.hacim.skor > 0 ? 'AL' : panel.hacim.skor < 0 ? 'SAT' : 'BEKLE') : 'BEKLE',
       hataPayi: panel.denetci ? panel.denetci.hata : null,
       ozet: panel.ozet,
       tartisma: panel.tartisma,
@@ -442,6 +451,10 @@
         t2: s.plan.t2
       } : null,
       fiyat: sonFiyat,
+      signalAt: sonMum ? Number(sonMum.t) + aralikMs : null,
+      stopFiyat: s.plan ? dn.kal.lo + s.plan.stop * (dn.kal.hi - dn.kal.lo) : null,
+      hedefFiyat: s.plan ? dn.kal.lo + s.plan.t1 * (dn.kal.hi - dn.kal.lo) : null,
+      rr: s.plan && isFinite(s.plan.rr) ? s.plan.rr : null,
       sonMumDegisim: sonMumDegisim,
       sonHacim: sonHacim,
       ortHacim20: ortHacim20,
@@ -461,7 +474,16 @@
       teknik: r.teknikKarar,
       hacim: r.hacimSkor,
       hata: r.hataPayi,
+      hacimKarar: r.hacimKarar,
       fiyat: r.fiyat,
+      signalAt: r.signalAt,
+      stopFiyat: r.stopFiyat,
+      hedefFiyat: r.hedefFiyat,
+      rr: r.rr,
+      zd: r.zd,
+      genelKarar: r.genelKarar,
+      teknikKarar: r.teknikKarar,
+      hacimSkor: r.hacimSkor,
       sonMumDegisim: r.sonMumDegisim,
       sonHacim: r.sonHacim,
       ortHacim20: r.ortHacim20,
@@ -493,6 +515,15 @@
       var bNet = b.karar === 'BEKLE' ? -20 : 0;
       return (b.skor + bNet) - (a.skor + aNet);
     });
+
+    if (window.AjanPerformans && typeof window.AjanPerformans.kaydetTarama === 'function') {
+      window.AjanPerformans.kaydetTarama(adaylar, {
+        source: 'BIST tarama',
+        market: 'BIST',
+        timeframe: zd,
+        agentVersion: 'tahmin-v1.3'
+      });
+    }
 
     var enIyi = adaylar.length ? adaylar[0] : null;
 
@@ -757,7 +788,7 @@
       '<p id="tahmin-durum" class="alt"></p>' +
       '<div id="tahmin-alan"></div>' +
       '<div id="tahmin-hafiza"></div>' +
-      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: BIST 100’ün tamamı taranır. Fiyat ve hacim son mum verisidir; açık seansta son mum tamamlanmamış olabilir.</p>';
+      '<p class="kart" style="font-size:13px;color:#8b98a5">Not: BIST 100’ün tamamı taranır. Açık mumlar hesaplamaya alınmaz. AL/SAT sinyalleri (en fazla 40) veya AL/SAT yoksa en güçlü BEKLE adayı performans karnesine kaydedilir.</p>';
 
     var btn = document.getElementById('tahmin-btn');
     var durum = document.getElementById('tahmin-durum');
