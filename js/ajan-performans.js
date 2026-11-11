@@ -87,19 +87,23 @@
             if (newRank >= oldRank && old.tradeStatus !== 'completed' && old.directionStatus !== 'completed') {
               var changedDecision = old.decision !== record.decision;
               [
-                'name', 'market', 'timeframe', 'signalAt', 'price', 'stop', 'target', 'rr',
+                'name', 'market', 'timeframe', 'signalAt', 'scanAt', 'price', 'stop', 'target', 'rr',
                 'decision', 'generalDecision', 'technicalDecision', 'volumeDecision',
                 'volumeScore', 'flowDecision', 'flowScore', 'flowAvailable',
                 'marketRegime', 'mtfAlignment', 'sourceTimestamps',
+                'deepScan', 'deepVeto', 'deepReasons', 'finalReason',
+                'spotStatus', 'spotResult',
                 'auditorError', 'auditorWarningCount', 'score', 'trend', 'rsi', 'fundamentalStatus',
                 'fkPE', 'fkValuation', 'fkVeto', 'costPct', 'horizon', 'agentVersion'
               ].forEach(function (key) {
                 if (record[key] !== undefined) finalRecord[key] = record[key];
               });
               if (changedDecision) {
-                finalRecord.tradeStatus = record.decision === 'BEKLE' ? 'not-applicable' : 'pending';
+                finalRecord.tradeStatus = record.decision === 'AL' ? 'pending' : 'not-applicable';
+                finalRecord.spotStatus = record.decision === 'SAT' ? 'pending' : 'not-applicable';
                 finalRecord.directionStatus = 'pending';
                 finalRecord.tradeResult = null;
+                finalRecord.spotResult = null;
                 finalRecord.forwardPct = null;
                 finalRecord.waitResult = null;
               }
@@ -174,6 +178,7 @@
       market: input.market || marketOf(symbol),
       timeframe: tf,
       signalAt: at,
+      scanAt: num(input.scanAt) ? input.scanAt : now,
       price: price,
       stop: num(input.stop) && input.stop > 0 ? input.stop : null,
       target: num(input.target) && input.target > 0 ? input.target : null,
@@ -190,6 +195,11 @@
       mtfAlignment: num(input.mtfAlignment) ? input.mtfAlignment : null,
       sourceTimestamps: input.sourceTimestamps && typeof input.sourceTimestamps === 'object'
         ? input.sourceTimestamps : null,
+      deepScan: input.deepScan || null,
+      deepVeto: Boolean(input.deepVeto),
+      deepReasons: Array.isArray(input.deepReasons)
+        ? input.deepReasons.slice(0, 8).map(function (reason) { return String(reason); }) : [],
+      finalReason: input.finalReason || null,
       auditorError: input.auditorError || null,
       auditorWarningCount: num(input.auditorWarningCount) ? Math.max(0, input.auditorWarningCount) : null,
       score: num(input.score) ? input.score : null,
@@ -201,9 +211,11 @@
       fkVeto: Boolean(input.fkVeto),
       costPct: num(input.costPct) ? Math.max(0, Math.min(5, input.costPct)) : currentCostPct,
       horizon: Math.max(2, Math.min(30, Number(input.horizon) || HORIZON)),
-      tradeStatus: decision === 'BEKLE' ? 'not-applicable' : 'pending',
+      tradeStatus: decision === 'AL' ? 'pending' : 'not-applicable',
+      spotStatus: decision === 'SAT' ? 'pending' : 'not-applicable',
       directionStatus: 'pending',
       tradeResult: null,
+      spotResult: null,
       forwardPct: null,
       waitResult: null,
       agentVersion: String(input.agentVersion || 'graph-ai-agent-v1')
@@ -296,19 +308,14 @@
   function saveScan(candidates, meta) {
     if (!Array.isArray(candidates) || !candidates.length) return 0;
     meta = meta || {};
-    var actionable = candidates.filter(function (c) { return c && (c.karar === 'AL' || c.karar === 'SAT'); });
-    var chosen = actionable.slice(0, 40);
-    var bestWait = candidates.find(function (c) {
-      return c && c.karar === 'BEKLE' && c.sembol && c.sembol !== '—';
-    });
-    if (bestWait && !chosen.some(function (c) {
-      return c.sembol === bestWait.sembol && c.signalAt === bestWait.signalAt;
-    })) chosen.push(bestWait);
+    var scanAt = num(meta.scanAt) ? meta.scanAt : Date.now();
     var count = 0;
     var writes = [];
-    chosen.forEach(function (c) {
+    candidates.forEach(function (c) {
+      if (!c || !c.sembol || c.sembol === '—') return;
       var record = safeRecord({
         source: meta.source || 'Tarama',
+        scanAt: scanAt,
         symbol: c.sembol,
         name: c.ad,
         market: meta.market || marketOf(c.sembol),
@@ -329,15 +336,22 @@
         marketRegime: c.marketRegime && c.marketRegime.regime,
         mtfAlignment: c.mtf && c.mtf.score,
         sourceTimestamps: c.sourceTimestamps,
+        deepScan: c.deepScan || null,
+        deepVeto: !!c.deepVeto,
+        deepReasons: c.deepReasons,
+        finalReason: c.nihaiNeden || c.finalReason || null,
         auditorError: c.hataPayi,
         auditorWarningCount: c.denetciSorunSayisi,
         score: c.skor,
         trend: c.trend,
         rsi: c.rsi,
         fundamentalStatus: 'not-included',
-        agentVersion: meta.agentVersion || 'graph-ai-scan-v1'
+        agentVersion: meta.agentVersion || c.agentVersion || 'graph-ai-scan-v1'
       });
-      if (record) { count++; writes.push(putRecord(record)); }
+      if (record) {
+        count++;
+        writes.push(putRecord(record));
+      }
     });
     Promise.all(writes).then(allRecords).then(render).catch(function (e) {
       setStatus('Tarama sinyalleri kaydedilemedi: ' + (e && e.message ? e.message : String(e)), true);
@@ -348,8 +362,13 @@
   function updateDecision(id, decision, extra) {
     if (!id || ['AL', 'SAT', 'BEKLE'].indexOf(decision) < 0) return Promise.resolve(null);
     var patch = Object.assign({}, extra || {}, { decision: decision });
-    patch.tradeStatus = decision === 'BEKLE' ? 'not-applicable' : 'pending';
+    patch.tradeStatus = decision === 'AL' ? 'pending' : 'not-applicable';
+    patch.spotStatus = decision === 'SAT' ? 'pending' : 'not-applicable';
     patch.directionStatus = 'pending';
+    patch.tradeResult = null;
+    patch.spotResult = null;
+    patch.forwardPct = null;
+    patch.waitResult = null;
     return patchRecord(id, patch).then(function (updated) {
       return allRecords().then(function (records) {
         render(records);
@@ -393,22 +412,22 @@
   }
 
   function tradeResult(record, bars) {
-    if (record.decision !== 'AL' && record.decision !== 'SAT') return null;
+    // Spot AL işlemi simüle edilir; SAT hiçbir zaman kısa pozisyon açmaz.
+    if (record.decision !== 'AL') return null;
     var future = futureBars(record, bars);
     if (!future.length) return null;
     var horizon = record.horizon || HORIZON;
-    var dir = record.decision === 'AL' ? 1 : -1;
     var entryBar = future[0];
     var entry = entryBar.o;
     if (!num(entry) || entry <= 0) return null;
 
-    var hasPlan = num(record.stop) && num(record.target);
+    var hasPlan = num(record.stop) && num(record.target) && record.stop < record.target;
     if (hasPlan) {
-      if ((dir > 0 && entry <= record.stop) || (dir < 0 && entry >= record.stop)) {
-        return { status: 'skipped', reason: 'Sonraki açılışta stop seviyesi aşılmış; işlem açılmadı.', entry: entry, entryAt: entryBar.t };
+      if (entry <= record.stop) {
+        return { status: 'skipped', reason: 'Sonraki açılışta stop seviyesi aşılmış; Spot AL yapılmadı.', entry: entry, entryAt: entryBar.t };
       }
-      if ((dir > 0 && entry >= record.target) || (dir < 0 && entry <= record.target)) {
-        return { status: 'skipped', reason: 'Sonraki açılışta hedef geçilmiş; işlem açılmadı.', entry: entry, entryAt: entryBar.t };
+      if (entry >= record.target) {
+        return { status: 'skipped', reason: 'Sonraki açılışta hedef geçilmiş; Spot AL yapılmadı.', entry: entry, entryAt: entryBar.t };
       }
     }
 
@@ -417,17 +436,10 @@
     for (var i = 0; i < limit; i++) {
       var bar = future[i];
       if (hasPlan) {
-        if (dir > 0) {
-          if (bar.o <= record.stop) { exit = bar.o; reason = 'Stop boşluğu'; }
-          else if (bar.l <= record.stop) { exit = record.stop; reason = 'Stop'; }
-          else if (bar.o >= record.target) { exit = bar.o; reason = 'Hedef boşluğu'; }
-          else if (bar.h >= record.target) { exit = record.target; reason = 'Hedef'; }
-        } else {
-          if (bar.o >= record.stop) { exit = bar.o; reason = 'Stop boşluğu'; }
-          else if (bar.h >= record.stop) { exit = record.stop; reason = 'Stop'; }
-          else if (bar.o <= record.target) { exit = bar.o; reason = 'Hedef boşluğu'; }
-          else if (bar.l <= record.target) { exit = record.target; reason = 'Hedef'; }
-        }
+        if (bar.o <= record.stop) { exit = bar.o; reason = 'Stop boşluğu'; }
+        else if (bar.l <= record.stop) { exit = record.stop; reason = 'Stop'; }
+        else if (bar.o >= record.target) { exit = bar.o; reason = 'Hedef boşluğu'; }
+        else if (bar.h >= record.target) { exit = record.target; reason = 'Hedef'; }
       }
       if (exit !== null) { exitIndex = i; break; }
     }
@@ -436,13 +448,13 @@
       if (future.length < horizon) return null;
       exitIndex = horizon - 1;
       exit = future[exitIndex].c;
-      reason = hasPlan ? '10 mum zaman çıkışı' : '10 mum yön testi (işlem planı yok)';
+      reason = hasPlan ? '10 mum zaman çıkışı' : '10 mum Spot AL yön testi (işlem planı yok)';
     }
 
     var sample = future.slice(0, exitIndex + 1);
     var maxHigh = Math.max.apply(null, sample.map(function (b) { return b.h; }));
     var minLow = Math.min.apply(null, sample.map(function (b) { return b.l; }));
-    var gross = dir * (exit - entry) / entry * 100;
+    var gross = (exit - entry) / entry * 100;
     var net = gross - record.costPct;
     return {
       status: 'completed',
@@ -453,23 +465,64 @@
       exitAt: future[exitIndex].t,
       grossPct: gross,
       netPct: net,
-      mfePct: dir > 0 ? (maxHigh - entry) / entry * 100 : (entry - minLow) / entry * 100,
-      maePct: dir > 0 ? (minLow - entry) / entry * 100 : (entry - maxHigh) / entry * 100,
+      mfePct: (maxHigh - entry) / entry * 100,
+      maePct: (minLow - entry) / entry * 100,
       outcome: net > 0 ? 'win' : net < 0 ? 'loss' : 'flat'
+    };
+  }
+
+  function spotSaleResult(record, bars) {
+    // SAT: mevcut Spot pozisyonunu sonraki mum açılışında satıp 10 mum tutmaya kıyasla.
+    // Bu, gerçek portföy PnL'si değildir; alış maliyeti ve pozisyon miktarı bilinmez.
+    if (record.decision !== 'SAT') return null;
+    var future = futureBars(record, bars);
+    var horizon = record.horizon || HORIZON;
+    if (future.length < horizon || !(record.price > 0)) return null;
+
+    var sample = future.slice(0, horizon);
+    var sellBar = sample[0];
+    var holdBar = sample[sample.length - 1];
+    var sellPrice = sellBar && sellBar.o;
+    var holdPrice = holdBar && holdBar.c;
+    if (!num(sellPrice) || sellPrice <= 0 || !num(holdPrice) || holdPrice <= 0) return null;
+
+    var saleAdvantage = (sellPrice / holdPrice - 1) * 100;
+    var holdReturn = (holdPrice / sellPrice - 1) * 100;
+    return {
+      status: 'completed',
+      mode: 'spot-sell-vs-hold',
+      sellPrice: sellPrice,
+      sellAt: sellBar.t,
+      holdPrice: holdPrice,
+      holdAt: holdBar.t,
+      saleAdvantagePct: saleAdvantage,
+      holdReturnPct: holdReturn,
+      signalToHoldPct: (holdPrice / record.price - 1) * 100,
+      outcome: saleAdvantage > 0 ? 'sell-better' : saleAdvantage < 0 ? 'hold-better' : 'similar'
     };
   }
 
   function evaluateSignal(record, bars) {
     return {
       trade: tradeResult(record, bars),
+      spotSale: spotSaleResult(record, bars),
       direction: directionResult(record, bars)
     };
   }
 
   function statusText(record) {
+    if (record.decision === 'SAT') {
+      if (record.spotStatus === 'expired' || record.directionStatus === 'expired') return 'Veri aralığı dışında';
+      if (record.lastError) return 'Veri alınamadı';
+      if (record.spotStatus === 'completed' && record.spotResult) {
+        return record.spotResult.outcome === 'sell-better' ? 'Satış daha iyi'
+          : record.spotResult.outcome === 'hold-better' ? 'Tutmak daha iyi' : 'Satış ve tutma benzer';
+      }
+      return 'Spot SAT karşılaştırması bekleniyor';
+    }
     if (record.directionStatus === 'expired' || record.tradeStatus === 'expired') return 'Veri aralığı dışında';
     if (record.lastError) return 'Veri alınamadı';
-    if (record.tradeStatus === 'skipped') return 'İşlem açılmadı';
+    if (record.tradeStatus === 'skipped') return 'Spot AL yapılmadı';
     if (record.decision === 'BEKLE' && record.directionStatus === 'completed') {
       return record.waitResult === 'avoid-down' ? 'Düşüşten kaçınma'
         : record.waitResult === 'missed-up' ? 'Yükseliş kaçırma' : 'Yatay';
@@ -558,6 +611,46 @@
     return wrap;
   }
 
+  function renderSpotSaleBreakdown(records) {
+    var groups = Object.create(null);
+    (records || []).filter(function (r) {
+      return r.decision === 'SAT' && r.spotStatus === 'completed' && r.spotResult;
+    }).forEach(function (r) {
+      var key = (r.market || 'Diğer') + '|' + (r.timeframe || '—');
+      if (!groups[key]) groups[key] = { market: r.market || 'Diğer', timeframe: r.timeframe || '—', rows: [] };
+      groups[key].rows.push(r);
+    });
+    var wrap = el('div', 'backtest-table-wrap');
+    var table = el('table', 'backtest-trade-table');
+    var head = el('thead'), hr = el('tr');
+    ['Piyasa', 'Periyot', 'SAT sonucu', 'Satış daha iyi', 'Tutmak daha iyi', 'Ort. satış farkı'].forEach(function (x) {
+      hr.appendChild(el('th', '', x));
+    });
+    head.appendChild(hr);
+    table.appendChild(head);
+    var body = el('tbody');
+    Object.keys(groups).sort().forEach(function (key) {
+      var group = groups[key];
+      var soldBetter = group.rows.filter(function (r) { return r.spotResult.outcome === 'sell-better'; }).length;
+      var heldBetter = group.rows.filter(function (r) { return r.spotResult.outcome === 'hold-better'; }).length;
+      var average = group.rows.reduce(function (sum, r) {
+        return sum + r.spotResult.saleAdvantagePct;
+      }, 0) / group.rows.length;
+      var tr = el('tr');
+      [
+        group.market, group.timeframe, String(group.rows.length), String(soldBetter),
+        String(heldBetter), pct(average)
+      ].forEach(function (value) { tr.appendChild(el('td', '', value)); });
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    wrap.appendChild(table);
+    if (!Object.keys(groups).length) {
+      wrap.appendChild(el('p', 'backtest-not', 'Henüz tamamlanmış Spot SAT karşılaştırması yok.'));
+    }
+    return wrap;
+  }
+
   function renderAuditorTable(records) {
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
@@ -582,7 +675,7 @@
 
   function renderBreakdown(records) {
     var groups = Object.create(null);
-    records.forEach(function (r) {
+    records.filter(function (r) { return r.decision === 'AL'; }).forEach(function (r) {
       var key = (r.market || 'Diğer') + '|' + (r.timeframe || '—');
       if (!groups[key]) groups[key] = { market: r.market || 'Diğer', timeframe: r.timeframe || '—', rows: [] };
       groups[key].rows.push(r);
@@ -590,7 +683,7 @@
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), hr = el('tr');
-    ['Piyasa', 'Periyot', 'Sinyal', 'İşlem', 'Kazanma', 'Ort. net'].forEach(function (x) { hr.appendChild(el('th', '', x)); });
+    ['Piyasa', 'Periyot', 'Spot AL', 'İşlem', 'Kazanma', 'Ort. net'].forEach(function (x) { hr.appendChild(el('th', '', x)); });
     head.appendChild(hr); table.appendChild(head);
     var body = el('tbody');
     Object.keys(groups).sort().forEach(function (key) {
@@ -618,7 +711,7 @@
     var card = el('div', 'kart ajan-performans');
     var header = el('div', 'performans-baslik');
     var heading = el('div');
-    heading.appendChild(el('h3', '', '🏆 Ajanların gerçek performansı'));
+    heading.appendChild(el('h3', '', '🏆 Ajanların ölçülen performansı'));
     heading.appendChild(el('p', 'backtest-not', 'Sinyaller 365 gün saklanır · ham fiyat geçmişi saklanmaz · bu cihazda tutulur.'));
     header.appendChild(heading);
 
@@ -658,7 +751,14 @@
     card.appendChild(status);
 
     var all = records;
-    var completedTrades = all.filter(function (r) { return r.tradeStatus === 'completed' && r.tradeResult; });
+    var completedTrades = all.filter(function (r) {
+      return r.decision === 'AL' && r.tradeStatus === 'completed' && r.tradeResult;
+    });
+    var completedSales = all.filter(function (r) {
+      return r.decision === 'SAT' && r.spotStatus === 'completed' && r.spotResult;
+    });
+    var salesBetter = completedSales.filter(function (r) { return r.spotResult.outcome === 'sell-better'; }).length;
+    var holdsBetter = completedSales.filter(function (r) { return r.spotResult.outcome === 'hold-better'; }).length;
     var wins = completedTrades.filter(function (r) { return r.tradeResult.outcome === 'win'; });
     var losses = completedTrades.filter(function (r) { return r.tradeResult.outcome === 'loss'; });
     var grossWins = wins.reduce(function (sum, r) { return sum + Math.max(0, r.tradeResult.netPct); }, 0);
@@ -669,9 +769,15 @@
       ? completedTrades.reduce(function (sum, r) { return sum + r.tradeResult.netPct; }, 0) / completedTrades.length : null;
     var wr = winRate(completedTrades);
     var pending = all.filter(function (r) {
-      return r.tradeStatus === 'pending' || r.directionStatus === 'pending';
+      return r.directionStatus === 'pending' ||
+        (r.decision === 'AL' && r.tradeStatus === 'pending') ||
+        (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired');
     }).length;
-    var expired = all.filter(function (r) { return r.tradeStatus === 'expired' || r.directionStatus === 'expired'; }).length;
+    var expired = all.filter(function (r) {
+      return r.directionStatus === 'expired' ||
+        (r.decision === 'AL' && r.tradeStatus === 'expired') ||
+        (r.decision === 'SAT' && r.spotStatus === 'expired');
+    }).length;
     var observedWait = all.filter(function (r) { return r.decision === 'BEKLE' && r.directionStatus === 'completed'; });
     var avoided = observedWait.filter(function (r) { return r.waitResult === 'avoid-down'; }).length;
     var missed = observedWait.filter(function (r) { return r.waitResult === 'missed-up'; }).length;
@@ -679,10 +785,13 @@
     var grid = el('div', 'backtest-kpi-grid');
     [
       ['Kayıtlı sinyal', String(all.length)],
-      ['Tamamlanan AL/SAT', String(completedTrades.length)],
-      ['Kazanma oranı', wr.rate === null ? '—' : '%' + wr.rate.toFixed(1).replace('.', ',')],
-      ['Ort. net işlem', pct(average)],
-      ['Kâr faktörü', pf],
+      ['Tamamlanan Spot AL', String(completedTrades.length)],
+      ['Spot AL kazanma oranı', wr.rate === null ? '—' : '%' + wr.rate.toFixed(1).replace('.', ',')],
+      ['Spot AL ort. net', pct(average)],
+      ['Spot AL kâr faktörü', pf],
+      ['SAT satış/tutma testi', String(completedSales.length)],
+      ['SAT: satış daha iyi', String(salesBetter)],
+      ['SAT: tutmak daha iyi', String(holdsBetter)],
       ['Sonuç bekleyen', String(pending)],
       ['BEKLE değerlendirildi', String(observedWait.length)],
       ['Düşüşten kaçınma', String(avoided)],
@@ -694,15 +803,17 @@
     card.appendChild(grid);
 
     var quality = completedTrades.length < 30
-      ? 'Örneklem yetersiz: 30 tamamlanmış işlemden önce başarı oranı güvenilir kabul edilmemeli.'
+      ? 'Spot AL örneklemi yetersiz: 30 tamamlanmış işlemden önce kazanma oranı güvenilir kabul edilmemeli.'
       : completedTrades.length < 100
-        ? 'Ön sonuç: 30–99 işlem var. %95 Wilson aralığı yaklaşık %' + wr.low.toFixed(1) + '–%' + wr.high.toFixed(1) + '.'
-        : 'Genişleyen örneklem: %95 Wilson aralığı yaklaşık %' + wr.low.toFixed(1) + '–%' + wr.high.toFixed(1) + '. Bu yine de gelecekteki başarıyı garanti etmez.';
+        ? 'Spot AL ön sonucu: 30–99 işlem var. %95 Wilson aralığı yaklaşık %' + wr.low.toFixed(1) + '–%' + wr.high.toFixed(1) + '.'
+        : 'Spot AL örneklemi genişliyor: %95 Wilson aralığı yaklaşık %' + wr.low.toFixed(1) + '–%' + wr.high.toFixed(1) + '. Bu yine de gelecekteki başarıyı garanti etmez.';
     card.appendChild(el('p', 'backtest-not', quality));
     card.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · sinyalden 10 mum sonra'));
     card.appendChild(renderAgentTable(all));
-    card.appendChild(el('h4', 'backtest-trades-title', 'Piyasa ve zaman dilimi ayrımı'));
+    card.appendChild(el('h4', 'backtest-trades-title', 'Spot AL: piyasa ve zaman dilimi ayrımı'));
     card.appendChild(renderBreakdown(all));
+    card.appendChild(el('h4', 'backtest-trades-title', 'Spot SAT: satmak mı, tutmak mı?'));
+    card.appendChild(renderSpotSaleBreakdown(all));
     card.appendChild(el('h4', 'backtest-trades-title', 'Denetçi risk seviyesi sonrası 10 mum sonucu'));
     card.appendChild(renderAuditorTable(all));
 
@@ -723,8 +834,10 @@
     var body = el('tbody');
     all.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 15).forEach(function (r) {
       var tr = el('tr');
-      var net = r.tradeResult && num(r.tradeResult.netPct) ? pct(r.tradeResult.netPct)
-        : r.directionStatus === 'completed' && num(r.forwardPct) ? pct(r.forwardPct) + ' (yön)' : '—';
+      var net = r.decision === 'SAT' && r.spotResult && num(r.spotResult.saleAdvantagePct)
+        ? pct(r.spotResult.saleAdvantagePct) + ' (satış/tutma)'
+        : r.decision === 'AL' && r.tradeResult && num(r.tradeResult.netPct) ? pct(r.tradeResult.netPct)
+          : r.directionStatus === 'completed' && num(r.forwardPct) ? pct(r.forwardPct) + ' (yön)' : '—';
       var fkLabel = r.fundamentalStatus === 'available'
         ? (num(r.fkPE) ? 'Var · ' + r.fkPE.toFixed(2) + 'x' : 'Veri var')
         : r.fundamentalStatus === 'pending' ? 'Bekliyor'
@@ -737,7 +850,7 @@
     table.appendChild(body); wrap.appendChild(table); card.appendChild(wrap);
 
     card.appendChild(el('p', 'backtest-not',
-      'AL/SAT işlem simülasyonu sonraki mum açılışından başlar. SAT işlemi kısa pozisyon varsayımıdır; spot piyasada short mümkün olmayabilir. Maliyet her sinyal için kaydedilir; yeni sinyallerin maliyeti yukarıdan değiştirilebilir. BEKLE kararları kazanma oranına katılmaz. Ajan yön isabeti, sinyalden sonraki 10 kapanmış mumun fiyat yönüyle ölçülür. İşlemler bağımsız sinyal bazında değerlendirilir; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar Sonuç ekranını açınca ücretsiz kaynaktan güncellenir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
+      'Spot AL simülasyonu sonraki mum açılışından başlar; stop/hedef veya 10 mum çıkışı kullanılır. Varsayılan toplam maliyet %0,20 olup yeni sinyaller için değiştirilebilir. SAT için short açılmaz: eldeki coin sonraki mum açılışında satılmış varsayılır ve 10 mum tutmaya kıyasla fiyat farkı ölçülür. SAT karşılaştırması komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy kârı değildir. Ajanların AL/SAT yön isabeti bütün kaydedilen oyların sonraki 10 kapanmış mumdaki fiyat yönüyle karşılaştırılmasıdır. BEKLE kazanma oranına katılmaz. İşlemler bağımsız sinyal bazındadır; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar Sonuç ekranını açınca ücretsiz kaynaktan güncellenir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
     root.appendChild(card);
 
     refresh.addEventListener('click', function () { updateResults(); });
@@ -756,20 +869,31 @@
   }
 
   function exportCSV(records) {
-    var columns = ['signalAt', 'symbol', 'name', 'market', 'timeframe', 'decision', 'generalDecision',
+    var columns = ['signalAt', 'scanAt', 'symbol', 'name', 'market', 'timeframe', 'decision', 'generalDecision',
       'technicalDecision', 'volumeDecision', 'flowDecision', 'flowScore', 'flowAvailable',
-      'marketRegime', 'mtfAlignment', 'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
-      'costPct', 'tradeStatus', 'tradeOutcome', 'netPct', 'forwardPct', 'waitResult', 'source'];
+      'marketRegime', 'mtfAlignment', 'deepScan', 'deepVeto', 'deepReasons', 'finalReason',
+      'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
+      'costPct', 'tradeStatus', 'tradeOutcome', 'netPct', 'spotStatus', 'spotOutcome',
+      'spotSaleAdvantagePct', 'spotHoldReturnPct', 'spotSellPrice', 'spotHoldPrice',
+      'directionStatus', 'forwardPct', 'waitResult', 'source'];
     var rows = [columns.join(';')];
     records.slice().sort(function (a, b) { return a.signalAt - b.signalAt; }).forEach(function (r) {
       var values = [
-        new Date(r.signalAt).toISOString(), r.symbol, r.name, r.market, r.timeframe, r.decision,
+        new Date(r.signalAt).toISOString(), r.scanAt ? new Date(r.scanAt).toISOString() : '',
+        r.symbol, r.name, r.market, r.timeframe, r.decision,
         r.generalDecision, r.technicalDecision, r.volumeDecision, r.flowDecision, r.flowScore, r.flowAvailable,
-        r.marketRegime, r.mtfAlignment,
+        r.marketRegime, r.mtfAlignment, r.deepScan || '', r.deepVeto, (r.deepReasons || []).join('|'), r.finalReason || '',
         r.auditorError, r.auditorWarningCount, r.fundamentalStatus, r.price, r.stop, r.target, r.costPct, r.tradeStatus,
-        r.tradeResult ? r.tradeResult.outcome : '',
-        r.tradeResult ? r.tradeResult.netPct : '',
-        r.forwardPct == null ? '' : r.forwardPct, r.waitResult || '', (r.sources || [r.source]).join('+')
+        r.decision === 'AL' && r.tradeResult ? r.tradeResult.outcome : '',
+        r.decision === 'AL' && r.tradeResult ? r.tradeResult.netPct : '',
+        r.spotStatus || '',
+        r.spotResult ? r.spotResult.outcome : '',
+        r.spotResult ? r.spotResult.saleAdvantagePct : '',
+        r.spotResult ? r.spotResult.holdReturnPct : '',
+        r.spotResult ? r.spotResult.sellPrice : '',
+        r.spotResult ? r.spotResult.holdPrice : '',
+        r.directionStatus, r.forwardPct == null ? '' : r.forwardPct,
+        r.waitResult || '', (r.sources || [r.source]).join('+')
       ];
       rows.push(values.map(function (v) {
         var s = v == null ? '' : String(v);
@@ -804,7 +928,10 @@
     return prune().then(allRecords).then(function (records) {
       var groups = Object.create(null);
       records.forEach(function (r) {
-        if (r.tradeStatus !== 'pending' && r.directionStatus !== 'pending') return;
+        var needsTrade = r.decision === 'AL' && r.tradeStatus === 'pending';
+        var needsSpotSale = r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired';
+        var needsDirection = r.directionStatus === 'pending';
+        if (!needsTrade && !needsSpotSale && !needsDirection) return;
         if (Date.now() < r.signalAt + interval(r.timeframe)) return;
         if (num(r.nextCheckAt) && Date.now() < r.nextCheckAt) return;
         var key = r.symbol + '|' + r.timeframe;
@@ -832,7 +959,8 @@
           group.records.forEach(function (record) {
             if (first && record.signalAt < first - step * 2) {
               tasks.push(saveEvaluation(record.id, {
-                tradeStatus: record.tradeStatus === 'pending' ? 'expired' : record.tradeStatus,
+                tradeStatus: record.decision === 'AL' && record.tradeStatus === 'pending' ? 'expired' : record.tradeStatus,
+                spotStatus: record.decision === 'SAT' && record.spotStatus !== 'completed' ? 'expired' : record.spotStatus,
                 directionStatus: record.directionStatus === 'pending' ? 'expired' : record.directionStatus,
                 lastError: 'Ücretsiz kaynağın geçmiş aralığı bu sinyali kapsamıyor.'
               }));
@@ -844,9 +972,14 @@
               nextCheckAt: Date.now() + step,
               lastError: null
             };
-            if (evaluated.trade && record.tradeStatus === 'pending') {
+            if (evaluated.trade && record.decision === 'AL' && record.tradeStatus === 'pending') {
               patch.tradeStatus = evaluated.trade.status;
               patch.tradeResult = evaluated.trade;
+            }
+            if (evaluated.spotSale && record.decision === 'SAT' &&
+                record.spotStatus !== 'completed' && record.spotStatus !== 'expired') {
+              patch.spotStatus = evaluated.spotSale.status;
+              patch.spotResult = evaluated.spotSale;
             }
             if (evaluated.direction && record.directionStatus === 'pending') {
               patch.directionStatus = evaluated.direction.status;
@@ -880,7 +1013,11 @@
       return Promise.all([worker(), worker(), worker()]).then(function () {
         return allRecords().then(function (fresh) {
           render(fresh);
-          var pendingNow = fresh.filter(function (r) { return r.tradeStatus === 'pending' || r.directionStatus === 'pending'; }).length;
+          var pendingNow = fresh.filter(function (r) {
+            return r.directionStatus === 'pending' ||
+              (r.decision === 'AL' && r.tradeStatus === 'pending') ||
+              (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired');
+          }).length;
           setStatus('Güncelleme tamamlandı · ' + completed + '/' + list.length + ' varlık · ' +
             pendingNow + ' sinyalin sonucu bekleniyor · ' + failures + ' veri hatası.');
         });
