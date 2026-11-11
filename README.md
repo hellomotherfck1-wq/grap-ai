@@ -10,6 +10,8 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 - `js/cizim.js`: analiz grafiğini canvas üzerinde çizme
 - `js/ajan.js`, `js/ajan2.js`: hacim, teknik ve denetçi değerlendirmeleri
 - `js/tahmin.js`, `js/coin-tahmin.js`: BIST ve kripto tarama ekranları
+- `js/bist-arastirma.js`, `js/finansal-panel.js`: BIST şirket araştırması
+- `js/haber-ajani.js`: ücretsiz BIST haber taraması ve başlık temelli özet
 - `js/ajan-performans.js`: gerçek analiz ve tarama sinyallerinin performans takibi
 - `js/admin.js`: Supabase oturumu, yönetici yetkisi ve olay istatistikleri
 
@@ -34,6 +36,16 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 - Değerleme: ücretsiz kaynaktan F/K, PD/DD veya EPS gelmiyorsa sayı uydurulmaz; adil değer hesaplanmış gibi gösterilmez.
 
 **Veri ve güven sınırları:** BIST 100 üyeliği zamanla değişir; sembol listesi güncel tutulmalıdır. Ücretsiz fiyat ve haber uçları gecikmeli, eksik veya geçici olarak erişilemez olabilir. KAP bildirim listesi şirketin finansal tablosunun tamamını tarayıcıya indirmez; rapor bağlantıları kullanıcıyı KAP'a götürür. Veri gelmediğinde ilgili alan boş/uyarı olarak gösterilir. Otomatik çıktılar yatırım tavsiyesi değildir. Ücretli API anahtarı veya kullanıcı aboneliği gerekmez.
+
+## Haber Ajanı
+
+`js/haber-ajani.js`, BIST hissesi analiz edildiğinde son 7 gündeki haber başlıklarını ücretsiz kaynaklardan birleştirir:
+
+- KAP'ın kamuya açık şirket bildirimleri (özel durum açıklamaları ve finansal rapor başlıkları)
+- Google News RSS araması
+- Yahoo Finance'ın herkese açık haber araması
+
+Ajan haberleri tarih ve kaynak bağlantısıyla gösterir; tekrar eden başlıkları birleştirir ve başlık/kısa açıklama içindeki anahtar kelimelere göre olumlu, olumsuz, karışık veya nötr/belirsiz olarak sınıflandırır. Ücretli haber API'si veya ücretli yapay zekâ servisi kullanmaz. Haberlerin tam metnini okuduğunu iddia etmez; özet başlık ve varsa kısa açıklama temellidir. Haber Ajanı teknik AL/SAT kararını tek başına değiştirmez.
 
 ## Ajan performans karnesi
 
