@@ -53,7 +53,7 @@ Ajan haberleri tarih ve kaynak bağlantısıyla gösterir; tekrar eden başlıkl
 
 - Ham fiyat mumları depolanmaz; sonuç kontrol edilirken ücretsiz Yahoo Finance / Binance herkese açık geçmiş verisi yeniden çekilir. Geçmiş fiyatlar yalnızca gerçek analiz ve tarama sinyallerinin performansını ölçmek için kullanılır; ayrı bir manuel geçmiş sinyal simülasyonu bulunmaz.
 - Aynı sembol, zaman dilimi ve kapanmış mum için tekrar eden sinyaller tek kayıtta birleştirilir.
-- Coin taramasındaki 216 adayın tamamı; nihai karar, genel/teknik/hacim/Order Flow oyları, piyasa rejimi, MTF ve ilk 20 derin tarama bilgisiyle kaydedilir. Ham mumlar saklanmaz.
+- Coin taramasında verisi alınan tüm adaylar (tam listede 216 coin); nihai karar, genel/teknik/hacim/Order Flow oyları, piyasa rejimi, MTF ve ilk 20 derin tarama bilgisiyle kaydedilir. Ham mumlar saklanmaz.
 - Spot AL işlemi sonraki mum açılışından simüle edilir; varsayılan toplam maliyet %0,20, hedef/stop aynı mumda görülürse stop önceliklidir.
 - Spot SAT için short açılmaz. Elde coin olduğu varsayımıyla sonraki mum açılışındaki satış fiyatı, 10 mum tutmaya kıyaslanır. Bu fiyat farkı komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy PnL'si değildir.
 - Genel analiz, teknik, hacim ve nihai kurulun yön isabeti kaydedilen tüm AL/SAT oyları için 10 kapanmış mum sonraki fiyat yönüyle ölçülür. BEKLE kararları kazanma oranına eklenmez; düşüşten kaçınma / yükseliş kaçırma olarak raporlanır.

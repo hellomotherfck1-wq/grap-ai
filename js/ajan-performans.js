@@ -712,7 +712,7 @@
     var header = el('div', 'performans-baslik');
     var heading = el('div');
     heading.appendChild(el('h3', '', '🏆 Ajanların ölçülen performansı'));
-    heading.appendChild(el('p', 'backtest-not', 'Sinyaller 365 gün saklanır · ham fiyat geçmişi saklanmaz · bu cihazda tutulur.'));
+    heading.appendChild(el('p', 'backtest-not', 'Sinyaller 365 gün saklanır · 216 coin taramasındaki geçerli adayların oyları tutulur · ham mumlar saklanmaz · bu cihazda.'));
     header.appendChild(heading);
 
     var actions = el('div', 'performans-eylemler');
@@ -883,7 +883,8 @@
         r.symbol, r.name, r.market, r.timeframe, r.decision,
         r.generalDecision, r.technicalDecision, r.volumeDecision, r.flowDecision, r.flowScore, r.flowAvailable,
         r.marketRegime, r.mtfAlignment, r.deepScan || '', r.deepVeto, (r.deepReasons || []).join('|'), r.finalReason || '',
-        r.auditorError, r.auditorWarningCount, r.fundamentalStatus, r.price, r.stop, r.target, r.costPct, r.tradeStatus,
+        r.auditorError, r.auditorWarningCount, r.fundamentalStatus, r.price, r.stop, r.target, r.costPct,
+        r.decision === 'SAT' ? 'not-applicable' : r.tradeStatus,
         r.decision === 'AL' && r.tradeResult ? r.tradeResult.outcome : '',
         r.decision === 'AL' && r.tradeResult ? r.tradeResult.netPct : '',
         r.spotStatus || '',
@@ -959,7 +960,9 @@
           group.records.forEach(function (record) {
             if (first && record.signalAt < first - step * 2) {
               tasks.push(saveEvaluation(record.id, {
-                tradeStatus: record.decision === 'AL' && record.tradeStatus === 'pending' ? 'expired' : record.tradeStatus,
+                tradeStatus: record.decision === 'SAT' ? 'not-applicable'
+                  : record.decision === 'AL' && record.tradeStatus === 'pending' ? 'expired' : record.tradeStatus,
+                tradeResult: record.decision === 'SAT' ? null : record.tradeResult,
                 spotStatus: record.decision === 'SAT' && record.spotStatus !== 'completed' ? 'expired' : record.spotStatus,
                 directionStatus: record.directionStatus === 'pending' ? 'expired' : record.directionStatus,
                 lastError: 'Ücretsiz kaynağın geçmiş aralığı bu sinyali kapsamıyor.'
@@ -972,6 +975,11 @@
               nextCheckAt: Date.now() + step,
               lastError: null
             };
+            if (record.decision === 'SAT') {
+              // Önceki sürümlerde SAT, short işlem olarak saklanmış olabilir; geçersiz sonucu temizle.
+              patch.tradeStatus = 'not-applicable';
+              patch.tradeResult = null;
+            }
             if (evaluated.trade && record.decision === 'AL' && record.tradeStatus === 'pending') {
               patch.tradeStatus = evaluated.trade.status;
               patch.tradeResult = evaluated.trade;
