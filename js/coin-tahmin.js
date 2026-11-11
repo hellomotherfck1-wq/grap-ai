@@ -317,7 +317,7 @@
       flow: s.flow || null,
       mtf: s.mtf || null,
       marketRegime: s.marketRegime || null,
-      deepScan: s.deepScan || null,
+      deepScan: s.deepScan || (s.sembol && s.sembol !== '—' ? 'ilk 20 dışında' : null),
       deepVeto: !!s.deepVeto,
       deepReasons: Array.isArray(s.deepReasons) ? s.deepReasons.slice(0, 8) : [],
       sourceTimestamps: s.sourceTimestamps || null,
@@ -433,7 +433,6 @@
       nihaiDurum: panel.nihai ? panel.nihai.durum : null,
       nihaiNeden: panel.nihai ? panel.nihai.neden : null,
       hataPayi: panel.denetci ? panel.denetci.hata : null,
-      denetciSorunSayisi: panel.denetci ? panel.denetci.sorunSayisi : null,
       ozet: panel.ozet,
       tartisma: panel.tartisma,
       plan: s.plan && isFinite(s.plan.rr) ? {
@@ -464,9 +463,7 @@
       skor: r.skor,
       teknik: r.teknikKarar,
       hacim: r.hacimSkor,
-      hacimKarar: r.hacimKarar,
       hata: r.hataPayi,
-      denetciSorunSayisi: r.denetciSorunSayisi,
       signalAt: r.signalAt,
       fiyat: r.fiyat,
       stopFiyat: r.stopFiyat,
@@ -490,7 +487,7 @@
       flow: r.flow || null,
       mtf: r.mtf || null,
       marketRegime: r.marketRegime || null,
-      deepScan: r.deepScan || null,
+      deepScan: r.deepScan || 'ilk 20 dışında',
       deepVeto: !!r.deepVeto,
       deepReasons: Array.isArray(r.deepReasons) ? r.deepReasons.slice(0, 8) : [],
       sourceTimestamps: r.sourceTimestamps || null,
@@ -828,7 +825,7 @@
     ana.className = 'kart';
     ana.style.borderLeft = '6px solid ' + renkKarar(s.karar);
     var heading = document.createElement('h3');
-    heading.textContent = s.netYok ? 'BUGÜN NET AL/SAT SİNYALİ YOK' : 'SİSTEMİN SON KARARI';
+    heading.textContent = 'SİSTEMİN SON KARARI';
     heading.style.cssText = 'font-size:14px;letter-spacing:.4px;margin-bottom:10px;color:#c8d1da';
     ana.appendChild(heading);
 
