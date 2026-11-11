@@ -170,6 +170,52 @@ try {
       { t: 1000, o: 100, h: 102, l: 99, c: 101 },
       { t: 3601000, o: 101, h: 102, l: 100, c: 101.5 }
     ]);
+    const satRecord = {
+      decision: 'SAT', signalAt: 1000, price: 100,
+      timeframe: '1h', horizon: 2, costPct: 0.2
+    };
+    const satDown = P.sonucHesapla(satRecord, [
+      { t: 1000, o: 100, h: 101, l: 94, c: 95 },
+      { t: 3601000, o: 95, h: 96, l: 89, c: 90 }
+    ]);
+    const satUp = P.sonucHesapla(satRecord, [
+      { t: 1000, o: 100, h: 106, l: 99, c: 105 },
+      { t: 3601000, o: 105, h: 111, l: 104, c: 110 }
+    ]);
+    const fullScanAt = Date.now() - 12 * 60 * 60 * 1000;
+    const fullCandidates = Array.from({ length: 216 }, (_, i) => ({
+      sembol: 'E2EALL' + i + 'USDT',
+      ad: 'Tam tarama test ' + i,
+      zd: '1h',
+      signalAt: fullScanAt,
+      fiyat: 10 + i,
+      karar: 'BEKLE',
+      genelKarar: i % 2 ? 'AL' : 'SAT',
+      teknikKarar: i % 3 ? 'SAT' : 'AL',
+      hacimKarar: i % 2 ? 'AL' : 'BEKLE',
+      hacimSkor: i % 2 ? 2 : 0,
+      flow: { available: true, decision: 'AL', score: 2 },
+      mtf: { score: 1 },
+      marketRegime: { regime: 'bull' },
+      deepScan: i < 20 ? 'tamamlandı' : 'ilk 20 dışında',
+      deepVeto: i === 0,
+      deepReasons: i === 0 ? ['Denetçi riski'] : [],
+      nihaiNeden: i === 0 ? 'Test vetosu' : null,
+      hataPayi: 'Düşük',
+      denetciSorunSayisi: 1,
+      skor: 75
+    }));
+    const fullScanCount = P.kaydetTarama(fullCandidates, {
+      source: 'E2E tam tarama', market: 'Kripto', timeframe: '1h'
+    });
+    let fullScanRecords = [];
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const current = await P.listele();
+      fullScanRecords = current.filter(item => item.source === 'E2E tam tarama');
+      if (fullScanRecords.length === 216) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    const firstFullRecord = fullScanRecords.find(item => item.symbol === 'E2EALL0USDT');
     return {
       storedOnce: stored.length === 1,
       rawCandlesNotStored: stored.length === 1 && !Array.isArray(stored[0].mumlar),
@@ -183,8 +229,22 @@ try {
         target.trade.entry === 100 && target.trade.exit === 110 && target.trade.outcome === 'win',
       stopWinsSameCandleConflict: stop.trade && stop.trade.exit === 95 &&
         stop.trade.reason === 'Stop' && stop.trade.outcome === 'loss',
-      waitSeparateFromWinRate: wait.trade === null && wait.direction &&
-        wait.direction.classification === 'up' && wait.direction.forwardPct > 0
+      waitSeparateFromWinRate: wait.trade === null && wait.spotSale === null && wait.direction &&
+        wait.direction.classification === 'up' && wait.direction.forwardPct > 0,
+      satNeverShorts: satDown.trade === null && satUp.trade === null,
+      satSaleBeatsHoldingAfterDrop: satDown.spotSale && satDown.spotSale.outcome === 'sell-better' &&
+        satDown.spotSale.saleAdvantagePct > 0 && satDown.direction.classification === 'down',
+      holdingBeatsSaleAfterRise: satUp.spotSale && satUp.spotSale.outcome === 'hold-better' &&
+        satUp.spotSale.saleAdvantagePct < 0 && satUp.direction.classification === 'up',
+      fullScanCount: fullScanCount,
+      fullScanStored: fullScanRecords.length,
+      allVotesSaved: !!firstFullRecord && firstFullRecord.generalDecision === 'SAT' &&
+        firstFullRecord.technicalDecision === 'AL' && firstFullRecord.volumeDecision === 'BEKLE' &&
+        firstFullRecord.flowDecision === 'AL',
+      deepScanMetadataSaved: !!firstFullRecord && firstFullRecord.deepScan === 'tamamlandı' &&
+        firstFullRecord.deepVeto === true && firstFullRecord.deepReasons[0] === 'Denetçi riski',
+      deepScanBoundarySaved: fullScanRecords.filter(item => item.deepScan === 'tamamlandı').length === 20 &&
+        fullScanRecords.filter(item => item.deepScan === 'ilk 20 dışında').length === 196
     };
   });
   check('Performans hafızası sinyalleri tekilleştiriyor, taramaları kaydediyor ve 365 gün tutuyor',
@@ -200,6 +260,19 @@ try {
     performanceChecks.stopWinsSameCandleConflict, JSON.stringify(performanceChecks));
   check('BEKLE sinyali işlem kazanma oranından ayrı değerlendiriliyor',
     performanceChecks.waitSeparateFromWinRate, JSON.stringify(performanceChecks));
+  check('216 coinlik taramanın tamamı performans hafızasına kaydediliyor',
+    performanceChecks.fullScanCount === 216 && performanceChecks.fullScanStored === 216,
+    JSON.stringify(performanceChecks));
+  check('216 coin kaydında genel, teknik, hacim ve Order Flow oyları saklanıyor',
+    performanceChecks.allVotesSaved, JSON.stringify(performanceChecks));
+  check('İlk 20 derin tarama ve 196 hızlı tarama ayrımı kaydediliyor',
+    performanceChecks.deepScanMetadataSaved && performanceChecks.deepScanBoundarySaved,
+    JSON.stringify(performanceChecks));
+  check('Spot SAT short açmıyor; düşüşte erken satış tutmaya göre avantajlı',
+    performanceChecks.satNeverShorts && performanceChecks.satSaleBeatsHoldingAfterDrop,
+    JSON.stringify(performanceChecks));
+  check('Yükselişte SAT yerine tutmanın daha iyi olduğu ölçülüyor',
+    performanceChecks.holdingBeatsSaleAfterRise, JSON.stringify(performanceChecks));
 
 
   const candleAlignment = await page.evaluate(() => {

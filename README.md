@@ -53,9 +53,10 @@ Ajan haberleri tarih ve kaynak bağlantısıyla gösterir; tekrar eden başlıkl
 
 - Ham fiyat mumları depolanmaz; sonuç kontrol edilirken ücretsiz Yahoo Finance / Binance herkese açık geçmiş verisi yeniden çekilir. Geçmiş fiyatlar yalnızca gerçek analiz ve tarama sinyallerinin performansını ölçmek için kullanılır; ayrı bir manuel geçmiş sinyal simülasyonu bulunmaz.
 - Aynı sembol, zaman dilimi ve kapanmış mum için tekrar eden sinyaller tek kayıtta birleştirilir.
-- BIST/coin taramalarında en yüksek skorlu 40 AL/SAT adayı ve ayrıca en yüksek skorlu tek BEKLE adayı kaydedilir.
-- AL/SAT işlemi sonraki mum açılışından simüle edilir; varsayılan toplam maliyet %0,20, hedef/stop aynı mumda görülürse stop önceliklidir.
-- Genel analiz, teknik, hacim ve nihai kurulun yön isabeti ayrıca 10 kapanmış mum sonraki fiyat yönüyle ölçülür. BEKLE kararları kazanma oranına eklenmez; düşüşten kaçınma / yükseliş kaçırma olarak raporlanır.
+- Coin taramasında verisi alınan tüm adaylar (tam listede 216 coin); nihai karar, genel/teknik/hacim/Order Flow oyları, piyasa rejimi, MTF ve ilk 20 derin tarama bilgisiyle kaydedilir. Ham mumlar saklanmaz.
+- Spot AL işlemi sonraki mum açılışından simüle edilir; varsayılan toplam maliyet %0,20, hedef/stop aynı mumda görülürse stop önceliklidir.
+- Spot SAT için short açılmaz. Elde coin olduğu varsayımıyla sonraki mum açılışındaki satış fiyatı, 10 kapanmış mum tutmaya kıyaslanır. Bu fiyat farkı komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy PnL'si değildir.
+- Genel analiz, teknik, hacim ve nihai kurulun yön isabeti kaydedilen tüm AL/SAT oyları için 10 kapanmış mum sonraki fiyat yönüyle ölçülür. BEKLE kararları kazanma oranına eklenmez; düşüşten kaçınma / yükseliş kaçırma olarak raporlanır.
 - Denetçi ajanının Düşük/Orta/Yüksek risk seviyesi ve bulgu sayısı saklanır; her risk seviyesinden sonra 10 mumdaki düşüş/yükseliş dağılımı ayrı gösterilir. F/K ajanının AL → BEKLE veto kararları da sonraki fiyat hareketiyle karşılaştırılır.
 - Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu eksik açıkça belirtilir. Grafik analizinde F/K sonucu sonradan kararı değiştirirse aynı sinyal kaydı güncellenir.
 - 30 işlemden önce başarı oranı örneklem yetersiz olarak işaretlenir; Wilson güven aralığı gösterilir.
