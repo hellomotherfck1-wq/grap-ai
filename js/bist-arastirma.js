@@ -300,8 +300,10 @@
       newsBox.textContent = '📰 Haber Ajanı son 7 günün KAP ve haber akışını tarıyor…';
       window.HaberAjani.analizEt(v, { yahoo: report.news || [] }).then(function (newsReport) {
         window.HaberAjani.render(newsReport, newsBox);
+        status.textContent = 'Araştırma tamamlandı · ' + new Date().toLocaleString('tr-TR');
       }).catch(function (error) {
         newsBox.textContent = 'Haber Ajanı şu anda haber alamadı: ' + (error && error.message ? error.message : String(error));
+        status.textContent = 'Araştırma tamamlandı · Haber kaynağına erişilemedi';
       });
     }
     result.replaceChildren();
