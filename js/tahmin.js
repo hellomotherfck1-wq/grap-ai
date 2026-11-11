@@ -199,8 +199,9 @@
     };
   }
 
-  function ajanlaraSor(s, kal) {
+  function ajanlaraSor(s, kal, context) {
     var A = window.Ajan;
+    context = context || (s && s.meta) || {};
     var sonuc = {
       genel: { karar: (s && s.karar) || 'BEKLE', uyum: (s && s.uyum) || 0, score: (s && s.score) || 0 },
       teknik: null,
@@ -209,7 +210,8 @@
       nihai: null,
       tartisma: [],
       skor: 0,
-      ozet: ''
+      ozet: '',
+      agirliklar: null
     };
 
     if (!s || !Array.isArray(s.c) || s.c.length < 5) {
@@ -300,8 +302,22 @@
       sonuc.tartisma.push('⚖️ Nihai: ' + N.son + ' (' + N.durum + ')');
     }
 
-    sonuc.skor = skorla(s, H, T, N, D);
+    var agirliklar = window.AjanPerformans && typeof window.AjanPerformans.agirliklar === 'function'
+      ? window.AjanPerformans.agirliklar(context) : null;
+    sonuc.agirliklar = agirliklar;
+    sonuc.skor = skorla(s, H, T, N, D, agirliklar);
     sonuc.ozet = ozetYap(s, H, T, N, sonuc.skor);
+    if (agirliklar) {
+      var ogrenme = ['general', 'technical', 'volume'].filter(function (key) {
+        return agirliklar[key] && agirliklar[key].aktif;
+      }).map(function (key) {
+        var ad = key === 'general' ? 'Genel' : key === 'technical' ? 'Teknik' : 'Hacim';
+        return ad + ' ' + agirliklar[key].katsayi.toFixed(2) + 'x';
+      });
+      sonuc.tartisma.push(ogrenme.length
+        ? '🧠 Geçmiş performans ağırlıkları (yalnızca tarama puanı): ' + ogrenme.join(' · ')
+        : '🧠 Öğrenen ağırlıklar henüz devrede değil; aynı piyasa ve periyotta ajan başına 30 tamamlanmış yön sonucu bekleniyor.');
+    }
     return sonuc;
   }
 
@@ -316,7 +332,7 @@
     return Math.round(Math.min(100, Math.max(0, base)));
   }
 
-  function skorla(s, H, T, N, D) {
+  function skorla(s, H, T, N, D, agirliklar) {
     var skor = 0;
     var karar = (N && N.son) || s.karar || 'BEKLE';
     var y = dir(karar);
@@ -371,6 +387,18 @@
       if (N.durum === 'temkinli') skor -= 3;
     }
 
+    // Öğrenen katsayılar yalnızca nihai yönle aynı/ters düşen ajan oyunun puan katkısını ayarlar.
+    // BEKLE kararına yapay puan eklenmez; nihai AL/SAT güvenlik kuralları değişmez.
+    if (agirliklar && y !== 0) {
+      function agirlikEtki(oy, agirlik) {
+        if (!oy || !agirlik || !agirlik.aktif) return 0;
+        return Math.round((agirlik.katsayi - 1) * 20 * (oy === y ? 1 : -1));
+      }
+      skor += agirlikEtki(dir(s.karar), agirliklar.general);
+      skor += agirlikEtki(T && T.var ? dir(T.karar) : 0, agirliklar.technical);
+      skor += agirlikEtki(H && H.var ? isaret(H.skor) : 0, agirliklar.volume);
+    }
+
     return Math.round(Math.min(100, Math.max(0, skor)));
   }
 
@@ -386,6 +414,64 @@
     return parcalar.join(' · ');
   }
 
+  function beklemeKosullari(s, kal) {
+    var c = s && Array.isArray(s.analysisC) && s.analysisC.length
+      ? s.analysisC : (s && Array.isArray(s.c) ? s.c : []);
+    if (c.length < 5) return [];
+    var son = c[c.length - 1];
+    var fiyat = Number(son && son.c);
+    if (!isFinite(fiyat)) return [];
+    var sv = s.sv || {};
+    var direncler = Array.isArray(sv.direncler) ? sv.direncler : [];
+    var destekler = Array.isArray(sv.destekler) ? sv.destekler : [];
+    var ust = direncler.find(function (x) { return x && isFinite(x.seviye) && x.seviye > fiyat; });
+    var alt = destekler.find(function (x) { return x && isFinite(x.seviye) && x.seviye < fiyat; });
+    var son20 = c.slice(-20);
+    if (!ust) {
+      var zirve = Math.max.apply(null, son20.map(function (x) { return Number(x.h); }).filter(isFinite));
+      if (isFinite(zirve)) ust = { seviye: zirve };
+    }
+    if (!alt) {
+      var dip = Math.min.apply(null, son20.map(function (x) { return Number(x.l); }).filter(isFinite));
+      if (isFinite(dip)) alt = { seviye: dip };
+    }
+    var kalibre = kal && isFinite(kal.lo) && isFinite(kal.hi) && kal.hi > kal.lo;
+    function gercek(x) { return kalibre ? kal.lo + x * (kal.hi - kal.lo) : x; }
+    function yaz(x) {
+      if (kalibre) return Analiz.fiyat(x, kal);
+      return Analiz && typeof Analiz.fiyat === 'function' ? Analiz.fiyat(x, null) : String(x);
+    }
+    var alUstu = ust ? gercek(ust.seviye) * (kalibre ? 1.002 : 1) : null;
+    var satAlti = alt ? gercek(alt.seviye) * (kalibre ? 0.998 : 1) : null;
+    var satirlar = [];
+    if (ust) {
+      satirlar.push('AL koşulu: Son kapanmış mumun ' + (kalibre ? yaz((alUstu - kal.lo) / (kal.hi - kal.lo)) : yaz(ust.seviye)) +
+        (kalibre ? ' üzerinde' : ' direnç seviyesinin üzerinde') + ' kapanması.');
+    } else {
+      satirlar.push('AL koşulu: Yukarı yönlü güvenilir direnç bulunamadı; yeni tepe oluşumu beklenmeli.');
+    }
+    if (alt) {
+      satirlar.push('SAT koşulu: Son kapanmış mumun ' + (kalibre ? yaz((satAlti - kal.lo) / (kal.hi - kal.lo)) : yaz(alt.seviye)) +
+        (kalibre ? ' altında' : ' destek seviyesinin altında') + ' kapanması.');
+    } else {
+      satirlar.push('SAT koşulu: Aşağı yönlü güvenilir destek bulunamadı; yeni dip oluşumu beklenmeli.');
+    }
+    var hacim = window.Ajan && Array.isArray(window.Ajan.hacim) ? window.Ajan.hacim.slice(0, c.length) : null;
+    if (hacim && hacim.length === c.length) {
+      var baz = hacim.slice(Math.max(0, hacim.length - 21), Math.max(0, hacim.length - 1))
+        .map(Number).filter(function (x) { return isFinite(x) && x > 0; });
+      var ort = baz.length ? baz.reduce(function (a, b) { return a + b; }, 0) / baz.length : 0;
+      if (ort > 0) {
+        var hacimPeriyodu = baz.length >= 20 ? 'önceki 20 mumun' : 'önceki ' + baz.length + ' mumun';
+        satirlar.push('Hacim teyidi: Kırılım mumunun hacmi, ' + hacimPeriyodu + ' ortalamasının en az 1,2 katı olmalı.');
+      } else satirlar.push('Hacim teyidi: Güvenilir hacim ortalaması hesaplanamadı.');
+    } else {
+      satirlar.push('Hacim teyidi: Bu grafikte hacim verisi bulunmuyor; hacim onayı verilemiyor.');
+    }
+    satirlar.push('Bu seviyeler tek başına alım/satım talimatı değildir. Kapanış ve diğer ajan teyitleri gelene kadar BEKLE korunur.');
+    return { alUstu: alUstu, satAlti: satAlti, satirlar: satirlar };
+  }
+
   async function taraBir(item, zd) {
     if (typeof Veri === 'undefined' || typeof Veri.ara !== 'function') {
       throw new Error('Veri modülü yok');
@@ -398,11 +484,12 @@
     }
 
     var v = await Veri.ara(item.q, zd, function () {});
-    var aralikMs = zd === '15m' ? 15 * 60 * 1000 : zd === '1h' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-    var kapanmisHam = Array.isArray(v.mumlar) ? v.mumlar.slice() : [];
-    var sonHam = kapanmisHam.length ? kapanmisHam[kapanmisHam.length - 1] : null;
-    var sonMumAcik = !!(sonHam && Number.isFinite(Number(sonHam.t)) && Date.now() < Number(sonHam.t) + aralikMs);
-    if (sonMumAcik) kapanmisHam.pop();
+    var kalite = v.veriDurumu || Veri.veriDurumu(v);
+    if (!kalite.ok) throw new Error(kalite.mesaj);
+    var ham = Array.isArray(v.mumlar) ? v.mumlar : [];
+    var sonHam = ham.length ? ham[ham.length - 1] : null;
+    var sonMumAcik = !!(sonHam && Date.now() < Veri.kapanisZamani(v, sonHam));
+    var kapanmisHam = Veri.kapanmisMumlar(v);
     if (kapanmisHam.length < 20) throw new Error('Kapanmış mum sayısı yetersiz.');
     var vKapanmis = Object.assign({}, v, { mumlar: kapanmisHam });
     var dn = Veri.donustur(vKapanmis, 80);
@@ -411,12 +498,14 @@
     }
     var t = Goruntu.trend(dn.m);
     var s = Analiz.yap(dn.m, t);
-    var panel = ajanlaraSor(s, dn.kal);
+    s.meta = { market: v.tur === 'Kripto' ? 'Kripto' : (/\.IS$/i.test(v.sembol || '') ? 'BIST' : 'Diğer'), timeframe: zd };
+    var panel = ajanlaraSor(s, dn.kal, s.meta);
     var karar = (panel.nihai && panel.nihai.son) || s.karar || 'BEKLE';
     var mumlar = Array.isArray(dn.d) ? dn.d : [];
     var sonMum = mumlar.length ? mumlar[mumlar.length - 1] : null;
     var oncekiMum = mumlar.length > 1 ? mumlar[mumlar.length - 2] : null;
     var sonFiyat = sonMum ? sonMum.c : null;
+    var bekleKosullariSonuc = karar === 'BEKLE' ? beklemeKosullari(s, dn.kal) : null;
     var sonMumDegisim = sonMum && oncekiMum && oncekiMum.c
       ? ((sonMum.c / oncekiMum.c) - 1) * 100 : null;
     var bazHacimler = mumlar.slice(Math.max(0, mumlar.length - 21), Math.max(0, mumlar.length - 1))
@@ -452,7 +541,8 @@
         t2: s.plan.t2
       } : null,
       fiyat: sonFiyat,
-      signalAt: sonMum ? Number(sonMum.t) + aralikMs : null,
+      signalAt: sonMum ? Veri.kapanisZamani(vKapanmis, sonMum) : null,
+      bekleKosullari: bekleKosullariSonuc ? bekleKosullariSonuc.satirlar : null,
       stopFiyat: s.plan ? dn.kal.lo + s.plan.stop * (dn.kal.hi - dn.kal.lo) : null,
       hedefFiyat: s.plan ? dn.kal.lo + s.plan.t1 * (dn.kal.hi - dn.kal.lo) : null,
       rr: s.plan && isFinite(s.plan.rr) ? s.plan.rr : null,
@@ -491,7 +581,8 @@
       ortHacim20: r.ortHacim20,
       hacimOrani: r.hacimOrani,
       trend: r.trend,
-      rsi: r.rsi
+      rsi: r.rsi,
+      bekleKosullari: r.bekleKosullari ? r.bekleKosullari.slice() : null
     };
   }
 
@@ -746,6 +837,10 @@
     }
 
     if (kayit.adaylar && kayit.adaylar.length) {
+      var bekleAdayi = kayit.adaylar.find(function (a) {
+        return a && a.karar === 'BEKLE' && Array.isArray(a.bekleKosullari) && a.bekleKosullari.length;
+      });
+      if (bekleAdayi) alan.appendChild(kart('BEKLE koşulları · ' + (bekleAdayi.ad || bekleAdayi.sembol), bekleAdayi.bekleKosullari, '#f0b429'));
       alan.appendChild(renderTaramaTablosu(kayit.adaylar, kayit.hatalar || []));
     }
 
@@ -847,6 +942,7 @@
     bugunUret: bugunUret,
     taraBir: taraBir,
     ajanlaraSor: ajanlaraSor,
+    beklemeKosullari: beklemeKosullari,
     okuHafiza: okuHafiza,
     okuBugunCache: okuBugunCache,
     sonDurum: null,

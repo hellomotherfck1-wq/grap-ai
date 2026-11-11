@@ -130,6 +130,89 @@ const Veri = {
     throw son;
   },
 
+  periyotMs(zd) {
+    return ({ '15m': 15 * 60 * 1000, '1h': 60 * 60 * 1000, '1d': 24 * 60 * 60 * 1000 })[zd] || 0;
+  },
+
+  kapanisZamani(v, mum) {
+    const step = this.periyotMs(v && v.zd);
+    const t = Number(mum && mum.t);
+    if (!step || !Number.isFinite(t)) return NaN;
+    // Yahoo BIST günlük mumları UTC 00:00 damgası taşır; seans kapanışı Türkiye saatiyle yaklaşık 18:00'dır.
+    const bistGunluk = v && v.kaynak === 'y' && v.zd === '1d' && /\.IS$/i.test(String(v.sembol || ''));
+    return t + (bistGunluk ? 15 * 60 * 60 * 1000 : step);
+  },
+
+  kapanmisMumlar(v, now) {
+    const simdi = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+    const kaynak = Array.isArray(v && v.mumlar) ? v.mumlar : [];
+    const tekil = new Map();
+    kaynak.forEach(m => {
+      if (!m) return;
+      const t = Number(m.t), o = Number(m.o), h = Number(m.h), l = Number(m.l), c = Number(m.c);
+      if (![t, o, h, l, c].every(Number.isFinite) || t <= 0 || o <= 0 || h <= 0 || l <= 0 || c <= 0) return;
+      if (h < Math.max(o, c, l) || l > Math.min(o, c, h)) return;
+      if (this.kapanisZamani(v, m) > simdi) return;
+      const volume = Number(m.v);
+      tekil.set(t, { t, o, h, l, c, v: Number.isFinite(volume) && volume >= 0 ? volume : null });
+    });
+    return Array.from(tekil.values()).sort((a, b) => a.t - b.t);
+  },
+
+  veriDurumu(v, now) {
+    const simdi = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+    const bars = this.kapanmisMumlar(v, simdi);
+    const tf = v && v.zd;
+    const step = this.periyotMs(tf);
+    if (!bars.length || !step) {
+      return {
+        ok: false, sonMumZamani: null, sonKapanisZamani: null, gecikmeMs: null,
+        sinirMs: 0, mumSayisi: bars.length,
+        mesaj: 'VERİ ESKİ: Güncel ve kapanmış mum bulunamadı; analiz güvenli şekilde durduruldu.'
+      };
+    }
+
+    const son = bars[bars.length - 1];
+    const kapanis = this.kapanisZamani(v, son);
+    const gecikmeMs = Math.max(0, simdi - kapanis);
+    const bist = v.kaynak === 'y' && /\.IS$/i.test(String(v.sembol || ''));
+    const kripto = v.kaynak === 'b';
+    const gun = 24 * 60 * 60 * 1000;
+    let seansAcik = false;
+    if (bist && tf !== '1d') {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Istanbul', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).formatToParts(new Date(simdi));
+      const p = {};
+      parts.forEach(x => { if (x.type !== 'literal') p[x.type] = x.value; });
+      const dakika = Number(p.hour) * 60 + Number(p.minute);
+      seansAcik = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].indexOf(p.weekday) >= 0 &&
+        dakika >= 10 * 60 && dakika <= 18 * 60 + 10;
+    }
+
+    let sinirMs;
+    if (kripto) sinirMs = step * 2.5;
+    else if (tf === '1d') sinirMs = 5 * gun;
+    else if (bist) sinirMs = seansAcik ? Math.max(step * 2.5, 90 * 60 * 1000) : 5 * gun;
+    else sinirMs = 4 * gun;
+
+    const ok = gecikmeMs <= sinirMs;
+    const sureYaz = ms => {
+      if (ms >= gun) return (ms / gun).toFixed(1).replace('.', ',') + ' gün';
+      if (ms >= 60 * 60 * 1000) return (ms / (60 * 60 * 1000)).toFixed(1).replace('.', ',') + ' saat';
+      return Math.max(1, Math.round(ms / 60000)) + ' dakika';
+    };
+    const tarih = this.tarih(tf === '1d' ? son.t : kapanis, tf === '1d');
+    const mesaj = ok
+      ? 'Güncel veri · son kapanmış mum ' + tarih + ' (Türkiye saati), ' + sureYaz(gecikmeMs) + ' önce kapandı.'
+      : 'VERİ ESKİ: Son kapanmış mum ' + tarih + ' (Türkiye saati), ' + sureYaz(gecikmeMs) +
+        ' önce kapandı. İzin verilen gecikme ' + sureYaz(sinirMs) + '; AL/SAT analizi durduruldu.';
+    return {
+      ok, sonMumZamani: son.t, sonKapanisZamani: kapanis, gecikmeMs, sinirMs,
+      mumSayisi: bars.length, seansAcik, mesaj
+    };
+  },
+
   async ara(girdi, zd, durum) {
     const l = this.coz(girdi);
     if (!l.length) throw new Error('Varlık adı anlaşılamadı.');
@@ -138,8 +221,19 @@ const Veri = {
       try {
         if (durum) durum(a.ad + ' aranıyor (' + (a.kaynak === 'b' ? 'Binance' : 'Yahoo Finance') + ')...');
         const mumlar = a.kaynak === 'b' ? await this.binance(a.sembol, zd) : await this.yahoo(a.sembol, zd);
-        return Object.assign({}, a, { mumlar, zd, cekim: new Date() });
-      } catch (e) { hata = e; }
+        const veri = Object.assign({}, a, { mumlar, zd, cekim: new Date() });
+        veri.veriDurumu = this.veriDurumu(veri);
+        if (!veri.veriDurumu.ok) {
+          const e = new Error(veri.veriDurumu.mesaj);
+          e.kesin = true;
+          e.veriDurumu = veri.veriDurumu;
+          throw e;
+        }
+        return veri;
+      } catch (e) {
+        hata = e;
+        if (e && e.kesin) throw e;
+      }
     }
     throw new Error('Veri bulunamadı' + (hata ? ' (' + hata.message + ').' : '.'));
   },
@@ -170,16 +264,21 @@ const Veri = {
   bilgi(v, d) {
     const gun = v.zd === '1d';
     const zdAd = { '15m': '15 dakika', '1h': '1 saat', '1d': '1 gün' }[v.zd];
+    const durum = v.veriDurumu || this.veriDurumu(v);
+    const sonKapali = this.kapanmisMumlar(v).slice(-1)[0] || null;
     const L = [
       'Varlık: ' + v.ad + ' (' + v.sembol + ') – ' + v.tur,
       'Veri kaynağı: ' + (v.kaynak === 'b' ? 'Binance herkese açık piyasa verisi' : 'Yahoo Finance (gecikmeli olabilir)'),
       'Zaman dilimi: ' + zdAd + ', analiz edilen mum sayısı: ' + d.length,
       'Grafikteki son mum: ' + this.tarih(d[d.length - 1].t, gun) + ' (Türkiye saati)',
       'İlk mum: ' + this.tarih(d[0].t, gun) + ' (Türkiye saati)',
-      'Son kapanış fiyatı: ' + this.fmt(d[d.length - 1].c),
+      'Son kapanış fiyatı: ' + (sonKapali ? this.fmt(sonKapali.c) : '—'),
       'Veri alınma zamanı: ' + this.tarih(v.cekim.getTime(), false)
     ];
-    if (!gun) L.push('Son mum henüz kapanmamış olabilir. Borsa kapalıysa son seansın verisi görünür.');
+    L.push('Veri güvenlik kontrolü: ' + (durum.ok ? 'GÜNCEL' : 'DOĞRULANAMADI') +
+      (durum.sonKapanisZamani ? ' · son kapanış: ' + this.tarih(durum.sonKapanisZamani, false) : ''));
+    L.push(durum.mesaj);
+    if (!gun) L.push('Açık mumlar analiz hesabına katılmaz.');
     return L;
   }
 };

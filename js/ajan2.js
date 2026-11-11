@@ -303,6 +303,15 @@
       'Hata payı: ' + D.hata + '. Hata payı sıfır değildir; bu bir yatırım tavsiyesi değildir.'
     ];
     if (s.meta && s.meta.sonMumAcik) nh.push('Devam eden son mum analize alınmadı; yalnızca kapanmış mumlar kullanıldı.');
+    var ogrenilenAgirliklar = window.AjanPerformans && typeof window.AjanPerformans.agirliklar === 'function'
+      ? window.AjanPerformans.agirliklar({ market: s.meta && s.meta.market, timeframe: s.meta && s.meta.zd }) : null;
+    if (ogrenilenAgirliklar) {
+      nh.push('Geçmiş performans katsayıları (yalnızca tarama puanlamasında kullanılır): Genel ' +
+        ogrenilenAgirliklar.general.katsayi.toFixed(2) + 'x · Teknik ' +
+        ogrenilenAgirliklar.technical.katsayi.toFixed(2) + 'x · Hacim ' +
+        ogrenilenAgirliklar.volume.katsayi.toFixed(2) + 'x. Yeterli örnek yoksa katsayı 1,00x kalır.');
+      nh.push('Bu öğrenme nihai AL/SAT güvenlik şartlarını gevşetmez; karar için tüm zorunlu teyitler yine gerekir.');
+    }
 
     var dn = [];
     dn.push(D.kontrol + ' kontrol yapıldı, ' + D.sorunlar.length + ' sorun bulundu. Hata payı: ' + D.hata + '.');
@@ -349,6 +358,22 @@
             return !(k && typeof k.baslik === 'string' && eskiBaslik.some(function (p) { return k.baslik.indexOf(p) === 0; }));
           });
           Array.prototype.unshift.apply(y.kartlar, yeni);
+
+          // Ekranın ana kararı ve performans kaydı, teknik ön kararı değil kurulun nihai kararını göstermeli.
+          var nihaiKart = yeni.find(function (k) { return k && String(k.baslik || '').indexOf('⚖️ Nihai Karar') === 0; });
+          var eslesenKarar = nihaiKart && /:\s*(AL|SAT|BEKLE)\s*$/.exec(String(nihaiKart.baslik || ''));
+          if (eslesenKarar) {
+            y.karar = eslesenKarar[1];
+            y.renk = y.karar === 'AL' ? '#26a69a' : y.karar === 'SAT' ? '#ef5350' : '#f0b429';
+            var neden = nihaiKart.satirlar && nihaiKart.satirlar[1] ? String(nihaiKart.satirlar[1]) : '';
+            y.ozet = ['Ajan kurulunun nihai kararı: ' + y.karar + '. ' + neden].concat(y.ozet || []);
+            if (y.karar === 'BEKLE' && window.TahminAI && typeof window.TahminAI.beklemeKosullari === 'function') {
+              var kosullar = window.TahminAI.beklemeKosullari(s, kal);
+              if (kosullar && kosullar.satirlar && kosullar.satirlar.length) {
+                y.kartlar.push({ baslik: '⏳ BEKLE koşulları · ne olursa AL/SAT?', satirlar: kosullar.satirlar });
+              }
+            }
+          }
         }
       } catch (e) { /* hata olursa önceki ajan kartları kalır */ }
       return y;

@@ -306,9 +306,9 @@
   }
 
   /** BIST TahminAI ajanlarını yeniden kullan */
-  function ajanlaraSor(s, kal) {
+  function ajanlaraSor(s, kal, context) {
     if (window.TahminAI && typeof window.TahminAI.ajanlaraSor === 'function') {
-      return window.TahminAI.ajanlaraSor(s, kal);
+      return window.TahminAI.ajanlaraSor(s, kal, context);
     }
     // Fallback (TahminAI yoksa basit skor)
     var sonuc = {
@@ -352,11 +352,11 @@
       mumlar: candles,
       cekim: new Date()
     };
-    var aralikMs = zd === '15m' ? 15 * 60 * 1000 : zd === '1h' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-    var kapanmisHam = candles.slice();
-    var sonHam = kapanmisHam.length ? kapanmisHam[kapanmisHam.length - 1] : null;
-    var sonMumAcik = !!(sonHam && Number.isFinite(Number(sonHam.t)) && Date.now() < Number(sonHam.t) + aralikMs);
-    if (sonMumAcik) kapanmisHam.pop();
+    var kalite = Veri.veriDurumu(v);
+    if (!kalite.ok) throw new Error(kalite.mesaj);
+    var sonHam = candles.length ? candles[candles.length - 1] : null;
+    var sonMumAcik = !!(sonHam && Date.now() < Veri.kapanisZamani(v, sonHam));
+    var kapanmisHam = Veri.kapanmisMumlar(v);
     if (kapanmisHam.length < 20) throw new Error('Kapanmış mum sayısı yetersiz.');
     var vKapanmis = Object.assign({}, v, { mumlar: kapanmisHam });
     var dn = Veri.donustur(vKapanmis, 80);
@@ -365,9 +365,12 @@
     }
     var t = Goruntu.trend(dn.m);
     var s = Analiz.yap(dn.m, t);
-    var panel = ajanlaraSor(s, dn.kal);
+    s.meta = { market: 'Kripto', timeframe: zd };
+    var panel = ajanlaraSor(s, dn.kal, s.meta);
     var karar = (panel.nihai && panel.nihai.son) || s.karar || 'BEKLE';
     var sonFiyat = (dn.d && dn.d.length) ? dn.d[dn.d.length - 1].c : null;
+    var bekleKosullariSonuc = karar === 'BEKLE' && window.TahminAI && typeof window.TahminAI.beklemeKosullari === 'function'
+      ? window.TahminAI.beklemeKosullari(s, dn.kal) : null;
 
     return {
       q: item.q,
@@ -395,7 +398,8 @@
         t2: s.plan.t2
       } : null,
       fiyat: sonFiyat,
-      signalAt: dn.d.length ? Number(dn.d[dn.d.length - 1].t) + aralikMs : null,
+      signalAt: dn.d.length ? Veri.kapanisZamani(vKapanmis, dn.d[dn.d.length - 1]) : null,
+      bekleKosullari: bekleKosullariSonuc ? bekleKosullariSonuc.satirlar : null,
       stopFiyat: s.plan ? dn.kal.lo + s.plan.stop * (dn.kal.hi - dn.kal.lo) : null,
       hedefFiyat: s.plan ? dn.kal.lo + s.plan.t1 * (dn.kal.hi - dn.kal.lo) : null,
       rr: s.plan && isFinite(s.plan.rr) ? s.plan.rr : null,
@@ -425,7 +429,8 @@
       teknikKarar: r.teknikKarar,
       hacimSkor: r.hacimSkor,
       trend: r.trend,
-      rsi: r.rsi
+      rsi: r.rsi,
+      bekleKosullari: r.bekleKosullari ? r.bekleKosullari.slice() : null
     };
   }
 
@@ -600,6 +605,10 @@
     }
 
     if (kayit.adaylar && kayit.adaylar.length) {
+      var bekleAdayi = kayit.adaylar.find(function (a) {
+        return a && a.karar === 'BEKLE' && Array.isArray(a.bekleKosullari) && a.bekleKosullari.length;
+      });
+      if (bekleAdayi) alan.appendChild(kart('BEKLE koşulları · ' + (bekleAdayi.ad || bekleAdayi.sembol), bekleAdayi.bekleKosullari, '#f0b429'));
       var satirlar = kayit.adaylar.slice(0, 20).map(function (a, idx) {
         return (idx + 1) + '. ' + (a.ad || '?') + ' → ' + (a.karar || '?') +
           ' (skor ' + (a.skor != null ? a.skor : '?') +

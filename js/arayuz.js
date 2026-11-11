@@ -217,22 +217,20 @@ el('ara-btn').addEventListener('click', async () => {
     if (!dn || !Array.isArray(dn.m) || dn.m.length < 15) throw new Error('Analiz için yeterli piyasa verisi alınamadı.');
 
     const sonMum = dn.d[dn.d.length - 1];
-    const aralikMs = v.zd === '15m' ? 15 * 60 * 1000
-      : v.zd === '1h' ? 60 * 60 * 1000
-      : (v.kaynak === 'b' ? 24 * 60 * 60 * 1000
-        : (/\.IS$/i.test(v.sembol || '') && new Date(sonMum.t).getUTCHours() <= 2
-          ? 15 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000));
-    const sonMumAcik = !!(sonMum && Number.isFinite(sonMum.t) && Date.now() < sonMum.t + aralikMs);
+    const sonMumKapanisi = sonMum ? Veri.kapanisZamani(v, sonMum) : NaN;
+    const sonMumAcik = !!(sonMum && Number.isFinite(sonMumKapanisi) && Date.now() < sonMumKapanisi);
     const trendMumlari = sonMumAcik ? dn.m.slice(0, -1) : dn.m;
     const t = Goruntu.trend(trendMumlari);
     const sinyalMumu = dn.d[dn.d.length - (sonMumAcik ? 2 : 1)] || null;
+    const sinyalAralikMs = sinyalMumu
+      ? Veri.kapanisZamani(v, sinyalMumu) - Number(sinyalMumu.t) : null;
     const meta = {
       ad: v.ad, sembol: v.sembol, tur: v.tur, zd: v.zd, kaynak: v.kaynak,
       sonMumZamani: sonMum ? sonMum.t : null,
       sonMumAcik: sonMumAcik,
       sinyalMumuZamani: sinyalMumu ? sinyalMumu.t : null,
       sinyalFiyati: sinyalMumu ? sinyalMumu.c : null,
-      sinyalAralikMs: aralikMs,
+      sinyalAralikMs: sinyalAralikMs,
       market: /USDT$/i.test(v.sembol || '') ? 'Kripto' : /\.IS$/i.test(v.sembol || '') ? 'BIST' : 'Diğer',
       fundamentalStatus: (v.kaynak !== 'b' &&
         !/(kripto|coin|crypto|forex|emtia|endeks)/i.test(String(v.tur || '')) &&
