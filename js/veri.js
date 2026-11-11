@@ -202,7 +202,7 @@ const Veri = {
       if (ms >= 60 * 60 * 1000) return (ms / (60 * 60 * 1000)).toFixed(1).replace('.', ',') + ' saat';
       return Math.max(1, Math.round(ms / 60000)) + ' dakika';
     };
-    const tarih = this.tarih(kapanis, tf === '1d');
+    const tarih = this.tarih(tf === '1d' ? son.t : kapanis, tf === '1d');
     const mesaj = ok
       ? 'Güncel veri · son kapanmış mum ' + tarih + ' (Türkiye saati), ' + sureYaz(gecikmeMs) + ' önce kapandı.'
       : 'VERİ ESKİ: Son kapanmış mum ' + tarih + ' (Türkiye saati), ' + sureYaz(gecikmeMs) +
