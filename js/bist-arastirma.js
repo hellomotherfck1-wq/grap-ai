@@ -267,6 +267,13 @@
       : null;
     var report = await research(v, dn, panel);
     render(report, container);
+    if (window.HaberAjani && typeof window.HaberAjani.analizEt === 'function') {
+      var newsReport = await window.HaberAjani.analizEt(v, { yahoo: report.news || [] });
+      var newsBox = document.createElement('div');
+      newsBox.className = 'kart';
+      window.HaberAjani.render(newsReport, newsBox);
+      if (container.parentNode) container.parentNode.insertBefore(newsBox, container.nextSibling);
+    }
     return report;
   }
 
@@ -282,6 +289,11 @@
       ? window.TahminAI.ajanlaraSor(s, dn.kal) : null;
     status.textContent = 'Finansal göstergeler ve haber başlıkları araştırılıyor…';
     var report = await research(v, dn, panel);
+    var newsReport = null;
+    if (window.HaberAjani && typeof window.HaberAjani.analizEt === 'function') {
+      status.textContent = 'Haber Ajanı son 7 günün KAP ve haber akışını inceliyor…';
+      newsReport = await window.HaberAjani.analizEt(v, { yahoo: report.news || [] });
+    }
     result.replaceChildren();
     if (typeof Cizim !== 'undefined' && Cizim.grafik) {
       var canvas = Cizim.grafik(s, dn.kal);
@@ -294,6 +306,12 @@
     content.className = 'kart';
     render(report, content);
     result.appendChild(content);
+    if (newsReport && window.HaberAjani) {
+      var newsBox = document.createElement('div');
+      newsBox.className = 'kart';
+      window.HaberAjani.render(newsReport, newsBox);
+      result.appendChild(newsBox);
+    }
     status.textContent = 'Araştırma tamamlandı · ' + new Date().toLocaleString('tr-TR');
   }
 
