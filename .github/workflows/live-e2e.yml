@@ -43,6 +43,21 @@ jobs:
       - name: Smoke test crypto agents
         run: node .github/tests/crypto-agent-smoke.cjs
 
+      - name: Validate browser Binance diagnostic page
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const html = fs.readFileSync('binance-api-check.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+          assert.equal(scripts.length, 1, 'Expected one inline diagnostic script');
+          new Function(scripts[0][1]);
+          for (const endpoint of ['premiumIndex', 'openInterest', 'openInterestHist', 'globalLongShortAccountRatio', 'takerlongshortRatio']) {
+            assert.ok(html.includes(endpoint), 'Missing endpoint: ' + endpoint);
+          }
+          console.log('PASS browser Binance diagnostic page syntax and endpoint coverage');
+          NODE
+
       - name: Probe live Binance Spot and USD-M Futures APIs
         continue-on-error: true
         run: node .github/tests/binance-live-api.cjs
