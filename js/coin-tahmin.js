@@ -712,7 +712,7 @@
     box.appendChild(reviewer);
 
     var note = document.createElement('p');
-    note.textContent = 'Oy verenler: Genel analiz, Teknik bot ve Hacim botu. Denetçi oy kullanmaz; Order Flow, zaman dilimleri ve BTC/ETH kontrolleri de oy değil, güvenlik filtresidir. Bu yüzden son karar oy çoğunluğundan farklı olabilir.';
+    note.textContent = 'Genel analiz, Teknik ve Hacim botları oy verir. Denetçi oy kullanmaz; botların kararını ve piyasa risklerini kontrol eder. Gerekirse son kararı BEKLE yapar.';
     note.style.cssText = 'font-size:12px;line-height:1.5;color:#9eacb9;margin-top:6px';
     box.appendChild(note);
     return box;
