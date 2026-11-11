@@ -53,7 +53,7 @@
 
   <section class="card">
     <h2>Bu test ne yapar?</h2>
-    <p class="muted">BTCUSDT spot mumlarını, kapanmış mumları, Order Flow hesaplamasını ve Binance USDⓈ-M Futures fonlama, açık pozisyon, Long/Short ve Taker verilerini okur.</p>
+    <p class="muted">BTCUSDT spot mumlarını ve Order Flow için gerekli hacim alanlarını kontrol eder; ayrıca Binance USDⓈ-M Futures fonlama, açık pozisyon, Long/Short ve Taker verilerini okur.</p>
     <p class="muted"><strong>Güvenlik:</strong> Yalnızca herkese açık GET uç noktaları kullanılır. API anahtarı istenmez; hesaba girilmez, emir verilmez ve işlem yapılmaz.</p>
     <p class="foot">HTTP 451, 403, 429 veya tarayıcı CORS/ağ hatası görülürse sonuçta ayrıca belirtilir. Bu sayfa işlem sinyali veya yatırım tavsiyesi üretmez.</p>
   </section>
@@ -101,6 +101,7 @@
         for (const row of rows) {
           assert(Array.isArray(row) && row.length >= 12, 'Binance Kline 12 alanlı şemaya uymuyor.');
           for (const index of [0,1,2,3,4,5,6,7,8,9,10]) assert(Number.isFinite(Number(row[index])), 'Mum alanı sayısal değil: ' + index);
+          assert(Number(row[10]) <= Number(row[7]) + 1e-8, 'Taker buy quote volume toplam quote volume değerini aşıyor.');
         }
         const last = closed[closed.length - 1];
         const age = now - Number(last[6]);
@@ -178,7 +179,9 @@
             'https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT',
             row => {
               assert(row && row.symbol === 'BTCUSDT' && Number(row.openInterest) > 0, 'Açık pozisyon alanı eksik.');
-              return 'BTCUSDT açık pozisyon=' + row.openInterest;
+              const age = Date.now() - Number(row.time);
+              assert(Number.isFinite(age) && age >= -5 * 60000 && age <= 5 * 60000, 'Açık pozisyon verisi güncel değil.');
+              return 'BTCUSDT açık pozisyon=' + row.openInterest + ' · yaş=' + Math.round(age / 1000) + ' sn';
             }),
           runOne('Futures · openInterestHist',
             'https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=1h&limit=6',
@@ -196,7 +199,9 @@
               assert(Array.isArray(rows) && rows.length > 0, 'Long/Short verisi boş.');
               const last = rows[rows.length - 1];
               assert(Number(last.longShortRatio) > 0 && Number.isFinite(Number(last.timestamp)), 'Long/Short alanları eksik.');
-              return 'Long/Short=' + last.longShortRatio;
+              const age = Date.now() - Number(last.timestamp);
+              assert(age >= -5 * 60000 && age <= 2 * HOUR, 'Long/Short verisi güncel değil.');
+              return 'Long/Short=' + last.longShortRatio + ' · yaş=' + Math.round(age / 60000) + ' dk';
             }),
           runOne('Futures · takerlongshortRatio',
             'https://fapi.binance.com/futures/data/takerlongshortRatio?symbol=BTCUSDT&period=1h&limit=6',
@@ -204,7 +209,9 @@
               assert(Array.isArray(rows) && rows.length > 0, 'Taker verisi boş.');
               const last = rows[rows.length - 1];
               assert(Number(last.buySellRatio) > 0 && Number.isFinite(Number(last.timestamp)), 'Taker oranı alanları eksik.');
-              return 'Buy/Sell=' + last.buySellRatio;
+              const age = Date.now() - Number(last.timestamp);
+              assert(age >= -5 * 60000 && age <= 2 * HOUR, 'Taker verisi güncel değil.');
+              return 'Buy/Sell=' + last.buySellRatio + ' · yaş=' + Math.round(age / 60000) + ' dk';
             })
         ]);
 
