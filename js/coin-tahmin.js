@@ -8,6 +8,10 @@
 
   var KEY = 'graphai_coin_tahmin_v1';
   var BUGUN_KEY = 'graphai_coin_tahmin_bugun';
+  var CACHE_VERSION = 'crypto-intelligence-2.0.0';
+  function cacheKey(zd) {
+    return BUGUN_KEY + ':' + CACHE_VERSION + ':' + (zd || '1h');
+  }
 
   /** Binance'te kesin USDT çifti olan ~200 coin */
   var LISTE = [
@@ -260,10 +264,10 @@
 
   function okuBugunCache() {
     try {
-      var raw = localStorage.getItem(BUGUN_KEY);
+      var raw = localStorage.getItem(cacheKey('1h'));
       if (!raw) return null;
       var o = JSON.parse(raw);
-      if (o && o.tarih === bugunStr()) return o;
+      if (o && o.tarih === bugunStr() && o.ajanSurum === CACHE_VERSION && o.zd === '1h') return o;
       return null;
     } catch (e) {
       return null;
@@ -272,7 +276,7 @@
 
   function yazBugunCache(kayit) {
     try {
-      localStorage.setItem(BUGUN_KEY, JSON.stringify(kayit));
+      localStorage.setItem(cacheKey(kayit.zd || '1h'), JSON.stringify(kayit));
     } catch (e) { /* quota */ }
   }
 
@@ -301,14 +305,23 @@
       fiyat: s.fiyat,
       trend: s.trend || null,
       rsi: s.rsi,
-      netYok: !!s.netYok
+      netYok: !!s.netYok,
+      flow: s.flow || null,
+      futures: s.futures || null,
+      mtf: s.mtf || null,
+      marketRegime: s.marketRegime || null,
+      deepScan: s.deepScan || null,
+      deepVeto: !!s.deepVeto,
+      deepReasons: Array.isArray(s.deepReasons) ? s.deepReasons.slice(0, 8) : [],
+      sourceTimestamps: s.sourceTimestamps || null,
+      agentVersion: s.agentVersion || CACHE_VERSION
     };
   }
 
   /** BIST TahminAI ajanlarını yeniden kullan */
-  function ajanlaraSor(s, kal) {
+  function ajanlaraSor(s, kal, context) {
     if (window.TahminAI && typeof window.TahminAI.ajanlaraSor === 'function') {
-      return window.TahminAI.ajanlaraSor(s, kal);
+      return window.TahminAI.ajanlaraSor(s, kal, context);
     }
     // Fallback (TahminAI yoksa basit skor)
     var sonuc = {
@@ -352,11 +365,15 @@
       mumlar: candles,
       cekim: new Date()
     };
-    var aralikMs = zd === '15m' ? 15 * 60 * 1000 : zd === '1h' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-    var kapanmisHam = candles.slice();
-    var sonHam = kapanmisHam.length ? kapanmisHam[kapanmisHam.length - 1] : null;
-    var sonMumAcik = !!(sonHam && Number.isFinite(Number(sonHam.t)) && Date.now() < Number(sonHam.t) + aralikMs);
-    if (sonMumAcik) kapanmisHam.pop();
+    var aralikMs = zd === '15m' ? 15 * 60 * 1000 :
+      zd === '4h' ? 4 * 60 * 60 * 1000 :
+      zd === '1d' ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
+    var kapanmisHam = typeof Veri.kapanmisMumlar === 'function'
+      ? Veri.kapanmisMumlar(candles, zd)
+      : candles.filter(function (m) {
+          return m && Number.isFinite(Number(m.t)) &&
+            (m.closeTime != null ? Number(m.closeTime) < Date.now() : Number(m.t) + aralikMs <= Date.now());
+        });
     if (kapanmisHam.length < 20) throw new Error('Kapanmış mum sayısı yetersiz.');
     var vKapanmis = Object.assign({}, v, { mumlar: kapanmisHam });
     var dn = Veri.donustur(vKapanmis, 80);
@@ -365,9 +382,20 @@
     }
     var t = Goruntu.trend(dn.m);
     var s = Analiz.yap(dn.m, t);
-    var panel = ajanlaraSor(s, dn.kal);
+    var panel = ajanlaraSor(s, dn.kal, {
+      volume: dn.d.map(function (m) { return m.v; }),
+      symbol: symbol,
+      timeframe: zd
+    });
     var karar = (panel.nihai && panel.nihai.son) || s.karar || 'BEKLE';
     var sonFiyat = (dn.d && dn.d.length) ? dn.d[dn.d.length - 1].c : null;
+    var sonMum = dn.d.length ? dn.d[dn.d.length - 1] : null;
+    var oncekiMum = dn.d.length > 1 ? dn.d[dn.d.length - 2] : null;
+    var sonMumDegisim = sonMum && oncekiMum && oncekiMum.c
+      ? ((sonMum.c / oncekiMum.c) - 1) * 100 : null;
+    var signalAt = sonMum
+      ? (sonMum.closeTime != null ? Number(sonMum.closeTime) + 1 : Number(sonMum.t) + aralikMs)
+      : null;
 
     return {
       q: item.q,
@@ -395,12 +423,15 @@
         t2: s.plan.t2
       } : null,
       fiyat: sonFiyat,
-      signalAt: dn.d.length ? Number(dn.d[dn.d.length - 1].t) + aralikMs : null,
+      signalAt: signalAt,
       stopFiyat: s.plan ? dn.kal.lo + s.plan.stop * (dn.kal.hi - dn.kal.lo) : null,
       hedefFiyat: s.plan ? dn.kal.lo + s.plan.t1 * (dn.kal.hi - dn.kal.lo) : null,
       rr: s.plan && isFinite(s.plan.rr) ? s.plan.rr : null,
       trend: t ? t.yon : null,
-      rsi: s.rsi
+      rsi: s.rsi,
+      sonMumDegisim: sonMumDegisim,
+      _mumlar: dn.d.map(function (m) { return Object.assign({}, m); }),
+      agentVersion: CACHE_VERSION
     };
   }
 
@@ -425,18 +456,29 @@
       teknikKarar: r.teknikKarar,
       hacimSkor: r.hacimSkor,
       trend: r.trend,
-      rsi: r.rsi
+      rsi: r.rsi,
+      sonMumDegisim: r.sonMumDegisim,
+      flow: r.flow || null,
+      futures: r.futures || null,
+      mtf: r.mtf || null,
+      marketRegime: r.marketRegime || null,
+      deepScan: r.deepScan || null,
+      deepVeto: !!r.deepVeto,
+      deepReasons: Array.isArray(r.deepReasons) ? r.deepReasons.slice(0, 8) : [],
+      sourceTimestamps: r.sourceTimestamps || null,
+      agentVersion: r.agentVersion || CACHE_VERSION
     };
   }
 
   async function bugunUret(zd, onProgress) {
-    zd = zd || '1h';
+    // 216 coin için yalnızca 1 saatlik hızlı tarama; derin analiz ilk 20 adayda çalışır.
+    zd = '1h';
     var adaylar = [];
     var hatalar = [];
 
     for (var i = 0; i < LISTE.length; i++) {
       var item = LISTE[i];
-      if (typeof onProgress === 'function') onProgress(i + 1, LISTE.length, item.ad);
+      if (typeof onProgress === 'function') onProgress(i + 1, LISTE.length, item.ad, 'Hızlı tarama');
       try {
         var r = await taraBir(item, zd);
         adaylar.push(r);
@@ -444,6 +486,11 @@
         hatalar.push(item.ad + ': ' + (e && e.message ? e.message : String(e)));
       }
       await sleep(220);
+    }
+
+    if (window.KriptoAjanlari && typeof window.KriptoAjanlari.derinAnaliz === 'function' && adaylar.length) {
+      var derinSonuc = await window.KriptoAjanlari.derinAnaliz(adaylar, onProgress);
+      adaylar = derinSonuc.adaylar;
     }
 
     adaylar.sort(function (a, b) {
@@ -457,7 +504,7 @@
         source: 'Coin tarama',
         market: 'Kripto',
         timeframe: zd,
-        agentVersion: 'coin-tahmin-v1.2'
+        agentVersion: CACHE_VERSION
       });
     }
 
@@ -498,7 +545,7 @@
       secim: secim,
       adaylar: adaylar.map(kisaOzet),
       hatalar: hatalar,
-      ajanSurum: 'coin-tahmin-v1.2'
+      ajanSurum: CACHE_VERSION
     };
 
     var hafiza = okuHafiza();
@@ -599,6 +646,22 @@
       alan.appendChild(kart('Ajanların görüşü', s.tartisma, '#2f81f7'));
     }
 
+    if (s.flow || s.futures || s.mtf || s.marketRegime || s.deepScan) {
+      var deepLines = [];
+      if (s.deepScan) deepLines.push('Derin tarama: ' + s.deepScan + (s.deepVeto ? ' · AL/SAT güvenlik filtresi uygulandı' : ''));
+      if (s.flow) deepLines.push('Order Flow: ' + (s.flow.reason || 'Veri yok'));
+      if (s.futures) deepLines.push('Vadeli piyasa: ' + (s.futures.reason || 'Veri yok'));
+      if (s.marketRegime) deepLines.push('BTC/ETH piyasa rejimi: ' + (s.marketRegime.reason || s.marketRegime.regime || 'Belirsiz'));
+      if (s.mtf) {
+        deepLines.push('Zaman dilimleri: 1G ' + (s.mtf.daily ? s.mtf.daily.trend : 'veri yok') +
+          ' · 4S ' + (s.mtf.fourHour ? s.mtf.fourHour.trend : 'veri yok') +
+          ' · 1S ' + (s.mtf.hourly ? s.mtf.hourly.trend : 'veri yok') +
+          ' · 15D ' + (s.mtf.fifteenMinute ? s.mtf.fifteenMinute.trend : 'veri yok'));
+      }
+      (s.deepReasons || []).forEach(function (reason) { deepLines.push('Güvenlik: ' + reason); });
+      alan.appendChild(kart('🧠 Kripto derin analiz', deepLines, '#8b5cf6'));
+    }
+
     if (kayit.adaylar && kayit.adaylar.length) {
       var satirlar = kayit.adaylar.slice(0, 20).map(function (a, idx) {
         return (idx + 1) + '. ' + (a.ad || '?') + ' → ' + (a.karar || '?') +
@@ -640,12 +703,7 @@
 
     sec.innerHTML =
       '<h2>Coin Tahmin AI</h2>' +
-      '<p class="alt">Popüler kripto coinleri tarar; Teknik, Hacim ve Denetçi ajanlarına sorar; en yüksek skorlu kurulumu seçer. Hafıza bu cihazda saklanır.</p>' +
-      '<select id="coin-tahmin-zd" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">' +
-      '<option value="1h" selected>1 saatlik</option>' +
-      '<option value="1d">Günlük</option>' +
-      '<option value="15m">15 dakikalık</option>' +
-      '</select>' +
+      '<p class="alt">216 coin 1 saatlik hızlı taranır. En güçlü 20 aday 1G, 4S, 1S ve 15D zaman dilimleri, Order Flow ve vadeli piyasa verileriyle derinlemesine incelenir. Hafıza bu cihazda saklanır.</p>' +
       '<button type="button" id="coin-tahmin-btn" class="buton">BUGÜNÜN COİN TAHMİNİNİ ÜRET</button>' +
       '<p id="coin-tahmin-durum" class="alt"></p>' +
       '<div id="coin-tahmin-alan"></div>' +
@@ -671,10 +729,8 @@
         if (btn.disabled) return;
         btn.disabled = true;
         if (alan) alan.innerHTML = '';
-        var zdEl = document.getElementById('coin-tahmin-zd');
-        var zd = zdEl ? zdEl.value : '1h';
-        bugunUret(zd, function (i, n, ad) {
-          if (durum) durum.textContent = 'Taranıyor ' + i + '/' + n + ': ' + ad + '…';
+        bugunUret('1h', function (i, n, ad, phase) {
+          if (durum) durum.textContent = (phase || 'Taranıyor') + ' ' + i + '/' + n + ': ' + ad + '…';
         }).then(function (kayit) {
           if (durum) durum.textContent = 'Tamamlandı · ' + kayit.tarih;
           renderKayit(kayit, alan);

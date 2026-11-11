@@ -88,3 +88,18 @@ Ardından uygulamadaki Admin ekranından bu hesapla giriş yap. Yetki, kullanıc
 - Çevrimdışı: daha önce önbelleğe alınmış uygulama dosyaları
 
 Piyasa verisi sağlayıcıları, internet erişimi ve üçüncü taraf servislerin kullanılabilirliğine bağlıdır. Otomatik teknik analiz yatırım tavsiyesi değildir.
+
+
+## Kripto Intelligence 2.0 — Faz 1
+
+`js/kripto-ajanlari.js` adds a crypto-only deep-analysis layer without changing the existing BIST council:
+
+- All listed coins are first scanned on the 1-hour timeframe. The top 20 candidates are then checked on 1D, 4H and 15M; the 1H result is reused.
+- Order Flow uses Binance Kline quote volume and taker-buy quote volume. It measures executed aggressive flow, not whale identity or hidden orders.
+- Futures context uses public USDⓈ-M endpoints for funding, open interest, global long/short accounts and taker buy/sell ratio. Coins without derivatives data receive no vote.
+- BTC/ETH trend and the breadth of the scanned coin universe provide a market-regime veto.
+- New agents can only downgrade a conflicting or unverified AL/SAT to WAIT. They cannot create an AL/SAT decision or override the existing technical, volume, auditor and risk/reward gates.
+- Only the top 20 receive deep confirmation. An actionable signal outside that shortlist is downgraded to WAIT until it is confirmed.
+- Futures and candle endpoints are mocked in automated tests. The tests do not depend on live market values.
+
+The first phase does not use top-trader endpoints, API keys, paid feeds, order-book claims or automatic weight learning. Funding and open interest are contextual risk inputs, not standalone trade signals.

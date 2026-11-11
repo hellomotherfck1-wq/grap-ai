@@ -27,7 +27,7 @@
   function num(x) { return typeof x === 'number' && isFinite(x); }
   function norm(x) { return String(x || '').trim().toUpperCase().replace(/\s+/g, ''); }
   function interval(tf) {
-    return ({ '15m': 15 * 60 * 1000, '1h': 60 * 60 * 1000, '1d': 24 * 60 * 60 * 1000 })[tf] || 0;
+    return ({ '15m': 15 * 60 * 1000, '1h': 60 * 60 * 1000, '4h': 4 * 60 * 60 * 1000, '1d': 24 * 60 * 60 * 1000 })[tf] || 0;
   }
   function marketOf(symbol) {
     return /USDT$/i.test(symbol) ? 'Kripto' : /\.IS$/i.test(symbol) ? 'BIST' : 'Diğer';
@@ -89,7 +89,9 @@
               [
                 'name', 'market', 'timeframe', 'signalAt', 'price', 'stop', 'target', 'rr',
                 'decision', 'generalDecision', 'technicalDecision', 'volumeDecision',
-                'volumeScore', 'auditorError', 'auditorWarningCount', 'score', 'trend', 'rsi', 'fundamentalStatus',
+                'volumeScore', 'flowDecision', 'flowScore', 'futuresDecision', 'futuresScore',
+                'marketRegime', 'mtfAlignment', 'sourceTimestamps',
+                'auditorError', 'auditorWarningCount', 'score', 'trend', 'rsi', 'fundamentalStatus',
                 'fkPE', 'fkValuation', 'fkVeto', 'costPct', 'horizon', 'agentVersion'
               ].forEach(function (key) {
                 if (record[key] !== undefined) finalRecord[key] = record[key];
@@ -181,6 +183,14 @@
       technicalDecision: input.technicalDecision || null,
       volumeDecision: input.volumeDecision || null,
       volumeScore: num(input.volumeScore) ? input.volumeScore : null,
+      flowDecision: input.flowDecision || null,
+      flowScore: num(input.flowScore) ? input.flowScore : null,
+      futuresDecision: input.futuresDecision || null,
+      futuresScore: num(input.futuresScore) ? input.futuresScore : null,
+      marketRegime: input.marketRegime || null,
+      mtfAlignment: num(input.mtfAlignment) ? input.mtfAlignment : null,
+      sourceTimestamps: input.sourceTimestamps && typeof input.sourceTimestamps === 'object'
+        ? input.sourceTimestamps : null,
       auditorError: input.auditorError || null,
       auditorWarningCount: num(input.auditorWarningCount) ? Math.max(0, input.auditorWarningCount) : null,
       score: num(input.score) ? input.score : null,
@@ -314,6 +324,13 @@
         technicalDecision: c.teknikKarar,
         volumeDecision: c.hacimKarar || voteFromVolume(c.hacimSkor, c.hacimSkor !== null && c.hacimSkor !== undefined),
         volumeScore: c.hacimSkor,
+        flowDecision: c.flow && c.flow.decision,
+        flowScore: c.flow && c.flow.score,
+        futuresDecision: c.futures && c.futures.decision,
+        futuresScore: c.futures && c.futures.score,
+        marketRegime: c.marketRegime && c.marketRegime.regime,
+        mtfAlignment: c.mtf && c.mtf.score,
+        sourceTimestamps: c.sourceTimestamps,
         auditorError: c.hataPayi,
         auditorWarningCount: c.denetciSorunSayisi,
         score: c.skor,
@@ -742,14 +759,16 @@
 
   function exportCSV(records) {
     var columns = ['signalAt', 'symbol', 'name', 'market', 'timeframe', 'decision', 'generalDecision',
-      'technicalDecision', 'volumeDecision', 'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
+      'technicalDecision', 'volumeDecision', 'flowDecision', 'flowScore', 'futuresDecision', 'futuresScore',
+      'marketRegime', 'mtfAlignment', 'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
       'costPct', 'tradeStatus', 'tradeOutcome', 'netPct', 'forwardPct', 'waitResult', 'source'];
     var rows = [columns.join(';')];
     records.slice().sort(function (a, b) { return a.signalAt - b.signalAt; }).forEach(function (r) {
       var values = [
         new Date(r.signalAt).toISOString(), r.symbol, r.name, r.market, r.timeframe, r.decision,
-        r.generalDecision, r.technicalDecision, r.volumeDecision, r.auditorError, r.auditorWarningCount,
-        r.fundamentalStatus, r.price, r.stop, r.target, r.costPct, r.tradeStatus,
+        r.generalDecision, r.technicalDecision, r.volumeDecision, r.flowDecision, r.flowScore,
+        r.futuresDecision, r.futuresScore, r.marketRegime, r.mtfAlignment,
+        r.auditorError, r.auditorWarningCount, r.fundamentalStatus, r.price, r.stop, r.target, r.costPct, r.tradeStatus,
         r.tradeResult ? r.tradeResult.outcome : '',
         r.tradeResult ? r.tradeResult.netPct : '',
         r.forwardPct == null ? '' : r.forwardPct, r.waitResult || '', (r.sources || [r.source]).join('+')

@@ -37,6 +37,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Smoke test crypto agents
+        run: node .github/tests/crypto-agent-smoke.cjs
+
       - name: Install Playwright
         run: |
           npm install --no-save playwright
