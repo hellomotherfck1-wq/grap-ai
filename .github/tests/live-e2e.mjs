@@ -36,7 +36,7 @@ try {
   check('Canlı site HTTP yanıtı', Boolean(response && response.ok()), response ? String(response.status()) : 'Yanıt alınamadı');
 
   await page.waitForFunction(() =>
-    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.BacktestAI && window.AjanPerformans) &&
+    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.AjanPerformans) &&
     typeof Veri !== 'undefined' && typeof Analiz !== 'undefined' && typeof Cizim !== 'undefined',
     null,
     { timeout: 45000 }
@@ -75,17 +75,6 @@ try {
   check('Ajanlar, hacim ve risk/kazanç aynı yöndeyse karar veriyor', decisionRules.confirmed === 'AL', JSON.stringify(decisionRules));
   check('Hacim verisi yoksa nihai karar BEKLE', decisionRules.noVolume === 'BEKLE', JSON.stringify(decisionRules));
   check('Risk/kazanç 1:1,5 altındaysa BEKLE', decisionRules.weakRR === 'BEKLE', JSON.stringify(decisionRules));
-  const stopPriority = await page.evaluate(() => {
-    const trade = window.BacktestAI.simuleIslem(
-      'AL', 100, 95, 110,
-      [{ t: 1, o: 100, h: 112, l: 94, c: 108 }],
-      0, 1, 0.20
-    );
-    return trade && { exit: trade.cikis, reason: trade.neden, net: trade.netYuzde };
-  });
-  check('Aynı mumda stop ve hedef görülürse stop önce sayılıyor',
-    stopPriority && stopPriority.exit === 95 && stopPriority.reason === 'Stop' && stopPriority.net < 0,
-    JSON.stringify(stopPriority));
 
   await page.locator('nav button[data-git="sonuc"]').click();
   await page.locator('#ajan-performans-guncelle').waitFor({ state: 'attached', timeout: 15000 });
@@ -198,40 +187,6 @@ try {
   check('BEKLE sinyali işlem kazanma oranından ayrı değerlendiriliyor',
     performanceChecks.waitSeparateFromWinRate, JSON.stringify(performanceChecks));
 
-
-  const backtestEngine = await page.evaluate(() => {
-    const oldAnaliz = Analiz.yap;
-    const oldAjanlar = window.TahminAI.ajanlaraSor;
-    try {
-      Analiz.yap = function (m, trend) {
-        const result = oldAnaliz.call(this, m, trend);
-        result.plan = { stop: 0, t1: 1.5, rr: 2 };
-        return result;
-      };
-      window.TahminAI.ajanlaraSor = function () {
-        return { nihai: { son: 'AL' } };
-      };
-      const rows = Array.from({ length: 120 }, (_, i) => {
-        const close = 100 + i * 0.5;
-        return {
-          t: Date.now() - (120 - i) * 86400000,
-          o: close - 0.2, h: close + 1, l: close - 1, c: close, v: 1000 + i * 10
-        };
-      });
-      const result = window.BacktestAI.analizEt(rows, '1d', 0.20, 1);
-      return {
-        trades: result.islemSayisi,
-        entriesAfterSignal: result.islemler.every(trade => trade.girisZamani > trade.sinyalZamani),
-        portfolioReturn: result.toplamGetiri
-      };
-    } finally {
-      Analiz.yap = oldAnaliz;
-      window.TahminAI.ajanlaraSor = oldAjanlar;
-    }
-  });
-  check('Backtest sinyali sonraki mum açılışında işleme dönüştürüyor',
-    backtestEngine.trades > 0 && backtestEngine.entriesAfterSignal,
-    JSON.stringify(backtestEngine));
 
   const candleAlignment = await page.evaluate(() => {
     const rows = Array.from({ length: 40 }, (_, i) => {
@@ -608,31 +563,17 @@ try {
     await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(binanceRows) });
   });
 
-  // The backtest must use free public history and execute only after the signal candle closes.
+  // Historical candles remain available only to evaluate real signals in the agent performance ledger.
   await page.locator('nav button[data-git="strateji"]').click();
-  await page.locator('#backtest-panel').waitFor({ state: 'attached', timeout: 15000 });
-  await page.locator('#backtest-panel summary').click();
-  const historyCheck = await page.evaluate(async () => {
-    const data = await Veri.gecmis('THYAO', '1d');
-    return { symbol: data.sembol, count: data.mumlar.length, source: data.kaynak };
-  });
-  check('Ücretsiz Yahoo Finance geçmiş verisi alınıyor',
-    historyCheck.symbol === 'THYAO.IS' && historyCheck.count >= 80 && historyCheck.source === 'y',
-    JSON.stringify(historyCheck));
-
-  await page.locator('#backtest-sembol').fill('THYAO');
-  await page.locator('#backtest-zd').selectOption('1d');
-  await page.locator('#backtest-btn').click();
-  await page.waitForFunction(() => {
-    const status = document.querySelector('#backtest-durum')?.textContent || '';
-    return status.startsWith('Test tamamlandı') || status.startsWith('Test tamamlanamadı:');
-  }, null, { timeout: 90000 });
-  const backtestStatus = await page.locator('#backtest-durum').innerText();
-  const backtestText = await page.locator('#backtest-sonuc').innerText();
-  check('Ücretsiz geçmiş sinyal testi arayüzü çalışıyor',
-    backtestStatus.startsWith('Test tamamlandı') && backtestText.includes('Yahoo Finance') && backtestText.includes('Son mum test dışında'),
-    backtestStatus + ' · ' + backtestText.slice(0, 350));
-
+  const historyFeature = await page.evaluate(() => ({
+    panelPresent: document.querySelector('#backtest-panel') !== null,
+    engineLoaded: typeof window.BacktestAI !== 'undefined',
+    performanceHistoryAvailable: typeof Veri !== 'undefined' && typeof Veri.gecmis === 'function'
+  }));
+  check('Bağımsız geçmiş sinyal testi paneli kaldırıldı',
+    !historyFeature.panelPresent && !historyFeature.engineLoaded, JSON.stringify(historyFeature));
+  check('Ajan performans karnesi için geçmiş veri erişimi korundu',
+    historyFeature.performanceHistoryAvailable, JSON.stringify(historyFeature));
 
   const yahooVolume = await page.evaluate(async () => {
     const rows = await Veri.yahoo('THYAO.IS', '1d');
