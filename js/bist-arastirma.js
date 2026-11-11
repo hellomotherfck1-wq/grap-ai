@@ -268,11 +268,15 @@
     var report = await research(v, dn, panel);
     render(report, container);
     if (window.HaberAjani && typeof window.HaberAjani.analizEt === 'function') {
-      var newsReport = await window.HaberAjani.analizEt(v, { yahoo: report.news || [] });
       var newsBox = document.createElement('div');
       newsBox.className = 'kart';
-      window.HaberAjani.render(newsReport, newsBox);
+      newsBox.textContent = '📰 Haber Ajanı son 7 günün KAP ve haber akışını tarıyor…';
       if (container.parentNode) container.parentNode.insertBefore(newsBox, container.nextSibling);
+      window.HaberAjani.analizEt(v, { yahoo: report.news || [] }).then(function (newsReport) {
+        window.HaberAjani.render(newsReport, newsBox);
+      }).catch(function (error) {
+        newsBox.textContent = 'Haber Ajanı şu anda haber alamadı: ' + (error && error.message ? error.message : String(error));
+      });
     }
     return report;
   }
@@ -289,10 +293,16 @@
       ? window.TahminAI.ajanlaraSor(s, dn.kal) : null;
     status.textContent = 'Finansal göstergeler ve haber başlıkları araştırılıyor…';
     var report = await research(v, dn, panel);
-    var newsReport = null;
+    var newsBox = null;
     if (window.HaberAjani && typeof window.HaberAjani.analizEt === 'function') {
-      status.textContent = 'Haber Ajanı son 7 günün KAP ve haber akışını inceliyor…';
-      newsReport = await window.HaberAjani.analizEt(v, { yahoo: report.news || [] });
+      newsBox = document.createElement('div');
+      newsBox.className = 'kart';
+      newsBox.textContent = '📰 Haber Ajanı son 7 günün KAP ve haber akışını tarıyor…';
+      window.HaberAjani.analizEt(v, { yahoo: report.news || [] }).then(function (newsReport) {
+        window.HaberAjani.render(newsReport, newsBox);
+      }).catch(function (error) {
+        newsBox.textContent = 'Haber Ajanı şu anda haber alamadı: ' + (error && error.message ? error.message : String(error));
+      });
     }
     result.replaceChildren();
     if (typeof Cizim !== 'undefined' && Cizim.grafik) {
@@ -306,13 +316,8 @@
     content.className = 'kart';
     render(report, content);
     result.appendChild(content);
-    if (newsReport && window.HaberAjani) {
-      var newsBox = document.createElement('div');
-      newsBox.className = 'kart';
-      window.HaberAjani.render(newsReport, newsBox);
-      result.appendChild(newsBox);
-    }
-    status.textContent = 'Araştırma tamamlandı · ' + new Date().toLocaleString('tr-TR');
+    if (newsBox) result.appendChild(newsBox);
+    status.textContent = 'Araştırma tamamlandı · Haber Ajanı arka planda güncelleniyor';
   }
 
   function uiKur() {
