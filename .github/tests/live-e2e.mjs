@@ -724,7 +724,7 @@ try {
   check(
     'Coin toplu tarama akışı',
     coinScan.scanned > 0 && coinScan.scanned + coinScan.errors === coinScan.total &&
-      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.0.0' &&
+      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.1.0' &&
       coinScan.status.startsWith('Tamamlandı'),
     JSON.stringify(coinScan)
   );
