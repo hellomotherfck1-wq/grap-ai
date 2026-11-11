@@ -675,9 +675,14 @@ try {
 
   const coinVolumeAgent = await page.evaluate(async () => {
     const result = await CoinTahminAI.taraBir({ q: 'BTC', ad: 'Bitcoin' }, '1d');
-    return { symbol: result.sembol, price: result.fiyat, volumeScore: result.hacimSkor };
+    return { symbol: result.sembol, price: result.fiyat, volumeScore: result.hacimSkor, generalDecision: result.genelKarar, technicalDecision: result.teknikKarar, technicalAvailable: result.teknikVar, volumeDecision: result.hacimKarar, volumeAvailable: result.hacimVar, reviewerRisk: result.denetciHata };
   });
   check('Coin hacim ajanına veri aktarımı', coinVolumeAgent.price > 0 && typeof coinVolumeAgent.volumeScore === 'number', JSON.stringify(coinVolumeAgent));
+  check('Coin botlarının kararları ayrı ayrı kaydediliyor',
+    ['AL', 'SAT', 'BEKLE'].includes(coinVolumeAgent.generalDecision) &&
+    (coinVolumeAgent.technicalAvailable ? ['AL', 'SAT', 'BEKLE'].includes(coinVolumeAgent.technicalDecision) : coinVolumeAgent.technicalDecision === null) &&
+    (coinVolumeAgent.volumeAvailable ? ['AL', 'SAT', 'BEKLE'].includes(coinVolumeAgent.volumeDecision) : coinVolumeAgent.volumeDecision === null),
+    JSON.stringify(coinVolumeAgent));
   const flowCheck = await page.evaluate(() => {
     const now = Date.now(), hour = 60 * 60 * 1000;
     const bars = Array.from({ length: 30 }, (_, i) => {
@@ -724,7 +729,7 @@ try {
   check(
     'Coin toplu tarama akışı',
     coinScan.scanned > 0 && coinScan.scanned + coinScan.errors === coinScan.total &&
-      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.1.0' &&
+      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.2.0' &&
       coinScan.status.startsWith('Tamamlandı'),
     JSON.stringify(coinScan)
   );
@@ -733,6 +738,19 @@ try {
     'Coin veri hataları kullanıcıya gösteriliyor',
     coinScan.errors === 0 || coinResultText.includes('Veri alınamayanlar'),
     coinResultText.slice(-350)
+  );
+  check(
+    'Coin sonuç ekranı AL/SAT/BEKLE kararlarını sade anlatıyor',
+    coinResultText.includes('SİSTEMİN SON KARARI') &&
+      coinResultText.includes('Botların oyları') &&
+      coinResultText.includes('Genel analiz') &&
+      coinResultText.includes('Teknik bot') &&
+      coinResultText.includes('Hacim botu') &&
+      coinResultText.includes('Denetçi kontrolü') &&
+      coinResultText.includes('Spot piyasada alım') &&
+      coinResultText.includes('açığa satış') &&
+      coinResultText.includes('216 coin tarama özeti'),
+    coinResultText.slice(0, 1000)
   );
   await page.locator('nav button[data-git="strateji"]').click();
 
