@@ -521,17 +521,21 @@
       result.appendChild(kapFallback);
     }
 
-    var newsBox = el('div', 'finansal-ozet-kart');
-    newsBox.appendChild(el('h4', '', 'Ücretsiz haber başlıkları'));
-    if (report.news.length) {
-      report.news.forEach(function (item) {
-        var line = el('p', 'finansal-kap-satir');
-        addLink(line, item.title, item.link);
-        line.appendChild(el('small', '', ' · ' + item.publisher + (item.date ? ' · ' + safeDate(item.date) : '')));
-        newsBox.appendChild(line);
-      });
+    var newsBox = el('div', 'finansal-ozet-kart haber-ajani');
+    if (report.newsAgent && window.HaberAjani) {
+      window.HaberAjani.render(report.newsAgent, newsBox);
     } else {
-      newsBox.appendChild(el('p', 'alt', 'Yahoo Finance haber akışından başlık alınamadı.'));
+      newsBox.appendChild(el('h4', '', 'Ücretsiz haber başlıkları'));
+      if (report.news.length) {
+        report.news.forEach(function (item) {
+          var line = el('p', 'finansal-kap-satir');
+          addLink(line, item.title, item.link);
+          line.appendChild(el('small', '', ' · ' + item.publisher + (item.date ? ' · ' + safeDate(item.date) : '')));
+          newsBox.appendChild(line);
+        });
+      } else {
+        newsBox.appendChild(el('p', 'alt', 'Haber akışından başlık alınamadı.'));
+      }
     }
     result.appendChild(newsBox);
 
@@ -575,6 +579,14 @@
       ]);
       var news = tasks[0].status === 'fulfilled' ? tasks[0].value : [];
       var kap = tasks[1].status === 'fulfilled' ? tasks[1].value : null;
+      var newsAgent = null;
+      if (window.HaberAjani && typeof window.HaberAjani.analizEt === 'function') {
+        newsAgent = await window.HaberAjani.analizEt({
+          sembol: code + '.IS',
+          ad: kap && kap.company ? kap.company : (market.ad || code),
+          tur: 'BIST hissesi'
+        }, { yahoo: news, kap: kap });
+      }
       var fundamentals = kap && kap.statement ? kap.statement.fundamentals : null;
       var errors = [];
       tasks.forEach(function (task, i) {
@@ -593,7 +605,8 @@
         fundamentals: fundamentals,
         kap: kap,
         news: news,
-        errors: errors,
+        newsAgent: newsAgent,
+        errors: errors.concat(newsAgent && newsAgent.errors ? newsAgent.errors : []),
         assessment: assessment
       };
 
