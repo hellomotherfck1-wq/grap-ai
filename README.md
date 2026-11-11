@@ -37,6 +37,14 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 
 **Veri ve güven sınırları:** BIST 100 üyeliği zamanla değişir; sembol listesi güncel tutulmalıdır. Ücretsiz fiyat ve haber uçları gecikmeli, eksik veya geçici olarak erişilemez olabilir. KAP bildirim listesi şirketin finansal tablosunun tamamını tarayıcıya indirmez; rapor bağlantıları kullanıcıyı KAP'a götürür. Veri gelmediğinde ilgili alan boş/uyarı olarak gösterilir. Otomatik çıktılar yatırım tavsiyesi değildir. Ücretli API anahtarı veya kullanıcı aboneliği gerekmez.
 
+## Veri güvenilirliği ve BEKLE koşulları
+
+- Canlı analiz ve BIST/coin taramaları son kapanmış mumun zamanını kontrol eder. Eski, eksik veya doğrulanamayan veriyle AL/SAT analizi başlatılmaz.
+- Binance için zaman dilimine göre kısa gecikme sınırı; BIST günlük verisi için hafta sonu/tatil toleransı; BIST seans içi 15 dakika/saatlik veriler için daha sıkı güncellik kontrolü uygulanır.
+- BIST günlük Yahoo mumlarının seans kapanışı yaklaşık Türkiye saati 18:00 olarak ele alınır; açık mumlar teknik göstergelere dahil edilmez.
+- BEKLE kararı, yakın destek/direnç seviyelerine göre olası AL ve SAT teyit koşullarını gösterir. Hacim varsa 20 mumluk ortalamaya göre hacim teyidi de açıklanır.
+- Grafik ekranındaki ana karar ve performans kaydı, teknik ön karardan ziyade ajan kurulunun nihai kararını kullanır.
+
 ## Haber Ajanı
 
 `js/haber-ajani.js`, BIST hissesi analiz edildiğinde son 7 gündeki haber başlıklarını ücretsiz kaynaklardan birleştirir:
@@ -59,6 +67,7 @@ Ajan haberleri tarih ve kaynak bağlantısıyla gösterir; tekrar eden başlıkl
 - Denetçi ajanının Düşük/Orta/Yüksek risk seviyesi ve bulgu sayısı saklanır; her risk seviyesinden sonra 10 mumdaki düşüş/yükseliş dağılımı ayrı gösterilir. F/K ajanının AL → BEKLE veto kararları da sonraki fiyat hareketiyle karşılaştırılır.
 - Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu eksik açıkça belirtilir. Grafik analizinde F/K sonucu sonradan kararı değiştirirse aynı sinyal kaydı güncellenir.
 - 30 işlemden önce başarı oranı örneklem yetersiz olarak işaretlenir; Wilson güven aralığı gösterilir.
+- Genel analiz, teknik ve hacim ajanlarının ağırlıkları yalnızca aynı piyasa/zaman diliminde ajan başına en az 30 tamamlanmış yön sonucu oluştuğunda otomatik ayarlanır. Katsayı 0,85–1,15 aralığında sınırlıdır; yalnızca tarama puanını etkiler, nihai AL/SAT güvenlik koşullarını gevşetmez.
 - Kayıtlar yalnızca bu cihaz/tarayıcıda bulunur. Tarayıcı verisi temizlenirse kaybolabilir; CSV dışa aktarımı vardır. 365 günden eski kayıtlar otomatik silinir.
 - Ücretsiz Yahoo geçmiş sınırları yaklaşık 15 dakika için 30 gün, 1 saat için 3 ay, günlük için 2 yıldır; Binance geçmişi en fazla 1.000 mumdur. Kayıtlar 365 gün saklansa da sonuçları geciktirmeden güncellemek gerekir; kaynak geçmişi dışına çıkan sonuçlar "veri aralığı dışında" olarak işaretlenir.
 
