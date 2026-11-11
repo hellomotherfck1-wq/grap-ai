@@ -276,6 +276,8 @@ try {
     }, null, { timeout: 60000 }).catch(() => {});
     const chartAreaText = await page.locator('#tuval-alan').innerText();
     check('Grafik sonrası araştırma özeti', chartAreaText.includes('Araştırma Ajanı') || chartAreaText.includes('Araştırma ajanı şu anda veri alamadı'), chartAreaText.slice(-600));
+    check('Grafik analizinde Haber Ajanı kartı açılıyor',
+      chartAreaText.includes('Haber Ajanı'), chartAreaText.slice(-900));
   }
 
   await page.locator('nav button[data-git="sonuc"]').click();
