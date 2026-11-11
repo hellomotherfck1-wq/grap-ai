@@ -36,12 +36,18 @@ try {
   check('Canlı site HTTP yanıtı', Boolean(response && response.ok()), response ? String(response.status()) : 'Yanıt alınamadı');
 
   await page.waitForFunction(() =>
-    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.AjanPerformans) &&
+    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.AjanPerformans && window.HaberAjani) &&
     typeof Veri !== 'undefined' && typeof Analiz !== 'undefined' && typeof Cizim !== 'undefined',
     null,
     { timeout: 45000 }
   );
-  check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma ajanı');
+  check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma / Haber ajanı');
+  const newsRules = await page.evaluate(() => ({
+    positive: window.HaberAjani.siniflandir({ title: 'Şirket yeni sözleşme imzaladı', summary: '' }).impact,
+    negative: window.HaberAjani.siniflandir({ title: 'Şirket zarar açıkladı', summary: '' }).impact
+  }));
+  check('Haber Ajanı olumlu ve olumsuz başlıkları ayırıyor',
+    newsRules.positive === 'Olumlu' && newsRules.negative === 'Olumsuz', JSON.stringify(newsRules));
 
   const decisionRules = await page.evaluate(() => {
     const A = window.Ajan;
@@ -483,6 +489,19 @@ try {
       await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(quoteSummary) });
       return;
     }
+    if (requested.includes('news.google.com/rss/search')) {
+      const rssDate = new Date().toUTCString();
+      const rss = '<?xml version="1.0" encoding="UTF-8"?>' +
+        '<rss version="2.0"><channel><item>' +
+        '<title>Türk Hava Yolları yeni sipariş aldı</title>' +
+        '<link>https://news.google.com/rss/articles/test-thy</link>' +
+        '<pubDate>' + rssDate + '</pubDate>' +
+        '<source url="https://example.com">Test Haber</source>' +
+        '<description>Yeni sipariş ve büyüme gelişmesi.</description>' +
+        '</item></channel></rss>';
+      await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/rss+xml; charset=utf-8', body: rss });
+      return;
+    }
     if (requested.includes('/v1/finance/search?q=THYAO.IS')) {
       await route.fulfill({
         status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json',
@@ -664,6 +683,9 @@ try {
   check('KAP parantezli negatif tutar doğru okundu', kapMetrics.netProfit === -123456, JSON.stringify(kapMetrics));
   check('KAP ondalıksız binlik ayraç doğru okundu', kapMetrics.cash === 250000, JSON.stringify(kapMetrics));
   check('KAP bildirimleri ve haberler', financialText.includes('2026 ikinci çeyrek finansal raporu') && financialText.includes('THYAO ücretsiz test haber başlığı'), financialText.includes('Özel durum açıklaması') ? 'Finansal rapor, özel durum ve haber listelendi' : 'KAP veya haber eksik');
+  check('Haber Ajanı Google News, Yahoo ve KAP başlıklarını özetliyor',
+    financialText.includes('Haber Ajanı') && financialText.includes('Türk Hava Yolları yeni sipariş aldı') &&
+    financialText.includes('Olumlu'), financialText.slice(-900));
   const sharedSymbol = await page.evaluate(() => window.TahminAI?.temelAnaliz?.symbol || '');
   check('Ücretsiz araştırma diğer ajanlarla paylaşıldı', sharedSymbol === 'THYAO', sharedSymbol || 'Paylaşılan rapor bulunamadı');
   const apiKeyFields = await page.locator('#finansal-panel input[type="password"]').count();
