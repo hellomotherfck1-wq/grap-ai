@@ -387,17 +387,16 @@
       if (N.durum === 'temkinli') skor -= 3;
     }
 
-    // Öğrenen katsayılar yalnızca aday sıralama puanını etkiler; nihai AL/SAT güvenlik kuralları değişmez.
-    if (agirliklar) {
-      if (dir(s.karar) !== 0 && agirliklar.general && agirliklar.general.aktif) {
-        skor += Math.round((agirliklar.general.katsayi - 1) * 20);
+    // Öğrenen katsayılar yalnızca nihai yönle aynı/ters düşen ajan oyunun puan katkısını ayarlar.
+    // BEKLE kararına yapay puan eklenmez; nihai AL/SAT güvenlik kuralları değişmez.
+    if (agirliklar && y !== 0) {
+      function agirlikEtki(oy, agirlik) {
+        if (!oy || !agirlik || !agirlik.aktif) return 0;
+        return Math.round((agirlik.katsayi - 1) * 20 * (oy === y ? 1 : -1));
       }
-      if (T && T.var && dir(T.karar) !== 0 && agirliklar.technical && agirliklar.technical.aktif) {
-        skor += Math.round((agirliklar.technical.katsayi - 1) * 20);
-      }
-      if (H && H.var && isaret(H.skor) !== 0 && agirliklar.volume && agirliklar.volume.aktif) {
-        skor += Math.round((agirliklar.volume.katsayi - 1) * 20);
-      }
+      skor += agirlikEtki(dir(s.karar), agirliklar.general);
+      skor += agirlikEtki(T && T.var ? dir(T.karar) : 0, agirliklar.technical);
+      skor += agirlikEtki(H && H.var ? isaret(H.skor) : 0, agirliklar.volume);
     }
 
     return Math.round(Math.min(100, Math.max(0, skor)));
