@@ -23,6 +23,8 @@
   } catch (e) {}
   var dbPromise = null;
   var updating = false;
+  var cachedRecordsForWeights = [];
+  var MIN_AGENT_SAMPLES = 30;
 
   function num(x) { return typeof x === 'number' && isFinite(x); }
   function norm(x) { return String(x || '').trim().toUpperCase().replace(/\s+/g, ''); }
@@ -515,7 +517,81 @@
       else wrong++;
     });
     var directional = correct + wrong;
-    return { count: calls.length, correct: correct, wrong: wrong, flat: flat, rate: directional ? correct / directional * 100 : null };
+    return { count: calls.length, directional: directional, correct: correct, wrong: wrong, flat: flat, rate: directional ? correct / directional * 100 : null };
+  }
+
+  function agentWeight(records, key) {
+    var stats = agentStats(records, key);
+    var n = stats.directional;
+    var active = n >= MIN_AGENT_SAMPLES;
+    // 20 gözlemlik %50 önsel, küçük örneklemlerin katsayıyı aşırı oynatmasını engeller.
+    var posterior = (stats.correct + 10) / (n + 20);
+    var factor = active ? Math.max(0.85, Math.min(1.15, 1 + (posterior - 0.5) * 0.8)) : 1;
+    return {
+      aktif: active,
+      katsayi: factor,
+      ornek: n,
+      dogru: stats.correct,
+      yanlis: stats.wrong,
+      yatay: stats.flat,
+      isabet: n ? stats.correct / n * 100 : null
+    };
+  }
+
+  function agirliklariHesapla(records, context) {
+    context = context || {};
+    var market = String(context.market || '').trim();
+    var timeframe = String(context.timeframe || context.zd || '').trim();
+    var group = Array.isArray(records) ? records.filter(function (r) {
+      return market && timeframe && r.market === market && r.timeframe === timeframe;
+    }) : [];
+    return {
+      market: market || null,
+      timeframe: timeframe || null,
+      minOrnek: MIN_AGENT_SAMPLES,
+      general: agentWeight(group, 'generalDecision'),
+      technical: agentWeight(group, 'technicalDecision'),
+      volume: agentWeight(group, 'volumeDecision')
+    };
+  }
+
+  function renderWeightTable(records) {
+    var contexts = Object.create(null);
+    (records || []).forEach(function (r) {
+      if (!r.market || !r.timeframe) return;
+      var key = r.market + '|' + r.timeframe;
+      if (!contexts[key]) contexts[key] = { market: r.market, timeframe: r.timeframe, rows: [] };
+      contexts[key].rows.push(r);
+    });
+    var wrap = el('div', 'backtest-table-wrap');
+    if (!Object.keys(contexts).length) {
+      wrap.appendChild(el('p', 'backtest-not', 'Ağırlıklar için piyasa/periyot bazında tamamlanmış sonuç birikmesi bekleniyor. Her ajan için en az 30 yön sonucu gerekir.'));
+      return wrap;
+    }
+    var table = el('table', 'backtest-trade-table');
+    var head = el('thead'), hr = el('tr');
+    ['Piyasa', 'Periyot', 'Ajan', 'Yön örneği', 'İsabet', 'Katsayı'].forEach(function (x) { hr.appendChild(el('th', '', x)); });
+    head.appendChild(hr); table.appendChild(head);
+    var body = el('tbody');
+    Object.keys(contexts).sort().forEach(function (key) {
+      var group = contexts[key];
+      [
+        ['Genel analiz', 'generalDecision'],
+        ['Teknik ajan', 'technicalDecision'],
+        ['Hacim ajanı', 'volumeDecision']
+      ].forEach(function (agent) {
+        var w = agentWeight(group.rows, agent[1]);
+        var tr = el('tr');
+        [
+          group.market, group.timeframe, agent[0], String(w.ornek),
+          w.isabet === null ? '—' : '%' + w.isabet.toFixed(1).replace('.', ','),
+          w.aktif ? w.katsayi.toFixed(2).replace('.', ',') + 'x' : '1,00x · beklemede'
+        ].forEach(function (value) { tr.appendChild(el('td', '', value)); });
+        body.appendChild(tr);
+      });
+    });
+    table.appendChild(body); wrap.appendChild(table);
+    return wrap;
   }
 
   function renderAgentTable(records) {
@@ -597,6 +673,7 @@
   }
 
   function render(records) {
+    cachedRecordsForWeights = Array.isArray(records) ? records.slice() : [];
     var root = document.getElementById('ajan-performans-panel');
     if (!root) return;
     root.replaceChildren();
@@ -686,6 +763,9 @@
     card.appendChild(el('p', 'backtest-not', quality));
     card.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · sinyalden 10 mum sonra'));
     card.appendChild(renderAgentTable(all));
+    card.appendChild(el('h4', 'backtest-trades-title', 'Geçmiş performansa göre öğrenen ajan ağırlıkları'));
+    card.appendChild(renderWeightTable(all));
+    card.appendChild(el('p', 'backtest-not', 'Ağırlıklar yalnızca aynı piyasa ve zaman diliminde her ajan için en az 30 tamamlanmış yön sonucu olduğunda etkinleşir. Katsayı 0,85–1,15 aralığında sınırlıdır ve tarama puanını etkiler; nihai AL/SAT güvenlik şartlarını değiştirmez.'));
     card.appendChild(el('h4', 'backtest-trades-title', 'Piyasa ve zaman dilimi ayrımı'));
     card.appendChild(renderBreakdown(all));
     card.appendChild(el('h4', 'backtest-trades-title', 'Denetçi risk seviyesi sonrası 10 mum sonucu'));
@@ -900,7 +980,9 @@
     sonucHesapla: evaluateSignal,
     guncelleSonuclar: updateResults,
     maliyetOku: function () { return currentCostPct; },
-    ayarlar: { saklamaGun: 365, ufukMumu: HORIZON, varsayilanMaliyetYuzde: DEFAULT_COST }
+    agirliklar: function (context) { return agirliklariHesapla(cachedRecordsForWeights, context); },
+    agirliklariHesapla: agirliklariHesapla,
+    ayarlar: { saklamaGun: 365, ufukMumu: HORIZON, varsayilanMaliyetYuzde: DEFAULT_COST, minAjanOrnegi: MIN_AGENT_SAMPLES }
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
