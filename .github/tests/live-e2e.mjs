@@ -43,6 +43,13 @@ try {
     { timeout: 45000 }
   );
   check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma / Haber / Kripto ajanları');
+  const spotOnlyAgents = await page.evaluate(() => ({
+    orderFlow: typeof window.KriptoAjanlari.orderFlow,
+    futuresAgent: typeof window.KriptoAjanlari.futuresOku
+  }));
+  check('Kripto ajanları Spot odaklı; Futures ajanı yüklenmiyor',
+    spotOnlyAgents.orderFlow === 'function' && spotOnlyAgents.futuresAgent === 'undefined',
+    JSON.stringify(spotOnlyAgents));
   const newsRules = await page.evaluate(() => ({
     positive: window.HaberAjani.siniflandir({ title: 'Şirket yeni sözleşme imzaladı', summary: '' }).impact,
     negative: window.HaberAjani.siniflandir({ title: 'Şirket zarar açıkladı', summary: '' }).impact
@@ -605,34 +612,6 @@ try {
   await page.route('https://data-api.binance.vision/**', mockBinance);
   await page.route('https://api.binance.com/**', mockBinance);
 
-  await page.route('https://fapi.binance.com/**', async route => {
-    const requested = new URL(route.request().url());
-    const symbol = requested.searchParams.get('symbol') || '';
-    let payload = [];
-    if (requested.pathname === '/fapi/v1/premiumIndex') {
-      payload = [];
-    } else if (requested.pathname === '/fapi/v1/openInterest') {
-      payload = { symbol, openInterest: '100000', time: Date.now() };
-    } else if (requested.pathname === '/futures/data/openInterestHist') {
-      payload = Array.from({ length: 6 }, (_, i) => ({
-        sumOpenInterest: String(1000 + i * 10), timestamp: Date.now() - (5 - i) * 60 * 60 * 1000
-      }));
-    } else if (requested.pathname === '/futures/data/globalLongShortAccountRatio') {
-      payload = [{ longShortRatio: '1.1', timestamp: Date.now() }];
-    } else if (requested.pathname === '/futures/data/takerlongshortRatio') {
-      payload = [{ buySellRatio: '1.05', timestamp: Date.now() }];
-    } else {
-      await route.fulfill({ status: 404, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify({ code: -404, msg: 'Unknown test endpoint' }) });
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      headers: { 'access-control-allow-origin': '*' },
-      contentType: 'application/json',
-      body: JSON.stringify(payload)
-    });
-  });
-
   // Historical candles remain available only to evaluate real signals in the agent performance ledger.
   await page.locator('nav button[data-git="strateji"]').click();
   const historyFeature = await page.evaluate(() => ({
@@ -745,7 +724,7 @@ try {
   check(
     'Coin toplu tarama akışı',
     coinScan.scanned > 0 && coinScan.scanned + coinScan.errors === coinScan.total &&
-      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.0.0' &&
+      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.1.0' &&
       coinScan.status.startsWith('Tamamlandı'),
     JSON.stringify(coinScan)
   );

@@ -8,7 +8,7 @@
 
   var KEY = 'graphai_coin_tahmin_v1';
   var BUGUN_KEY = 'graphai_coin_tahmin_bugun';
-  var CACHE_VERSION = 'crypto-intelligence-2.0.0';
+  var CACHE_VERSION = 'crypto-intelligence-2.1.0';
   function cacheKey(zd) {
     return BUGUN_KEY + ':' + CACHE_VERSION + ':' + (zd || '1h');
   }
@@ -307,7 +307,6 @@
       rsi: s.rsi,
       netYok: !!s.netYok,
       flow: s.flow || null,
-      futures: s.futures || null,
       mtf: s.mtf || null,
       marketRegime: s.marketRegime || null,
       deepScan: s.deepScan || null,
@@ -466,7 +465,6 @@
       rsi: r.rsi,
       sonMumDegisim: r.sonMumDegisim,
       flow: r.flow || null,
-      futures: r.futures || null,
       mtf: r.mtf || null,
       marketRegime: r.marketRegime || null,
       deepScan: r.deepScan || null,
@@ -653,11 +651,10 @@
       alan.appendChild(kart('Ajanların görüşü', s.tartisma, '#2f81f7'));
     }
 
-    if (s.flow || s.futures || s.mtf || s.marketRegime || s.deepScan) {
+    if (s.flow || s.mtf || s.marketRegime || s.deepScan) {
       var deepLines = [];
       if (s.deepScan) deepLines.push('Derin tarama: ' + s.deepScan + (s.deepVeto ? ' · AL/SAT güvenlik filtresi uygulandı' : ''));
       if (s.flow) deepLines.push('Order Flow: ' + (s.flow.reason || 'Veri yok'));
-      if (s.futures) deepLines.push('Vadeli piyasa: ' + (s.futures.reason || 'Veri yok'));
       if (s.marketRegime) deepLines.push('BTC/ETH piyasa rejimi: ' + (s.marketRegime.reason || s.marketRegime.regime || 'Belirsiz'));
       if (s.mtf) {
         deepLines.push('Zaman dilimleri: 1G ' + (s.mtf.daily ? s.mtf.daily.trend : 'veri yok') +
@@ -710,7 +707,7 @@
 
     sec.innerHTML =
       '<h2>Coin Tahmin AI</h2>' +
-      '<p class="alt">216 coin 1 saatlik hızlı taranır. En güçlü 20 aday 1G, 4S, 1S ve 15D zaman dilimleri, Order Flow ve vadeli piyasa verileriyle derinlemesine incelenir. Hafıza bu cihazda saklanır.</p>' +
+      '<p class="alt">216 coin 1 saatlik hızlı taranır. En güçlü 20 aday 1G, 4S, 1S ve 15D zaman dilimleri, Order Flow ve BTC\/ETH piyasa rejimiyle derinlemesine incelenir. Hafıza bu cihazda saklanır.</p>' +
       '<button type="button" id="coin-tahmin-btn" class="buton">BUGÜNÜN COİN TAHMİNİNİ ÜRET</button>' +
       '<p id="coin-tahmin-durum" class="alt"></p>' +
       '<div id="coin-tahmin-alan"></div>' +

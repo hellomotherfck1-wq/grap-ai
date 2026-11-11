@@ -52,13 +52,14 @@ jobs:
           const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
           assert.equal(scripts.length, 1, 'Expected one inline diagnostic script');
           new Function(scripts[0][1]);
-          for (const endpoint of ['premiumIndex', 'openInterest', 'openInterestHist', 'globalLongShortAccountRatio', 'takerlongshortRatio']) {
-            assert.ok(html.includes(endpoint), 'Missing endpoint: ' + endpoint);
-          }
-          console.log('PASS browser Binance diagnostic page syntax and endpoint coverage');
+          const agents = fs.readFileSync('js/kripto-ajanlari.js', 'utf8');
+          assert.ok(html.includes('data-api.binance.vision') && html.includes('api.binance.com'), 'Missing Spot endpoints');
+          assert.ok(!html.includes('fapi.binance.com') && !html.includes('/futures/data') && !agents.includes('fapi.binance.com') && !agents.includes('/futures/data'), 'Unexpected derivatives endpoint reference');
+          assert.ok(agents.includes('function orderFlow') && agents.includes('function trendOku'), 'Missing Spot analysis agents');
+          console.log('PASS browser Binance Spot diagnostic syntax and endpoint coverage');
           NODE
 
-      - name: Probe live Binance Spot and USD-M Futures APIs
+      - name: Probe live Binance Spot APIs
         continue-on-error: true
         run: node .github/tests/binance-live-api.cjs
 
