@@ -236,3 +236,21 @@ button:focus-visible, summary:focus-visible, label:focus-visible { outline: 2px 
   border-radius: 8px; background: #0e1721; color: var(--yazi); font: inherit;
 }
 .performans-maliyet .buton { min-height: 36px; padding: 7px 10px; font-size: 11px; }
+
+
+/* Free BIST news agent */
+.haber-ajani { margin-top: 12px; }
+.haber-ajani-baslik { margin: 0 0 8px; color: #f1f5f9; font-size: 16px; }
+.haber-ajani-meta { margin: 6px 0; color: var(--soluk); font-size: 11px; line-height: 1.5; }
+.haber-ajani-ozet { margin: 9px 0 12px; color: #dce8f3; font-size: 13px; line-height: 1.55; }
+.haber-ajani-satir { margin: 9px 0; padding: 10px 0; border-top: 1px solid var(--kenar); }
+.haber-ajani-link { display: inline; color: #8abaff; font-size: 13px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+.haber-etiket { display: inline-block; margin-left: 7px; padding: 2px 7px; border-radius: 7px; font-size: 10px; font-weight: 750; vertical-align: 1px; }
+.haber-olumlu { background: rgba(38, 166, 154, .16); color: #8bd7b0; }
+.haber-olumsuz { background: rgba(239, 83, 80, .16); color: #f2aaa6; }
+.haber-karisik { background: rgba(240, 180, 41, .16); color: #e8c778; }
+.haber-notr { background: rgba(145, 160, 175, .14); color: #c0cbd6; }
+.haber-ajani-kaynak { display: block; margin-top: 4px; color: var(--soluk); font-size: 10px; }
+.haber-ajani-aciklama { margin: 5px 0 0; color: #b8c5d2; font-size: 12px; line-height: 1.45; }
+.haber-ajani-uyari { margin: 9px 0; color: #e8c778; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.haber-ajani-not { margin-top: 10px; color: var(--soluk); font-size: 11px; line-height: 1.5; }
