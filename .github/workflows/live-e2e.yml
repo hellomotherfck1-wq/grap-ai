@@ -7,6 +7,7 @@ on:
       - ".github/tests/**"
       - ".github/workflows/live-e2e.yml"
       - "index.html"
+      - "binance-api-check.html"
       - "js/**"
       - "css/**"
       - "sw.js"
@@ -16,6 +17,7 @@ on:
       - ".github/tests/**"
       - ".github/workflows/live-e2e.yml"
       - "index.html"
+      - "binance-api-check.html"
       - "js/**"
       - "css/**"
       - "sw.js"
@@ -41,6 +43,25 @@ jobs:
       - name: Smoke test crypto agents
         run: node .github/tests/crypto-agent-smoke.cjs
 
+      - name: Validate browser Binance diagnostic page
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const html = fs.readFileSync('binance-api-check.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+          assert.equal(scripts.length, 1, 'Expected one inline diagnostic script');
+          new Function(scripts[0][1]);
+          for (const endpoint of ['premiumIndex', 'openInterest', 'openInterestHist', 'globalLongShortAccountRatio', 'takerlongshortRatio']) {
+            assert.ok(html.includes(endpoint), 'Missing endpoint: ' + endpoint);
+          }
+          console.log('PASS browser Binance diagnostic page syntax and endpoint coverage');
+          NODE
+
+      - name: Probe live Binance Spot and USD-M Futures APIs
+        continue-on-error: true
+        run: node .github/tests/binance-live-api.cjs
+
       - name: Install Playwright
         run: |
           npm install --no-save playwright
@@ -65,7 +86,7 @@ jobs:
           BASE_URL: http://127.0.0.1:4173/
         run: node .github/tests/live-e2e.mjs
 
-      - name: Upload browser test report
+      - name: Upload browser and live API reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -73,5 +94,6 @@ jobs:
           path: |
             live-e2e-report.json
             live-e2e-failure.png
+            binance-live-api-report.json
           if-no-files-found: ignore
           retention-days: 7

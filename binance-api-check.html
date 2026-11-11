@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1118">
+  <title>Graph AI — Binance API Bağlantı Testi</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #0b1118; color: #e7edf4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 22px 14px 40px; max-width: 760px; margin-inline: auto; }
+    header { margin-bottom: 18px; }
+    h1 { font-size: 1.45rem; margin: 0 0 6px; }
+    p { color: #aab7c5; line-height: 1.55; }
+    .card { background: #131e29; border: 1px solid #263747; border-radius: 14px; padding: 16px; margin: 14px 0; }
+    button { border: 0; border-radius: 10px; padding: 13px 18px; width: 100%; background: #2b8aef; color: white; font-weight: 700; font-size: 1rem; }
+    button:disabled { opacity: .6; }
+    #summary { font-weight: 700; margin: 12px 0 0; }
+    .muted { font-size: .9rem; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { padding: 10px 7px; border-bottom: 1px solid #263747; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    th { color: #aab7c5; font-size: .82rem; }
+    td { font-size: .9rem; }
+    td:first-child { width: 44%; }
+    .ok { color: #55d69e; font-weight: 700; }
+    .bad { color: #ff8585; font-weight: 700; }
+    .warn { color: #f4c66b; font-weight: 700; }
+    code { color: #a9d2ff; }
+    .foot { font-size: .82rem; color: #8797a8; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📡 Graph AI — Binance API Testi</h1>
+    <p>Bu sayfa, Binance bağlantısını <strong>senin telefonunun veya bilgisayarının internet bağlantısından</strong> kontrol eder. GitHub test sunucusunun bulunduğu bölgeden bağımsız bir sonuç verir.</p>
+  </header>
+
+  <section class="card">
+    <button id="run" type="button">CANLI API TESTİNİ BAŞLAT</button>
+    <p id="summary" role="status" aria-live="polite">Test henüz başlatılmadı.</p>
+    <p id="time" class="muted"></p>
+  </section>
+
+  <section class="card">
+    <h2>Sonuçlar</h2>
+    <table>
+      <thead><tr><th>Kaynak</th><th>Durum / Açıklama</th></tr></thead>
+      <tbody id="results">
+        <tr><td colspan="2">Testi başlatınca sonuçlar burada görünecek.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Bu test ne yapar?</h2>
+    <p class="muted">BTCUSDT spot mumlarını ve Order Flow için gerekli hacim alanlarını kontrol eder; ayrıca Binance USDⓈ-M Futures fonlama, açık pozisyon, Long/Short ve Taker verilerini okur.</p>
+    <p class="muted"><strong>Güvenlik:</strong> Yalnızca herkese açık GET uç noktaları kullanılır. API anahtarı istenmez; hesaba girilmez, emir verilmez ve işlem yapılmaz.</p>
+    <p class="foot">HTTP 451, 403, 429 veya tarayıcı CORS/ağ hatası görülürse sonuçta ayrıca belirtilir. Bu sayfa işlem sinyali veya yatırım tavsiyesi üretmez.</p>
+  </section>
+
+  <script>
+    (function () {
+      'use strict';
+      const HOUR = 60 * 60 * 1000;
+      const runButton = document.getElementById('run');
+      const resultsBody = document.getElementById('results');
+      const summary = document.getElementById('summary');
+      const timeLabel = document.getElementById('time');
+
+      function requestJson(url, timeoutMs) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs || 12000);
+        return fetch(url, {
+          method: 'GET',
+          mode: 'cors',
+          cache: 'no-store',
+          credentials: 'omit',
+          headers: { Accept: 'application/json' },
+          signal: controller.signal
+        }).then(async response => {
+          const text = await response.text();
+          if (!response.ok) throw new Error('HTTP ' + response.status + (text ? ' — ' + text.slice(0, 140) : ''));
+          try { return JSON.parse(text); }
+          catch (_) { throw new Error('Sunucu geçerli JSON döndürmedi.'); }
+        }).catch(error => {
+          if (error && error.name === 'AbortError') throw new Error('Zaman aşımı (' + Math.round((timeoutMs || 12000) / 1000) + ' sn).');
+          if (error instanceof TypeError) throw new Error('Tarayıcı ağ/CORS hatası: ' + error.message);
+          throw error;
+        }).finally(() => clearTimeout(timer));
+      }
+
+      function assert(condition, message) {
+        if (!condition) throw new Error(message);
+      }
+
+      function validateKlines(rows, tf) {
+        assert(Array.isArray(rows) && rows.length >= 20, 'En az 20 mum alınamadı.');
+        const now = Date.now();
+        const closed = rows.filter(row => Array.isArray(row) && Number(row[6]) < now);
+        assert(closed.length >= 15, 'Yeterli kapanmış mum yok.');
+        for (const row of rows) {
+          assert(Array.isArray(row) && row.length >= 12, 'Binance Kline 12 alanlı şemaya uymuyor.');
+          for (const index of [0,1,2,3,4,5,6,7,8,9,10]) assert(Number.isFinite(Number(row[index])), 'Mum alanı sayısal değil: ' + index);
+          assert(Number(row[10]) <= Number(row[7]) + 1e-8, 'Taker buy quote volume toplam quote volume değerini aşıyor.');
+        }
+        const last = closed[closed.length - 1];
+        const age = now - Number(last[6]);
+        const step = tf === '1d' ? 24 * HOUR : tf === '4h' ? 4 * HOUR : tf === '15m' ? 15 * 60000 : HOUR;
+        assert(age >= 0 && age <= 2 * step, 'Son kapanmış mum eski veya geçersiz.');
+        return { count: rows.length, closed: closed.length, ageMinutes: Math.round(age / 60000), lastClose: Number(last[4]) };
+      }
+
+      function addResult(name, status, detail) {
+        const tr = document.createElement('tr');
+        const left = document.createElement('td');
+        const right = document.createElement('td');
+        const mark = document.createElement('span');
+        mark.className = status === 'OK' ? 'ok' : status === 'UYARI' ? 'warn' : 'bad';
+        mark.textContent = status;
+        left.textContent = name;
+        right.appendChild(mark);
+        const desc = document.createElement('div');
+        desc.textContent = detail || '';
+        desc.className = 'muted';
+        right.appendChild(desc);
+        tr.append(left, right);
+        resultsBody.appendChild(tr);
+      }
+
+      async function runOne(name, url, validator, optional) {
+        try {
+          const data = await requestJson(url, 15000);
+          const detail = validator ? validator(data) : 'JSON yanıtı alındı.';
+          addResult(name, 'OK', typeof detail === 'string' ? detail : JSON.stringify(detail));
+          return { ok: true, optional: !!optional };
+        } catch (error) {
+          const message = String(error && error.message || error);
+          const status = optional ? 'UYARI' : 'HATA';
+          addResult(name, status, message);
+          return { ok: false, optional: !!optional, error: message };
+        }
+      }
+
+      async function start() {
+        runButton.disabled = true;
+        runButton.textContent = 'TEST EDİLİYOR…';
+        resultsBody.replaceChildren();
+        summary.textContent = 'Binance uç noktaları kontrol ediliyor…';
+        timeLabel.textContent = '';
+
+        const checks = await Promise.all([
+          runOne('Spot mumları · data-api.binance.vision', 
+            'https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=120',
+            rows => validateKlines(rows, '1h')),
+          runOne('Spot yedek adres · api.binance.com',
+            'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=20',
+            rows => validateKlines(rows, '1h'), true),
+          runOne('Spot 1D mumları',
+            'https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=120',
+            rows => validateKlines(rows, '1d')),
+          runOne('Spot 4H mumları',
+            'https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=120',
+            rows => validateKlines(rows, '4h')),
+          runOne('Spot 15M mumları',
+            'https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=120',
+            rows => validateKlines(rows, '15m')),
+          runOne('Futures · premiumIndex',
+            'https://fapi.binance.com/fapi/v1/premiumIndex',
+            rows => {
+              assert(Array.isArray(rows), 'Tüm semboller için dizi dönmedi.');
+              const btc = rows.find(row => row && row.symbol === 'BTCUSDT');
+              assert(btc, 'Yanıtta BTCUSDT bulunamadı.');
+              assert(Number.isFinite(Number(btc.time)) && Number.isFinite(Number(btc.lastFundingRate)), 'Fonlama alanı eksik.');
+              const age = Date.now() - Number(btc.time);
+              assert(age >= -5 * 60000 && age <= 30 * 60000, 'Fonlama verisi güncel değil.');
+              return 'BTCUSDT fonlama=' + btc.lastFundingRate + ' · yaş=' + Math.round(age / 1000) + ' sn';
+            }),
+          runOne('Futures · openInterest',
+            'https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT',
+            row => {
+              assert(row && row.symbol === 'BTCUSDT' && Number(row.openInterest) > 0, 'Açık pozisyon alanı eksik.');
+              const age = Date.now() - Number(row.time);
+              assert(Number.isFinite(age) && age >= -5 * 60000 && age <= 5 * 60000, 'Açık pozisyon verisi güncel değil.');
+              return 'BTCUSDT açık pozisyon=' + row.openInterest + ' · yaş=' + Math.round(age / 1000) + ' sn';
+            }),
+          runOne('Futures · openInterestHist',
+            'https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=1h&limit=6',
+            rows => {
+              assert(Array.isArray(rows) && rows.length > 0, 'Geçmiş açık pozisyon verisi boş.');
+              const last = rows[rows.length - 1];
+              assert(Number(last.sumOpenInterest) > 0 && Number.isFinite(Number(last.timestamp)), 'Geçmiş açık pozisyon alanları eksik.');
+              const age = Date.now() - Number(last.timestamp);
+              assert(age >= -5 * 60000 && age <= 2 * HOUR, 'Geçmiş açık pozisyon verisi eski.');
+              return rows.length + ' kayıt · son veri yaşı=' + Math.round(age / 60000) + ' dk';
+            }),
+          runOne('Futures · globalLongShortAccountRatio',
+            'https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=6',
+            rows => {
+              assert(Array.isArray(rows) && rows.length > 0, 'Long/Short verisi boş.');
+              const last = rows[rows.length - 1];
+              assert(Number(last.longShortRatio) > 0 && Number.isFinite(Number(last.timestamp)), 'Long/Short alanları eksik.');
+              const age = Date.now() - Number(last.timestamp);
+              assert(age >= -5 * 60000 && age <= 2 * HOUR, 'Long/Short verisi güncel değil.');
+              return 'Long/Short=' + last.longShortRatio + ' · yaş=' + Math.round(age / 60000) + ' dk';
+            }),
+          runOne('Futures · takerlongshortRatio',
+            'https://fapi.binance.com/futures/data/takerlongshortRatio?symbol=BTCUSDT&period=1h&limit=6',
+            rows => {
+              assert(Array.isArray(rows) && rows.length > 0, 'Taker verisi boş.');
+              const last = rows[rows.length - 1];
+              assert(Number(last.buySellRatio) > 0 && Number.isFinite(Number(last.timestamp)), 'Taker oranı alanları eksik.');
+              const age = Date.now() - Number(last.timestamp);
+              assert(age >= -5 * 60000 && age <= 2 * HOUR, 'Taker verisi güncel değil.');
+              return 'Buy/Sell=' + last.buySellRatio + ' · yaş=' + Math.round(age / 60000) + ' dk';
+            })
+        ]);
+
+        const required = checks.filter(row => !row.optional);
+        const failed = required.filter(row => !row.ok).length;
+        const passed = required.length - failed;
+        const optionalFailed = checks.filter(row => row.optional && !row.ok).length;
+        summary.textContent = failed === 0
+          ? 'Tamamlandı: ' + passed + '/' + required.length + ' zorunlu kontrol başarılı' + (optionalFailed ? ' · yedek adres uyarısı: ' + optionalFailed : '')
+          : 'Kısmi sonuç: ' + passed + '/' + required.length + ' zorunlu kontrol başarılı · ' + failed + ' kaynakta erişim/veri hatası var.';
+        summary.className = failed === 0 ? 'ok' : 'warn';
+        timeLabel.textContent = 'Test zamanı: ' + new Date().toLocaleString('tr-TR');
+        runButton.disabled = false;
+        runButton.textContent = 'TESTİ TEKRARLA';
+      }
+
+      runButton.addEventListener('click', start);
+      start();
+    })();
+  </script>
+</body>
+</html>
