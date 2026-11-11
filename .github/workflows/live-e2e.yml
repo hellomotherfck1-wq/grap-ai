@@ -10,6 +10,15 @@ on:
       - "js/**"
       - "css/**"
       - "sw.js"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/tests/**"
+      - ".github/workflows/live-e2e.yml"
+      - "index.html"
+      - "js/**"
+      - "css/**"
+      - "sw.js"
   workflow_dispatch:
 
 permissions:
