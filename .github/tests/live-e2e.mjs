@@ -702,6 +702,161 @@ try {
     return { count: rows.length, lastVolume: rows[rows.length - 1].v };
   });
   check('Yahoo mumlarında hacim alanı', yahooVolume.count >= 20 && yahooVolume.lastVolume > 0, JSON.stringify(yahooVolume));
+  const yahooFallbackTests = await page.evaluate(async () => {
+    const originalGetir = Veri.getir;
+    const workerPrefix = 'https://grafik-vekil.hellomotherfck1.workers.dev/?u=';
+    const makePayload = () => {
+      const count = 30;
+      const now = Math.floor(Date.now() / 1000);
+      const timestamp = Array.from({ length: count }, (_, i) => now - (count - i) * 86400);
+      const close = Array.from({ length: count }, (_, i) => 100 + i * 0.25);
+      const open = close.map(value => value - 0.1);
+      return {
+        chart: {
+          result: [{
+            timestamp,
+            indicators: {
+              quote: [{
+                open,
+                high: close.map(value => value + 0.5),
+                low: close.map(value => value - 0.5),
+                close,
+                volume: close.map((_, i) => 1000 + i * 10)
+              }]
+            }
+          }],
+          error: null
+        }
+      };
+    };
+    const result = {};
+
+    try {
+      let calls = { proxy: 0, direct: 0 };
+      Veri.getir = async function (url) {
+        if (url.indexOf(workerPrefix) === 0) {
+          calls.proxy++;
+          const error = new Error('simulated timeout');
+          error.name = 'AbortError';
+          throw error;
+        }
+        if (url.indexOf('https://query1.finance.yahoo.com/v8/finance/chart/TIMEOUT.IS') === 0) {
+          calls.direct++;
+          return makePayload();
+        }
+        throw new Error('Unexpected test URL: ' + url);
+      };
+      const timeoutRows = await Veri.yahoo('TIMEOUT.IS', '1d');
+      result.timeoutFallback = {
+        count: timeoutRows.length,
+        volume: timeoutRows[timeoutRows.length - 1].v,
+        proxyCalls: calls.proxy,
+        directCalls: calls.direct
+      };
+
+      calls = { proxy: 0 };
+      Veri.getir = async function (url) {
+        if (url.indexOf(workerPrefix) === 0) {
+          calls.proxy++;
+          if (calls.proxy === 1) throw new Error('HTTP 503');
+          return makePayload();
+        }
+        throw new Error('Unexpected retry URL: ' + url);
+      };
+      const retryRows = await Veri.yahoo('RETRY.IS', '1d');
+      result.serverRetry = { count: retryRows.length, proxyCalls: calls.proxy };
+
+      calls = { proxy: 0, direct: 0, allOrigins: 0 };
+      Veri.getir = async function (url) {
+        if (url.indexOf(workerPrefix) === 0) {
+          calls.proxy++;
+          const error = new Error('simulated timeout');
+          error.name = 'AbortError';
+          throw error;
+        }
+        if (url.indexOf('https://query1.finance.yahoo.com/v8/finance/chart/ALLORIGINS.IS') === 0) {
+          calls.direct++;
+          throw new Error('CORS network error');
+        }
+        if (url.indexOf('https://api.allorigins.win/raw?url=') === 0) {
+          calls.allOrigins++;
+          return makePayload();
+        }
+        throw new Error('Unexpected AllOrigins URL: ' + url);
+      };
+      const allOriginsRows = await Veri.yahoo('ALLORIGINS.IS', '1d');
+      result.allOriginsFallback = {
+        count: allOriginsRows.length,
+        proxyCalls: calls.proxy,
+        directCalls: calls.direct,
+        allOriginsCalls: calls.allOrigins
+      };
+
+      calls = { proxy: 0, direct: 0, allOrigins: 0, corsProxy: 0 };
+      Veri.getir = async function (url) {
+        if (url.indexOf(workerPrefix) === 0) {
+          calls.proxy++;
+          const error = new Error('simulated timeout');
+          error.name = 'AbortError';
+          throw error;
+        }
+        if (url.indexOf('https://query1.finance.yahoo.com/v8/finance/chart/CORSPROXY.IS') === 0) {
+          calls.direct++;
+          throw new Error('CORS network error');
+        }
+        if (url.indexOf('https://api.allorigins.win/raw?url=') === 0) {
+          calls.allOrigins++;
+          throw new Error('HTTP 502');
+        }
+        if (url.indexOf('https://corsproxy.io/?') === 0) {
+          calls.corsProxy++;
+          return makePayload();
+        }
+        throw new Error('Unexpected CORS proxy URL: ' + url);
+      };
+      const corsProxyRows = await Veri.yahoo('CORSPROXY.IS', '1d');
+      result.corsProxyFallback = {
+        count: corsProxyRows.length,
+        proxyCalls: calls.proxy,
+        directCalls: calls.direct,
+        allOriginsCalls: calls.allOrigins,
+        corsProxyCalls: calls.corsProxy
+      };
+
+      Veri.getir = async function () { throw new Error('offline'); };
+      try {
+        await Veri.yahoo('OFFLINE.IS', '1d');
+        result.allSourcesFail = { error: '' };
+      } catch (error) {
+        result.allSourcesFail = { error: error.message };
+      }
+      return result;
+    } finally {
+      Veri.getir = originalGetir;
+    }
+  });
+  check('Vekil zaman aşımında Yahoo Finance yedeğine geçiliyor',
+    yahooFallbackTests.timeoutFallback.count === 30 &&
+    yahooFallbackTests.timeoutFallback.proxyCalls === 1 &&
+    yahooFallbackTests.timeoutFallback.directCalls === 1 &&
+    yahooFallbackTests.timeoutFallback.volume > 0,
+    JSON.stringify(yahooFallbackTests.timeoutFallback));
+  check('Vekil HTTP 503 hatasında bir kez otomatik tekrar deneniyor',
+    yahooFallbackTests.serverRetry.count === 30 && yahooFallbackTests.serverRetry.proxyCalls === 2,
+    JSON.stringify(yahooFallbackTests.serverRetry));
+  check('Yahoo Finance erişilemezse AllOrigins yedeği çalışıyor',
+    yahooFallbackTests.allOriginsFallback.count === 30 &&
+    yahooFallbackTests.allOriginsFallback.allOriginsCalls === 1,
+    JSON.stringify(yahooFallbackTests.allOriginsFallback));
+  check('AllOrigins da çalışmazsa CORS proxy yedeği çalışıyor',
+    yahooFallbackTests.corsProxyFallback.count === 30 &&
+    yahooFallbackTests.corsProxyFallback.corsProxyCalls === 1,
+    JSON.stringify(yahooFallbackTests.corsProxyFallback));
+  check('Bütün kaynaklar kapalıysa hata kaynakları açıkça bildiriliyor',
+    ['Cloudflare vekil', 'Yahoo Finance', 'AllOrigins', 'CORS proxy'].every(name =>
+      yahooFallbackTests.allSourcesFail.error.includes(name)),
+    yahooFallbackTests.allSourcesFail.error);
+
   const binanceVolume = await page.evaluate(async () => {
     const rows = await Veri.binance('BTCUSDT', '1d');
     const last = rows[rows.length - 1];
