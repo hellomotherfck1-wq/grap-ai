@@ -461,8 +461,10 @@
       var baz = hacim.slice(Math.max(0, hacim.length - 21), Math.max(0, hacim.length - 1))
         .map(Number).filter(function (x) { return isFinite(x) && x > 0; });
       var ort = baz.length ? baz.reduce(function (a, b) { return a + b; }, 0) / baz.length : 0;
-      if (ort > 0) satirlar.push('Hacim teyidi: Kırılım mumunun hacmi, önceki 20 mum ortalamasının en az 1,2 katı olmalı.');
-      else satirlar.push('Hacim teyidi: Güvenilir hacim ortalaması hesaplanamadı.');
+      if (ort > 0) {
+        var hacimPeriyodu = baz.length >= 20 ? 'önceki 20 mumun' : 'önceki ' + baz.length + ' mumun';
+        satirlar.push('Hacim teyidi: Kırılım mumunun hacmi, ' + hacimPeriyodu + ' ortalamasının en az 1,2 katı olmalı.');
+      } else satirlar.push('Hacim teyidi: Güvenilir hacim ortalaması hesaplanamadı.');
     } else {
       satirlar.push('Hacim teyidi: Bu grafikte hacim verisi bulunmuyor; hacim onayı verilemiyor.');
     }
