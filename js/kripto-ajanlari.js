@@ -1,14 +1,13 @@
 (function () {
   'use strict';
 
-  var FUTURES_API = 'https://fapi.binance.com';
   var TF_MS = {
     '15m': 15 * 60 * 1000,
     '1h': 60 * 60 * 1000,
     '4h': 4 * 60 * 60 * 1000,
     '1d': 24 * 60 * 60 * 1000
   };
-  var SURUM = 'crypto-intelligence-2.0.0';
+  var SURUM = 'crypto-intelligence-2.1.0';
   var candleCache = Object.create(null);
 
   function sayi(x) { return typeof x === 'number' && isFinite(x); }
@@ -31,36 +30,6 @@
       return step > 0 && Number(m.t) + step <= now;
     }).sort(function (a, b) { return Number(a.t) - Number(b.t); });
   }
-  async function api(path, params) {
-    var query = Object.keys(params || {}).map(function (key) {
-      return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
-    }).join('&');
-    var url = FUTURES_API + path + (query ? '?' + query : '');
-    var lastError = null;
-    for (var attempt = 0; attempt < 2; attempt++) {
-      try { return await Veri.getir(url, 12000); }
-      catch (error) {
-        lastError = error;
-        var message = String(error && error.message || error);
-        var limited = message.indexOf('429') >= 0 || message.indexOf('418') >= 0;
-        if (!limited || attempt > 0) break;
-        await new Promise(function (resolve) { setTimeout(resolve, 700); });
-      }
-    }
-    throw lastError || new Error('Binance Futures verisi alınamadı.');
-  }
-  function guvenliApi(path, params) { return api(path, params).catch(function () { return null; }); }
-  function sonSatir(rows) { return Array.isArray(rows) && rows.length ? rows[rows.length - 1] : null; }
-  function zaman(row) {
-    if (!row) return null;
-    var stamp = Number(row.timestamp != null ? row.timestamp : row.time);
-    return sayi(stamp) && stamp > 0 ? stamp : null;
-  }
-  function taze(row, maxAge) {
-    var stamp = zaman(row);
-    return stamp !== null && stamp <= Date.now() && Date.now() - stamp <= maxAge;
-  }
-
   /* Binance Kline taker alım/satım hacmi; balina tespiti değildir. */
   function orderFlow(mumlar) {
     var rows = (Array.isArray(mumlar) ? mumlar : []).filter(function (m) {
@@ -115,100 +84,6 @@
       reason: 'Son 5 kapanmış mumda agresif alım payı %' + Math.round(r.buyShare * 100) +
         ', alım-satım dengesi ' + (r.imbalance >= 0 ? '+' : '') + (r.imbalance * 100).toFixed(1) +
         ' puan; hacim baz dönemin ' + volumeRatio.toFixed(2) + ' katı.'
-    };
-  }
-
-  async function fundingMapOku() {
-    var rows = await guvenliApi('/fapi/v1/premiumIndex', {});
-    var map = Object.create(null);
-    if (Array.isArray(rows)) {
-      rows.forEach(function (row) {
-        if (row && row.symbol) map[String(row.symbol).toUpperCase()] = row;
-      });
-    } else if (rows && rows.symbol) {
-      map[String(rows.symbol).toUpperCase()] = rows;
-    }
-    return map;
-  }
-
-  async function futuresOku(symbol, baseDirection, premiums) {
-    var premium = premiums && premiums[symbol] ? premiums[symbol] : null;
-    var result = await Promise.all([
-      guvenliApi('/fapi/v1/openInterest', { symbol: symbol }),
-      guvenliApi('/futures/data/openInterestHist', { symbol: symbol, period: '1h', limit: 6 }),
-      guvenliApi('/futures/data/globalLongShortAccountRatio', { symbol: symbol, period: '1h', limit: 6 }),
-      guvenliApi('/futures/data/takerlongshortRatio', { symbol: symbol, period: '1h', limit: 6 })
-    ]);
-    var oiNow = result[0];
-    var oiRows = Array.isArray(result[1]) ? result[1] : [];
-    var lsRows = Array.isArray(result[2]) ? result[2] : [];
-    var takerRows = Array.isArray(result[3]) ? result[3] : [];
-    var oiLast = sonSatir(oiRows);
-    var oiFirst = oiRows.length ? oiRows[0] : null;
-    var ls = sonSatir(lsRows);
-    var taker = sonSatir(takerRows);
-
-    var oiNowFresh = taze(oiNow, 5 * 60 * 1000);
-    var oiHistoryFresh = taze(oiLast, 2 * TF_MS['1h']);
-    var lsFresh = taze(ls, 2 * TF_MS['1h']);
-    var takerFresh = taze(taker, 2 * TF_MS['1h']);
-    var premiumFresh = taze(premium, 30 * 60 * 1000);
-
-    var oiStart = oiFirst && Number(oiFirst.sumOpenInterest);
-    var oiEnd = oiHistoryFresh && oiLast ? Number(oiLast.sumOpenInterest) : NaN;
-    var oiDeltaPct = sayi(oiStart) && oiStart > 0 && sayi(oiEnd)
-      ? ((oiEnd / oiStart) - 1) * 100 : null;
-    var longShortRatio = lsFresh && sayi(Number(ls.longShortRatio)) ? Number(ls.longShortRatio) : null;
-    var takerRatio = takerFresh && sayi(Number(taker.buySellRatio)) ? Number(taker.buySellRatio) : null;
-    var fundingRate = premiumFresh && sayi(Number(premium.lastFundingRate))
-      ? Number(premium.lastFundingRate) : null;
-
-    var available = fundingRate !== null || oiDeltaPct !== null ||
-      longShortRatio !== null || takerRatio !== null ||
-      (oiNowFresh && sayi(Number(oiNow.openInterest)));
-    var crowdedAgainst = false;
-    var takerAgainst = false;
-    if (baseDirection > 0) {
-      crowdedAgainst = (fundingRate !== null && fundingRate >= 0.0005) ||
-        (longShortRatio !== null && longShortRatio >= 1.8);
-      takerAgainst = takerRatio !== null && takerRatio <= 0.8;
-    } else if (baseDirection < 0) {
-      crowdedAgainst = (fundingRate !== null && fundingRate <= -0.0005) ||
-        (longShortRatio !== null && longShortRatio <= 0.55);
-      takerAgainst = takerRatio !== null && takerRatio >= 1.2;
-    }
-    var score = 0;
-    if (baseDirection !== 0 && crowdedAgainst) score -= 1;
-    if (baseDirection !== 0 && takerAgainst) score -= 1;
-    if (baseDirection > 0 && takerRatio !== null && takerRatio >= 1.2) score += 1;
-    if (baseDirection < 0 && takerRatio !== null && takerRatio <= 0.8) score += 1;
-    var veto = baseDirection !== 0 && crowdedAgainst && takerAgainst;
-    var ts = {
-      funding: premiumFresh ? zaman(premium) : null,
-      openInterest: oiNowFresh ? zaman(oiNow) : null,
-      openInterestHistory: oiHistoryFresh ? zaman(oiLast) : null,
-      longShort: lsFresh ? zaman(ls) : null,
-      taker: takerFresh ? zaman(taker) : null
-    };
-    return {
-      available: available,
-      decision: takerRatio !== null && takerRatio >= 1.2 ? 'AL' :
-        takerRatio !== null && takerRatio <= 0.8 ? 'SAT' : 'BEKLE',
-      score: score,
-      veto: veto,
-      fundingRate: fundingRate,
-      openInterest: oiNowFresh && sayi(Number(oiNow.openInterest)) ? Number(oiNow.openInterest) : null,
-      openInterestDeltaPct: oiDeltaPct,
-      longShortRatio: longShortRatio,
-      takerBuySellRatio: takerRatio,
-      crowdedAgainst: crowdedAgainst,
-      sourceTimestamps: ts,
-      reason: available
-        ? 'Funding ' + (fundingRate === null ? 'yok' : (fundingRate * 100).toFixed(3) + '%') +
-          ' · OI değişimi ' + (oiDeltaPct === null ? 'yok' : oiDeltaPct.toFixed(2) + '%') +
-          ' · Long/Short ' + (longShortRatio === null ? 'yok' : longShortRatio.toFixed(2)) +
-          ' · Taker oranı ' + (takerRatio === null ? 'yok' : takerRatio.toFixed(2))
-        : 'Bu coin için kullanılabilir vadeli piyasa verisi yok; ajan oy kullanmadı.'
     };
   }
 
@@ -333,7 +208,6 @@
     }).slice(0, 20);
     var selected = Object.create(null);
     top.forEach(function (item) { selected[item.sembol] = true; });
-    var premiums = await fundingMapOku();
     var market = await piyasaRejimiOku(all);
     var next = 0, done = 0;
 
@@ -344,11 +218,7 @@
         var baseDirection = yon(item.karar);
         try {
           var flow = orderFlow(item._mumlar || []);
-          var values = await Promise.all([
-            mtfOku(item),
-            futuresOku(item.sembol, baseDirection, premiums)
-          ]);
-          var mtf = values[0], futures = values[1];
+          var mtf = await mtfOku(item);
           var reasons = [], veto = false;
           if (baseDirection !== 0 && !mtf.highTimeframeReady) {
             veto = true;
@@ -366,17 +236,12 @@
             veto = true;
             reasons.push('Order Flow güçlü biçimde ana sinyalin tersinde.');
           }
-          if (baseDirection !== 0 && futures.veto) {
-            veto = true;
-            reasons.push('Vadeli piyasada aşırı pozisyonlanma ve ters taker akışı birlikte görülüyor.');
-          }
           if (baseDirection !== 0 && market.available && market.vetoFor(baseDirection)) {
             veto = true;
             reasons.push('BTC/ETH piyasa rejimi ana sinyalin tersinde.');
           }
 
           item.flow = flow;
-          item.futures = futures;
           item.mtf = mtf;
           item.marketRegime = {
             regime: market.regime, breadth: market.breadth,
@@ -390,8 +255,7 @@
             '1h': item.signalAt || null,
             '1d': mtf.daily ? mtf.daily.lastCandleAt : null,
             '4h': mtf.fourHour ? mtf.fourHour.lastCandleAt : null,
-            '15m': mtf.fifteenMinute ? mtf.fifteenMinute.lastCandleAt : null,
-            futures: futures.sourceTimestamps || null
+            '15m': mtf.fifteenMinute ? mtf.fifteenMinute.lastCandleAt : null
           };
           if (veto && baseDirection !== 0) {
             item.karar = 'BEKLE';
@@ -401,7 +265,6 @@
           }
           item.tartisma = (Array.isArray(item.tartisma) ? item.tartisma : []).concat([
             '🟪 Order Flow: ' + flow.reason,
-            '🟨 Futures: ' + futures.reason,
             '🟦 Çoklu zaman dilimi: 1G ' + (mtf.daily ? mtf.daily.trend : 'veri yok') +
               ' · 4S ' + (mtf.fourHour ? mtf.fourHour.trend : 'veri yok') +
               ' · 1S ' + (mtf.hourly.trend || 'veri yok') +
@@ -440,7 +303,6 @@
   window.KriptoAjanlari = {
     surum: SURUM,
     orderFlow: orderFlow,
-    futuresOku: futuresOku,
     piyasaRejimiOku: piyasaRejimiOku,
     trendOku: trendOku,
     mtfOku: mtfOku,
