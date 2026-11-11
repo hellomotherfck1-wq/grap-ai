@@ -202,7 +202,7 @@ const Veri = {
       if (ms >= 60 * 60 * 1000) return (ms / (60 * 60 * 1000)).toFixed(1).replace('.', ',') + ' saat';
       return Math.max(1, Math.round(ms / 60000)) + ' dakika';
     };
-    const tarih = this.tarih(son.t, tf === '1d');
+    const tarih = this.tarih(kapanis, tf === '1d');
     const mesaj = ok
       ? 'Güncel veri · son kapanmış mum ' + tarih + ' (Türkiye saati), ' + sureYaz(gecikmeMs) + ' önce kapandı.'
       : 'VERİ ESKİ: Son kapanmış mum ' + tarih + ' (Türkiye saati), ' + sureYaz(gecikmeMs) +
@@ -264,16 +264,17 @@ const Veri = {
   bilgi(v, d) {
     const gun = v.zd === '1d';
     const zdAd = { '15m': '15 dakika', '1h': '1 saat', '1d': '1 gün' }[v.zd];
+    const durum = v.veriDurumu || this.veriDurumu(v);
+    const sonKapali = this.kapanmisMumlar(v).slice(-1)[0] || null;
     const L = [
       'Varlık: ' + v.ad + ' (' + v.sembol + ') – ' + v.tur,
       'Veri kaynağı: ' + (v.kaynak === 'b' ? 'Binance herkese açık piyasa verisi' : 'Yahoo Finance (gecikmeli olabilir)'),
       'Zaman dilimi: ' + zdAd + ', analiz edilen mum sayısı: ' + d.length,
       'Grafikteki son mum: ' + this.tarih(d[d.length - 1].t, gun) + ' (Türkiye saati)',
       'İlk mum: ' + this.tarih(d[0].t, gun) + ' (Türkiye saati)',
-      'Son kapanış fiyatı: ' + this.fmt(d[d.length - 1].c),
+      'Son kapanış fiyatı: ' + (sonKapali ? this.fmt(sonKapali.c) : '—'),
       'Veri alınma zamanı: ' + this.tarih(v.cekim.getTime(), false)
     ];
-    const durum = v.veriDurumu || this.veriDurumu(v);
     L.push('Veri güvenlik kontrolü: ' + (durum.ok ? 'GÜNCEL' : 'DOĞRULANAMADI') +
       (durum.sonKapanisZamani ? ' · son kapanış: ' + this.tarih(durum.sonKapanisZamani, false) : ''));
     L.push(durum.mesaj);
