@@ -275,7 +275,7 @@
     var bearish = !!(btc1d && btc4h && eth1d && eth4h && breadthReady &&
       btc1d.direction < 0 && btc4h.direction < 0 &&
       eth1d.direction <= 0 && eth4h.direction <= 0 && downShare >= 0.55);
-    var available = !!(btc1d && btc4h && breadthReady);
+    var available = !!(btc1d && btc4h && eth1d && eth4h && breadthReady);
     return {
       available: available,
       regime: bullish ? 'Yükseliş' : bearish ? 'Düşüş' : 'Karışık',
@@ -305,8 +305,8 @@
     ]);
     var daily = results[0], fourHour = results[1], fifteen = results[2];
     var baseDirection = yon(base.karar);
-    var dailyConflict = baseDirection !== 0 && daily && daily.direction === -baseDirection;
-    var fourHourConflict = baseDirection !== 0 && fourHour && fourHour.direction === -baseDirection;
+    var highTimeframeConflict = baseDirection !== 0 && daily && fourHour &&
+      (daily.direction !== baseDirection || fourHour.direction !== baseDirection);
     var entryConflict = baseDirection !== 0 && fifteen && fifteen.direction === -baseDirection;
     var hourlyDirection = yon(base.trend);
     return {
@@ -315,7 +315,7 @@
       daily: daily, fourHour: fourHour,
       hourly: { trend: base.trend || 'Belirsiz', direction: hourlyDirection },
       fifteenMinute: fifteen,
-      highTimeframeConflict: !!(dailyConflict && fourHourConflict),
+      highTimeframeConflict: !!highTimeframeConflict,
       entryConflict: !!entryConflict,
       score: baseDirection === 0 ? 0 : [daily, fourHour, { direction: hourlyDirection }, fifteen]
         .filter(function (item) { return item && item.direction; })
@@ -356,7 +356,7 @@
           }
           if (baseDirection !== 0 && mtf.highTimeframeConflict) {
             veto = true;
-            reasons.push('1G ve 4S trendleri ana sinyalin tersinde.');
+            reasons.push('1G ve 4S trendleri ana sinyali birlikte teyit etmiyor.');
           }
           if (baseDirection !== 0 && mtf.entryConflict) {
             veto = true;

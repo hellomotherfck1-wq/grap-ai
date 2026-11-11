@@ -375,6 +375,13 @@
             (m.closeTime != null ? Number(m.closeTime) < Date.now() : Number(m.t) + aralikMs <= Date.now());
         });
     if (kapanmisHam.length < 20) throw new Error('Kapanmış mum sayısı yetersiz.');
+    var sonKapali = kapanmisHam[kapanmisHam.length - 1];
+    var kapanisZamani = sonKapali.closeTime != null
+      ? Number(sonKapali.closeTime) : Number(sonKapali.t) + aralikMs - 1;
+    if (!Number.isFinite(kapanisZamani) || kapanisZamani >= Date.now() ||
+        Date.now() - kapanisZamani > 2 * aralikMs) {
+      throw new Error('Binance kapanmış mum verisi eski; sinyal üretilmedi.');
+    }
     var vKapanmis = Object.assign({}, v, { mumlar: kapanmisHam });
     var dn = Veri.donustur(vKapanmis, 80);
     if (!dn || !dn.m || dn.m.length < 5 || !dn.d.length) {
