@@ -267,6 +267,17 @@
       : null;
     var report = await research(v, dn, panel);
     render(report, container);
+    if (window.HaberAjani && typeof window.HaberAjani.analizEt === 'function') {
+      var newsBox = document.createElement('div');
+      newsBox.className = 'kart';
+      newsBox.textContent = '📰 Haber Ajanı son 7 günün KAP ve haber akışını tarıyor…';
+      if (container.parentNode) container.parentNode.insertBefore(newsBox, container.nextSibling);
+      window.HaberAjani.analizEt(v, { yahoo: report.news || [] }).then(function (newsReport) {
+        window.HaberAjani.render(newsReport, newsBox);
+      }).catch(function (error) {
+        newsBox.textContent = 'Haber Ajanı şu anda haber alamadı: ' + (error && error.message ? error.message : String(error));
+      });
+    }
     return report;
   }
 
@@ -282,6 +293,19 @@
       ? window.TahminAI.ajanlaraSor(s, dn.kal) : null;
     status.textContent = 'Finansal göstergeler ve haber başlıkları araştırılıyor…';
     var report = await research(v, dn, panel);
+    var newsBox = null;
+    if (window.HaberAjani && typeof window.HaberAjani.analizEt === 'function') {
+      newsBox = document.createElement('div');
+      newsBox.className = 'kart';
+      newsBox.textContent = '📰 Haber Ajanı son 7 günün KAP ve haber akışını tarıyor…';
+      window.HaberAjani.analizEt(v, { yahoo: report.news || [] }).then(function (newsReport) {
+        window.HaberAjani.render(newsReport, newsBox);
+        status.textContent = 'Araştırma tamamlandı · ' + new Date().toLocaleString('tr-TR');
+      }).catch(function (error) {
+        newsBox.textContent = 'Haber Ajanı şu anda haber alamadı: ' + (error && error.message ? error.message : String(error));
+        status.textContent = 'Araştırma tamamlandı · Haber kaynağına erişilemedi';
+      });
+    }
     result.replaceChildren();
     if (typeof Cizim !== 'undefined' && Cizim.grafik) {
       var canvas = Cizim.grafik(s, dn.kal);
@@ -294,7 +318,8 @@
     content.className = 'kart';
     render(report, content);
     result.appendChild(content);
-    status.textContent = 'Araştırma tamamlandı · ' + new Date().toLocaleString('tr-TR');
+    if (newsBox) result.appendChild(newsBox);
+    status.textContent = 'Araştırma tamamlandı · Haber Ajanı arka planda güncelleniyor';
   }
 
   function uiKur() {
