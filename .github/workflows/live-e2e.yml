@@ -49,7 +49,7 @@ jobs:
           const fs = require('node:fs');
           const assert = require('node:assert/strict');
           const html = fs.readFileSync('binance-api-check.html', 'utf8');
-          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
           assert.equal(scripts.length, 1, 'Expected one inline diagnostic script');
           new Function(scripts[0][1]);
           for (const endpoint of ['premiumIndex', 'openInterest', 'openInterestHist', 'globalLongShortAccountRatio', 'takerlongshortRatio']) {
