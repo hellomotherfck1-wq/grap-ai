@@ -272,11 +272,11 @@
       throw new Error('Haber Ajanı yalnızca BIST hisselerinde çalışır.');
     }
     var tasks = await Promise.allSettled([
-      Array.isArray(options.yahoo) ? Promise.resolve(options.yahoo) : yahooNews(asset),
+      options.kap ? Promise.resolve(kapNews(asset, options.kap)) : kapNews(asset),
       Array.isArray(options.google) ? Promise.resolve(options.google) : googleNews(asset),
-      options.kap ? Promise.resolve(kapNews(asset, options.kap)) : kapNews(asset)
+      Array.isArray(options.yahoo) ? Promise.resolve(options.yahoo) : yahooNews(asset)
     ]);
-    var names = ['Yahoo Finance', 'Google News', 'KAP'];
+    var names = ['KAP', 'Google News', 'Yahoo Finance'];
     var groups = [];
     var errors = [];
     tasks.forEach(function (task, index) {
