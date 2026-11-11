@@ -10,7 +10,7 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 - `js/cizim.js`: analiz grafiğini canvas üzerinde çizme
 - `js/ajan.js`, `js/ajan2.js`: hacim, teknik ve denetçi değerlendirmeleri
 - `js/tahmin.js`, `js/coin-tahmin.js`: BIST ve kripto tarama ekranları
-- `js/backtest.js`: ücretsiz geçmiş sinyal testi (teknik + hacim ajanları)
+- `js/ajan-performans.js`: gerçek analiz ve tarama sinyallerinin performans takibi
 - `js/admin.js`: Supabase oturumu, yönetici yetkisi ve olay istatistikleri
 
 ## Yayınlama
@@ -39,7 +39,7 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 
 **Sonuç** ekranındaki ajan performans paneli, gerçek analiz ve BIST/coin taramalarından gelen sinyalleri tarayıcının IndexedDB alanında 365 gün saklar.
 
-- Ham fiyat mumları depolanmaz; sonuç kontrol edilirken ücretsiz Yahoo Finance / Binance herkese açık geçmiş verisi yeniden çekilir.
+- Ham fiyat mumları depolanmaz; sonuç kontrol edilirken ücretsiz Yahoo Finance / Binance herkese açık geçmiş verisi yeniden çekilir. Geçmiş fiyatlar yalnızca gerçek analiz ve tarama sinyallerinin performansını ölçmek için kullanılır; ayrı bir manuel geçmiş sinyal simülasyonu bulunmaz.
 - Aynı sembol, zaman dilimi ve kapanmış mum için tekrar eden sinyaller tek kayıtta birleştirilir.
 - BIST/coin taramalarında en yüksek skorlu 40 AL/SAT adayı ve ayrıca en yüksek skorlu tek BEKLE adayı kaydedilir.
 - AL/SAT işlemi sonraki mum açılışından simüle edilir; varsayılan toplam maliyet %0,20, hedef/stop aynı mumda görülürse stop önceliklidir.
@@ -49,19 +49,6 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 - 30 işlemden önce başarı oranı örneklem yetersiz olarak işaretlenir; Wilson güven aralığı gösterilir.
 - Kayıtlar yalnızca bu cihaz/tarayıcıda bulunur. Tarayıcı verisi temizlenirse kaybolabilir; CSV dışa aktarımı vardır. 365 günden eski kayıtlar otomatik silinir.
 - Ücretsiz Yahoo geçmiş sınırları yaklaşık 15 dakika için 30 gün, 1 saat için 3 ay, günlük için 2 yıldır; Binance geçmişi en fazla 1.000 mumdur. Kayıtlar 365 gün saklansa da sonuçları geciktirmeden güncellemek gerekir; kaynak geçmişi dışına çıkan sonuçlar "veri aralığı dışında" olarak işaretlenir.
-
-## Ücretsiz geçmiş sinyal testi
-
-BIST ekranının altındaki **Ücretsiz geçmiş sinyal testi** paneli, hisse ve coin sembollerinde ücretli API anahtarı olmadan çalışır.
-
-- Fiyat/hacim geçmişi Yahoo Finance herkese açık chart uçlarından veya Binance public klines uçlarından alınır.
-- Günlük testte Yahoo Finance için 2 yıllık aralık istenir; Binance'ten en fazla 1.000 mum alınır. Ücretsiz servislerin erişim ve hız sınırları olabilir.
-- Her sinyal yalnızca o ana kadar kapanmış mumlarla hesaplanır; işlem bir sonraki mumun açılış fiyatından başlatılır. Son mum olası tamamlanmamış olabileceği için testten çıkarılır.
-- Testte mevcut teknik ve hacim ajanlarının nihai kararı, stop ve ilk hedef seviyesi kullanılır. Aynı mumda stop ve hedefe birlikte dokunulursa temkinli biçimde stop önce sayılır; pozisyon en fazla 10 mum tutulur.
-- Komisyon + kayma için toplam gidiş-dönüş maliyeti ve işlem başına risk kullanıcı tarafından değiştirilebilir. Portföy simülasyonu başlangıç 100 birim, kaldıraçsız ve aynı anda tek pozisyon varsayar.
-- Tarihsel F/K, KAP finansalları ve haberler bu teste dahil değildir; geçmiş tarihli temel veri tutarlı biçimde sağlanmadığından teknik + hacim stratejisi ayrı ölçülür. SAT işlemleri kısa pozisyon varsayar; spot piyasada short mümkün olmayabilir.
-
-Sonuçlar yalnızca tarayıcıda hesaplanır ve yerel depolamaya kaydedilmez. Geçmiş performans gelecekteki getiriyi garanti etmez; simülasyon yatırım tavsiyesi değildir.
 
 ## Supabase yönetici paneli
 
