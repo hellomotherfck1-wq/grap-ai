@@ -252,7 +252,7 @@ try {
     try {
       Veri.coz = () => [{ kaynak: 'y', sembol: 'STALE.IS', ad: 'Eski veri testi', tur: 'BIST hissesi' }];
       Veri.yahoo = async () => {
-        const start = Date.now() - 12 * 24 * 60 * 60 * 1000;
+        const start = Date.now() - 42 * 24 * 60 * 60 * 1000;
         return Array.from({ length: 30 }, (_, i) => ({
           t: start + i * 24 * 60 * 60 * 1000,
           o: 100, h: 102, l: 98, c: 101, v: 1000
