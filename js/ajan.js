@@ -481,8 +481,8 @@
       return out;
     };
 
-    // Backtest için daha uzun geçmiş: Yahoo Finance herkese açık chart ucu / Binance public klines.
-    // Ücretli API anahtarı kullanılmaz. Güncel tarama uçları değiştirilmeden ayrı tutulur.
+    // Ajan performans defterinde gerçek sinyallerin sonucunu ölçmek için daha uzun fiyat geçmişi.
+    // Yahoo Finance herkese açık chart ucu / Binance public klines kullanılır; ücretli API anahtarı gerekmez.
     Veri.gecmis = async function (girdi, zd) {
       var adaylar = this.coz(girdi);
       if (!adaylar.length) throw new Error('Varlık sembolü anlaşılamadı.');
