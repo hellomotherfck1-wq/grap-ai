@@ -206,6 +206,126 @@ try {
   });
   check('Açık mum grafikte kalırken analizden çıkarılıyor', candleAlignment.all === 40 && candleAlignment.used === 39, JSON.stringify(candleAlignment));
 
+  const freshnessChecks = await page.evaluate(() => {
+    const bar = t => ({ t, o: 100, h: 101, l: 99, c: 100, v: 1000 });
+    const now = Date.parse('2026-11-11T12:00:00Z');
+    const freshBinance = Veri.veriDurumu({
+      kaynak: 'b', sembol: 'BTCUSDT', zd: '1h',
+      mumlar: [bar(now - 2 * 60 * 60 * 1000)]
+    }, now);
+    const staleBinance = Veri.veriDurumu({
+      kaynak: 'b', sembol: 'BTCUSDT', zd: '1h',
+      mumlar: [bar(now - 5 * 60 * 60 * 1000)]
+    }, now);
+    const monday = Date.parse('2026-11-09T08:00:00Z');
+    const friday = Date.parse('2026-11-06T00:00:00Z');
+    const bistDaily = {
+      kaynak: 'y', sembol: 'THYAO.IS', zd: '1d',
+      mumlar: [bar(friday), bar(monday)]
+    };
+    const bistWeekend = Veri.veriDurumu(bistDaily, monday);
+    const closedWeekendBars = Veri.kapanmisMumlar(bistDaily, monday);
+    const bistIntraday = Veri.veriDurumu({
+      kaynak: 'y', sembol: 'THYAO.IS', zd: '15m',
+      mumlar: [bar(now - 3 * 60 * 60 * 1000 - 15 * 60 * 1000)]
+    }, now);
+    return {
+      freshBinance: freshBinance.ok,
+      staleBinance: !staleBinance.ok,
+      staleMessage: staleBinance.mesaj.includes('VERİ ESKİ'),
+      bistWeekend: bistWeekend.ok,
+      openDailyCandleExcluded: closedWeekendBars.length === 1,
+      bistIntradayStale: !bistIntraday.ok
+    };
+  });
+  check('Veri güvenlik kalkanı güncel Binance mumunu kabul ediyor',
+    freshnessChecks.freshBinance, JSON.stringify(freshnessChecks));
+  check('Eski Binance verisi AL/SAT analizinden engelleniyor',
+    freshnessChecks.staleBinance && freshnessChecks.staleMessage, JSON.stringify(freshnessChecks));
+  check('BIST günlük veri hafta sonu gereksiz yere eski sayılmıyor',
+    freshnessChecks.bistWeekend && freshnessChecks.openDailyCandleExcluded, JSON.stringify(freshnessChecks));
+  check('BIST seans içi aşırı gecikmiş 15 dakikalık veri engelleniyor',
+    freshnessChecks.bistIntradayStale, JSON.stringify(freshnessChecks));
+
+  const staleGate = await page.evaluate(async () => {
+    const oldCoz = Veri.coz, oldYahoo = Veri.yahoo;
+    try {
+      Veri.coz = () => [{ kaynak: 'y', sembol: 'STALE.IS', ad: 'Eski veri testi', tur: 'BIST hissesi' }];
+      Veri.yahoo = async () => {
+        const start = Date.now() - 12 * 24 * 60 * 60 * 1000;
+        return Array.from({ length: 30 }, (_, i) => ({
+          t: start + i * 24 * 60 * 60 * 1000,
+          o: 100, h: 102, l: 98, c: 101, v: 1000
+        }));
+      };
+      try {
+        await Veri.ara('STALE', '1d');
+        return false;
+      } catch (error) {
+        return String(error && error.message || error).includes('VERİ ESKİ');
+      }
+    } finally {
+      Veri.coz = oldCoz;
+      Veri.yahoo = oldYahoo;
+    }
+  });
+  check('Veri.ara eski kaynağı analiz motoruna geçirmiyor', staleGate, 'Eski veri kapısında durduruldu');
+
+  const waitChecks = await page.evaluate(() => {
+    const candles = Array.from({ length: 20 }, () => ({ c: 0.5, h: 0.55, l: 0.45 }));
+    const result = TahminAI.beklemeKosullari({
+      analysisC: candles,
+      sv: { direncler: [{ seviye: 0.75 }], destekler: [{ seviye: 0.25 }] }
+    }, { lo: 90, hi: 110 });
+    const sample = Array.from({ length: 40 }, (_, i) => {
+      const mid = 100 + i * 0.2 + Math.sin(i / 3);
+      const y = value => 1000 - value * 5;
+      return { renk: 1, ust: y(mid + 1), alt: y(mid - 1), ga: y(mid - 0.2), gu: y(mid + 0.2) };
+    });
+    const s = Analiz.yap(sample, { yon: 'Yükseliş', guc: 70 });
+    const y = Yorum.olustur(s, { lo: 90, hi: 110 }, []);
+    const finalCard = y.kartlar.find(card => String(card.baslik || '').indexOf('⚖️ Nihai Karar') === 0);
+    const finalMatch = finalCard && /:\s*(AL|SAT|BEKLE)\s*$/.exec(finalCard.baslik);
+    const waitCard = y.kartlar.some(card => String(card.baslik || '').indexOf('BEKLE koşulları') >= 0);
+    return {
+      hasBuyAndSell: result && result.alUstu > 105 && result.satAlti < 95,
+      hasVolumeGuidance: result && result.satirlar.some(line => line.includes('Hacim teyidi')),
+      mainDecisionMatchesCommittee: !!finalMatch && y.karar === finalMatch[1],
+      waitCardWhenNeeded: y.karar !== 'BEKLE' || waitCard
+    };
+  });
+  check('BEKLE kararı AL/SAT için somut fiyat koşulları üretiyor',
+    waitChecks.hasBuyAndSell && waitChecks.hasVolumeGuidance, JSON.stringify(waitChecks));
+  check('Ana karar kartı ve performans kaydı kurulun nihai kararını kullanıyor',
+    waitChecks.mainDecisionMatchesCommittee, JSON.stringify(waitChecks));
+  check('BEKLE kararında koşullu AL/SAT açıklaması gösteriliyor',
+    waitChecks.waitCardWhenNeeded, JSON.stringify(waitChecks));
+
+  const learnedWeights = await page.evaluate(() => {
+    const rows = Array.from({ length: 35 }, (_, i) => ({
+      market: 'Kripto', timeframe: '1h', directionStatus: 'completed',
+      forwardPct: i < 28 ? 1 : -1, costPct: 0.2,
+      generalDecision: 'AL', technicalDecision: 'SAT', volumeDecision: 'AL'
+    }));
+    const active = AjanPerformans.agirliklariHesapla(rows, { market: 'Kripto', timeframe: '1h' });
+    const pending = AjanPerformans.agirliklariHesapla(rows.slice(0, 29), { market: 'Kripto', timeframe: '1h' });
+    return {
+      sampleCount: active.general.ornek,
+      generalUp: active.general.aktif && active.general.katsayi > 1,
+      technicalDown: active.technical.aktif && active.technical.katsayi < 1,
+      volumeUp: active.volume.aktif && active.volume.katsayi > 1,
+      smallSampleNeutral: !pending.general.aktif && pending.general.katsayi === 1,
+      capOk: ['general', 'technical', 'volume'].every(key =>
+        active[key].katsayi >= 0.85 && active[key].katsayi <= 1.15),
+      minSamples: AjanPerformans.ayarlar.minAjanOrnegi
+    };
+  });
+  check('Öğrenen ajan ağırlıkları 30 tamamlanmış sonuçtan sonra devreye giriyor',
+    learnedWeights.sampleCount === 35 && learnedWeights.generalUp &&
+    learnedWeights.technicalDown && learnedWeights.volumeUp &&
+    learnedWeights.smallSampleNeutral && learnedWeights.capOk &&
+    learnedWeights.minSamples === 30, JSON.stringify(learnedWeights));
+
   const fkAgentLoaded = await page.evaluate(() => Boolean(window.Ajan && window.Ajan.fk && typeof window.Ajan.fk.degerlendir === 'function'));
   check('F/K ajanı modülü yüklendi', fkAgentLoaded, 'F/K değerleme ve karar denetimi hazır');
   const fkRules = await page.evaluate(() => {
