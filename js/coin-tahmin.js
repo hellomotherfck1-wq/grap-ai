@@ -661,9 +661,9 @@
     box.appendChild(h);
 
     var rows = [
-      { name: 'Genel analiz', decision: s.netYok ? null : s.genelKarar },
-      { name: 'Teknik bot', decision: s.netYok || !s.teknikVar ? null : s.teknikKarar },
-      { name: 'Hacim botu', decision: s.netYok || !s.hacimVar ? null : s.hacimKarar }
+      { name: 'Genel analiz', decision: s.netYok ? 'ADAY YOK' : s.genelKarar },
+      { name: 'Teknik bot', decision: s.netYok ? 'ADAY YOK' : (!s.teknikVar ? null : s.teknikKarar) },
+      { name: 'Hacim botu', decision: s.netYok ? 'ADAY YOK' : (!s.hacimVar ? null : s.hacimKarar) }
     ];
     rows.forEach(function (item) {
       var row = document.createElement('div');
@@ -712,7 +712,7 @@
     box.appendChild(reviewer);
 
     var note = document.createElement('p');
-    note.textContent = 'Denetçi oy kullanmaz; botların görüşlerini ve riskleri kontrol eder. Bu yüzden son karar, oyların çoğunluğundan farklı olabilir.';
+    note.textContent = 'Oy verenler: Genel analiz, Teknik bot ve Hacim botu. Denetçi oy kullanmaz; Order Flow, zaman dilimleri ve BTC/ETH kontrolleri de oy değil, güvenlik filtresidir. Bu yüzden son karar oy çoğunluğundan farklı olabilir.';
     note.style.cssText = 'font-size:12px;line-height:1.5;color:#9eacb9;margin-top:6px';
     box.appendChild(note);
     return box;
