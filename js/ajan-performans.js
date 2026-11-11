@@ -90,7 +90,6 @@
                 'name', 'market', 'timeframe', 'signalAt', 'price', 'stop', 'target', 'rr',
                 'decision', 'generalDecision', 'technicalDecision', 'volumeDecision',
                 'volumeScore', 'flowDecision', 'flowScore', 'flowAvailable',
-                'futuresDecision', 'futuresScore', 'futuresAvailable',
                 'marketRegime', 'mtfAlignment', 'sourceTimestamps',
                 'auditorError', 'auditorWarningCount', 'score', 'trend', 'rsi', 'fundamentalStatus',
                 'fkPE', 'fkValuation', 'fkVeto', 'costPct', 'horizon', 'agentVersion'
@@ -187,9 +186,6 @@
       flowDecision: input.flowDecision || null,
       flowScore: num(input.flowScore) ? input.flowScore : null,
       flowAvailable: typeof input.flowAvailable === 'boolean' ? input.flowAvailable : null,
-      futuresDecision: input.futuresDecision || null,
-      futuresScore: num(input.futuresScore) ? input.futuresScore : null,
-      futuresAvailable: typeof input.futuresAvailable === 'boolean' ? input.futuresAvailable : null,
       marketRegime: input.marketRegime || null,
       mtfAlignment: num(input.mtfAlignment) ? input.mtfAlignment : null,
       sourceTimestamps: input.sourceTimestamps && typeof input.sourceTimestamps === 'object'
@@ -330,9 +326,6 @@
         flowDecision: c.flow && c.flow.available ? c.flow.decision : null,
         flowScore: c.flow && c.flow.available ? c.flow.score : null,
         flowAvailable: c.flow ? !!c.flow.available : null,
-        futuresDecision: c.futures && c.futures.available ? c.futures.decision : null,
-        futuresScore: c.futures && c.futures.available ? c.futures.score : null,
-        futuresAvailable: c.futures ? !!c.futures.available : null,
         marketRegime: c.marketRegime && c.marketRegime.regime,
         mtfAlignment: c.mtf && c.mtf.score,
         sourceTimestamps: c.sourceTimestamps,
@@ -765,14 +758,14 @@
   function exportCSV(records) {
     var columns = ['signalAt', 'symbol', 'name', 'market', 'timeframe', 'decision', 'generalDecision',
       'technicalDecision', 'volumeDecision', 'flowDecision', 'flowScore', 'flowAvailable',
-      'futuresDecision', 'futuresScore', 'futuresAvailable', 'marketRegime', 'mtfAlignment', 'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
+      'marketRegime', 'mtfAlignment', 'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
       'costPct', 'tradeStatus', 'tradeOutcome', 'netPct', 'forwardPct', 'waitResult', 'source'];
     var rows = [columns.join(';')];
     records.slice().sort(function (a, b) { return a.signalAt - b.signalAt; }).forEach(function (r) {
       var values = [
         new Date(r.signalAt).toISOString(), r.symbol, r.name, r.market, r.timeframe, r.decision,
         r.generalDecision, r.technicalDecision, r.volumeDecision, r.flowDecision, r.flowScore, r.flowAvailable,
-        r.futuresDecision, r.futuresScore, r.futuresAvailable, r.marketRegime, r.mtfAlignment,
+        r.marketRegime, r.mtfAlignment,
         r.auditorError, r.auditorWarningCount, r.fundamentalStatus, r.price, r.stop, r.target, r.costPct, r.tradeStatus,
         r.tradeResult ? r.tradeResult.outcome : '',
         r.tradeResult ? r.tradeResult.netPct : '',
