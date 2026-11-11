@@ -199,7 +199,7 @@
     };
   }
 
-  function ajanlaraSor(s, kal) {
+  function ajanlaraSor(s, kal, context) {
     var A = window.Ajan;
     var sonuc = {
       genel: { karar: (s && s.karar) || 'BEKLE', uyum: (s && s.uyum) || 0, score: (s && s.score) || 0 },
@@ -227,8 +227,10 @@
 
     var c = s.c;
     var v = null;
-    if (Array.isArray(A.hacim) && A.hacim.length === c.length) {
-      v = A.hacim.map(function (x) { return (isFinite(x) && x > 0) ? +x : 0; });
+    var hasContextVolume = context && Object.prototype.hasOwnProperty.call(context, 'volume');
+    var volumeSource = hasContextVolume ? context.volume : A.hacim;
+    if (Array.isArray(volumeSource) && volumeSource.length === c.length) {
+      v = volumeSource.map(function (x) { return (isFinite(x) && x > 0) ? +x : 0; });
       var poz = 0;
       for (var i = 0; i < v.length; i++) if (v[i] > 0) poz++;
       if (poz < Math.max(10, c.length * 0.6)) v = null;
@@ -411,7 +413,11 @@
     }
     var t = Goruntu.trend(dn.m);
     var s = Analiz.yap(dn.m, t);
-    var panel = ajanlaraSor(s, dn.kal);
+    var panel = ajanlaraSor(s, dn.kal, {
+      volume: dn.d.map(function (m) { return m.v; }),
+      symbol: v.sembol,
+      timeframe: zd
+    });
     var karar = (panel.nihai && panel.nihai.son) || s.karar || 'BEKLE';
     var mumlar = Array.isArray(dn.d) ? dn.d : [];
     var sonMum = mumlar.length ? mumlar[mumlar.length - 1] : null;

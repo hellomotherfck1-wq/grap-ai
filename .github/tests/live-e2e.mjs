@@ -36,12 +36,13 @@ try {
   check('Canlı site HTTP yanıtı', Boolean(response && response.ok()), response ? String(response.status()) : 'Yanıt alınamadı');
 
   await page.waitForFunction(() =>
-    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.AjanPerformans && window.HaberAjani) &&
+    Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.AjanPerformans &&
+      window.HaberAjani && window.KriptoAjanlari) &&
     typeof Veri !== 'undefined' && typeof Analiz !== 'undefined' && typeof Cizim !== 'undefined',
     null,
     { timeout: 45000 }
   );
-  check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma / Haber ajanı');
+  check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma / Haber / Kripto ajanları');
   const newsRules = await page.evaluate(() => ({
     positive: window.HaberAjani.siniflandir({ title: 'Şirket yeni sözleşme imzaladı', summary: '' }).impact,
     negative: window.HaberAjani.siniflandir({ title: 'Şirket zarar açıkladı', summary: '' }).impact
@@ -573,15 +574,63 @@ try {
   const fallbackNews = await page.evaluate(async () => window.BistArastirma.haberGetir('FALLBACK'));
   check('Yahoo haberlerinde ikinci ücretsiz proxy yedeği', fallbackNews.length === 1 && fallbackNews[0].title.includes('AllOrigins'), fallbackNews.map(x => x.title).join(', ') || 'Haber alınamadı');
 
-  const binanceRows = chartPayload.chart.result[0].timestamp.map((timestamp, i) => {
-    const quote = chartPayload.chart.result[0].indicators.quote[0];
-    return [timestamp * 1000, quote.open[i], quote.high[i], quote.low[i], quote.close[i], quote.volume[i]];
-  });
-  await page.route('https://data-api.binance.vision/**', async route => {
-    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(binanceRows) });
-  });
-  await page.route('https://api.binance.com/**', async route => {
-    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(binanceRows) });
+  const makeBinanceRows = requestedUrl => {
+    const parsed = new URL(requestedUrl);
+    const tf = parsed.searchParams.get('interval') || '1h';
+    const step = ({ '15m': 15 * 60 * 1000, '1h': 60 * 60 * 1000, '4h': 4 * 60 * 60 * 1000, '1d': 24 * 60 * 60 * 1000 })[tf] || 60 * 60 * 1000;
+    const count = Math.max(20, Math.min(1000, Number(parsed.searchParams.get('limit')) || 120));
+    const lastOpen = Math.floor((Date.now() - step - 1000) / step) * step;
+    return Array.from({ length: count }, (_, i) => {
+      const t = lastOpen - (count - 1 - i) * step;
+      const open = 100 + i * 0.03;
+      const close = open + 0.02;
+      const quoteVolume = i >= count - 5 ? 120000 : 100000;
+      const buyShare = i >= count - 5 ? 0.60 : 0.52;
+      return [
+        t, open.toFixed(4), (close + 0.04).toFixed(4), (open - 0.04).toFixed(4),
+        close.toFixed(4), '1200', t + step - 1, String(quoteVolume), 500,
+        '700', String(quoteVolume * buyShare), '0'
+      ];
+    });
+  };
+  const mockBinance = async route => {
+    const rows = makeBinanceRows(route.request().url());
+    await route.fulfill({
+      status: 200,
+      headers: { 'access-control-allow-origin': '*' },
+      contentType: 'application/json',
+      body: JSON.stringify(rows)
+    });
+  };
+  await page.route('https://data-api.binance.vision/**', mockBinance);
+  await page.route('https://api.binance.com/**', mockBinance);
+
+  await page.route('https://fapi.binance.com/**', async route => {
+    const requested = new URL(route.request().url());
+    const symbol = requested.searchParams.get('symbol') || '';
+    let payload = [];
+    if (requested.pathname === '/fapi/v1/premiumIndex') {
+      payload = [];
+    } else if (requested.pathname === '/fapi/v1/openInterest') {
+      payload = { symbol, openInterest: '100000', time: Date.now() };
+    } else if (requested.pathname === '/futures/data/openInterestHist') {
+      payload = Array.from({ length: 6 }, (_, i) => ({
+        sumOpenInterest: String(1000 + i * 10), timestamp: Date.now() - (5 - i) * 60 * 60 * 1000
+      }));
+    } else if (requested.pathname === '/futures/data/globalLongShortAccountRatio') {
+      payload = [{ longShortRatio: '1.1', timestamp: Date.now() }];
+    } else if (requested.pathname === '/futures/data/takerlongshortRatio') {
+      payload = [{ buySellRatio: '1.05', timestamp: Date.now() }];
+    } else {
+      await route.fulfill({ status: 404, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify({ code: -404, msg: 'Unknown test endpoint' }) });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      headers: { 'access-control-allow-origin': '*' },
+      contentType: 'application/json',
+      body: JSON.stringify(payload)
+    });
   });
 
   // Historical candles remain available only to evaluate real signals in the agent performance ledger.
@@ -603,18 +652,41 @@ try {
   check('Yahoo mumlarında hacim alanı', yahooVolume.count >= 20 && yahooVolume.lastVolume > 0, JSON.stringify(yahooVolume));
   const binanceVolume = await page.evaluate(async () => {
     const rows = await Veri.binance('BTCUSDT', '1d');
-    return { count: rows.length, lastVolume: rows[rows.length - 1].v };
+    const last = rows[rows.length - 1];
+    return {
+      count: rows.length, lastVolume: last.v, quoteVolume: last.quoteVolume,
+      trades: last.trades, takerBuyQuoteVolume: last.takerBuyQuoteVolume,
+      closeTime: last.closeTime
+    };
   });
-  check('Binance mumlarında hacim alanı', binanceVolume.count >= 20 && binanceVolume.lastVolume > 0, JSON.stringify(binanceVolume));
+  check('Binance 12 alanlı Kline verisi korunuyor',
+    binanceVolume.count >= 20 && binanceVolume.lastVolume > 0 &&
+    binanceVolume.quoteVolume > 0 && binanceVolume.trades > 0 &&
+    binanceVolume.takerBuyQuoteVolume > 0 && binanceVolume.closeTime > 0,
+    JSON.stringify(binanceVolume));
 
   const timeframeChecks = await page.evaluate(async () => {
     const yahoo15 = await Veri.yahoo('THYAO.IS', '15m');
     const yahoo1h = await Veri.yahoo('THYAO.IS', '1h');
     const binance15 = await Veri.binance('BTCUSDT', '15m');
     const binance1h = await Veri.binance('BTCUSDT', '1h');
-    return { yahoo15: yahoo15.length, yahoo1h: yahoo1h.length, binance15: binance15.length, binance1h: binance1h.length };
+    const binance4h = await Veri.binance('BTCUSDT', '4h');
+    const now = Date.now();
+    const closed = Veri.kapanmisMumlar([
+      { t: now - 60 * 60 * 1000, closeTime: now - 1 },
+      { t: now, closeTime: now + 60 * 60 * 1000 - 1 }
+    ], '1h');
+    return {
+      yahoo15: yahoo15.length, yahoo1h: yahoo1h.length,
+      binance15: binance15.length, binance1h: binance1h.length,
+      binance4h: binance4h.length, closedCount: closed.length
+    };
   });
-  check('15 dakika, 1 saat ve günlük veri aralıkları', Object.values(timeframeChecks).every(count => count >= 20), JSON.stringify(timeframeChecks));
+  check('15 dakika, 1 saat, 4 saat ve günlük veri aralıkları',
+    timeframeChecks.yahoo15 >= 20 && timeframeChecks.yahoo1h >= 20 &&
+    timeframeChecks.binance15 >= 20 && timeframeChecks.binance1h >= 20 &&
+    timeframeChecks.binance4h >= 20 && timeframeChecks.closedCount === 1,
+    JSON.stringify(timeframeChecks));
 
   const bistVolumeAgent = await page.evaluate(async () => {
     const result = await TahminAI.taraBir({ q: 'THYAO', ad: 'Türk Hava Yolları' }, '1d');
@@ -627,6 +699,20 @@ try {
     return { symbol: result.sembol, price: result.fiyat, volumeScore: result.hacimSkor };
   });
   check('Coin hacim ajanına veri aktarımı', coinVolumeAgent.price > 0 && typeof coinVolumeAgent.volumeScore === 'number', JSON.stringify(coinVolumeAgent));
+  const flowCheck = await page.evaluate(() => {
+    const now = Date.now(), hour = 60 * 60 * 1000;
+    const bars = Array.from({ length: 30 }, (_, i) => {
+      const recent = i >= 25, quote = recent ? 1200 : 1000;
+      const t = now - (30 - i) * hour;
+      return { t, closeTime: t + hour - 1, quoteVolume: quote, takerBuyQuoteVolume: quote * (recent ? 0.65 : 0.5) };
+    });
+    const flow = window.KriptoAjanlari.orderFlow(bars);
+    const missing = window.KriptoAjanlari.orderFlow(bars.map(m => ({ t: m.t, closeTime: m.closeTime, v: 1 })));
+    return { available: flow.available, score: flow.score, missingAvailable: missing.available };
+  });
+  check('Order Flow alıcı/satıcı baskısı ve eksik veride no-vote',
+    flowCheck.available && flowCheck.score === 2 && !flowCheck.missingAvailable,
+    JSON.stringify(flowCheck));
 
   const symbolMappings = await page.evaluate(() => ({
     bist: Veri.coz('PGSUS.IS')[0]?.sembol,
@@ -650,13 +736,17 @@ try {
       total: window.CoinTahminAI.LISTE.length,
       scanned: result && result.adaylar ? result.adaylar.length : 0,
       errors: result && result.hatalar ? result.hatalar.length : -1,
+      deepScanned: result && result.adaylar ? result.adaylar.filter(item => item.deepScan === 'tamamlandı').length : 0,
+      deepVersion: result && result.ajanSurum,
       errorDetails: result && result.hatalar ? result.hatalar.slice(0, 8) : [],
       status: document.querySelector('#coin-tahmin-durum')?.textContent || ''
     };
   });
   check(
     'Coin toplu tarama akışı',
-    coinScan.scanned > 0 && coinScan.scanned + coinScan.errors === coinScan.total && coinScan.status.startsWith('Tamamlandı'),
+    coinScan.scanned > 0 && coinScan.scanned + coinScan.errors === coinScan.total &&
+      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.0.0' &&
+      coinScan.status.startsWith('Tamamlandı'),
     JSON.stringify(coinScan)
   );
   const coinResultText = await page.locator('#coin-tahmin-alan').innerText();

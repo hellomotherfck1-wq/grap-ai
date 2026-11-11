@@ -90,17 +90,60 @@ const Veri = {
     } finally { clearTimeout(t); }
   },
 
-  async binance(sembol, zd) {
+  async binance(sembol, zd, limit) {
     const hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
+    const adet = Math.max(20, Math.min(1000, Number(limit) || 120));
     let son;
-    for (const h of hosts) {
+    for (const host of hosts) {
       try {
-        const j = await this.getir(h + '/api/v3/klines?symbol=' + sembol + '&interval=' + zd + '&limit=120');
-        if (!Array.isArray(j) || j.length < 20) throw new Error('Yeterli veri yok');
-        return j.map(a => ({ t: a[0], o: +a[1], h: +a[2], l: +a[3], c: +a[4], v: a[5] != null ? Number(a[5]) : null }));
+        const url = host + '/api/v3/klines?symbol=' + encodeURIComponent(sembol) +
+          '&interval=' + encodeURIComponent(zd) + '&limit=' + adet;
+        const rows = await this.getir(url, 20000);
+        if (!Array.isArray(rows) || rows.length < 20) throw new Error('Yeterli Binance verisi yok');
+        const n = value => {
+          if (value === null || value === undefined || value === '') return null;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+        const mumlar = rows.map(row => ({
+          t: Number(row[0]),
+          o: Number(row[1]),
+          h: Number(row[2]),
+          l: Number(row[3]),
+          c: Number(row[4]),
+          v: n(row[5]),
+          closeTime: n(row[6]),
+          quoteVolume: n(row[7]),
+          trades: n(row[8]),
+          takerBuyBaseVolume: n(row[9]),
+          takerBuyQuoteVolume: n(row[10])
+        })).filter(k =>
+          Number.isFinite(k.t) && Number.isFinite(k.o) &&
+          Number.isFinite(k.h) && Number.isFinite(k.l) &&
+          Number.isFinite(k.c)
+        );
+        if (mumlar.length < 20) throw new Error('Geçerli Binance mumu yetersiz');
+        return mumlar;
       } catch (e) { son = e; }
     }
-    throw son;
+    throw son || new Error('Binance verisi alınamadı');
+  },
+
+  kapanmisMumlar(mumlar, zd, simdi) {
+    const sure = {
+      '15m': 15 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '4h': 4 * 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000
+    }[zd];
+    if (!sure) throw new Error('Desteklenmeyen mum zaman dilimi: ' + zd);
+    const now = Number.isFinite(simdi) ? simdi : Date.now();
+    return (Array.isArray(mumlar) ? mumlar : []).filter(m => {
+      if (!m || !Number.isFinite(Number(m.t))) return false;
+      if (m.closeTime !== null && m.closeTime !== undefined &&
+          Number.isFinite(Number(m.closeTime))) return Number(m.closeTime) < now;
+      return Number(m.t) + sure <= now;
+    }).sort((a, b) => Number(a.t) - Number(b.t));
   },
 
   async yahoo(sembol, zd) {

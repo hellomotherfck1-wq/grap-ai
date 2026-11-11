@@ -435,19 +435,6 @@
 
   /* ---------- Veri kaynağına hacim ekle ---------- */
   if (typeof Veri !== 'undefined' && Veri) {
-    Veri.binance = async function (sembol, zd) {
-      var hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
-      var son;
-      for (var h = 0; h < hosts.length; h++) {
-        try {
-          var j = await this.getir(hosts[h] + '/api/v3/klines?symbol=' + sembol + '&interval=' + zd + '&limit=120');
-          if (!Array.isArray(j) || j.length < 20) throw new Error('Yeterli veri yok');
-          return j.map(function (a) { return { t: a[0], o: +a[1], h: +a[2], l: +a[3], c: +a[4], v: +a[5] }; });
-        } catch (e) { son = e; }
-      }
-      throw son;
-    };
-
     Veri.yahoo = async function (sembol, zd) {
       var p = { '15m': ['15m', '5d'], '1h': ['60m', '1mo'], '1d': ['1d', '6mo'] }[zd];
       var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sembol) + '?interval=' + p[0] + '&range=' + p[1];
@@ -489,6 +476,7 @@
       var aralik = {
         '15m': { yahoo: ['15m', '30d'], binance: '15m' },
         '1h': { yahoo: ['60m', '3mo'], binance: '1h' },
+        '4h': { yahoo: null, binance: '4h' },
         '1d': { yahoo: ['1d', '2y'], binance: '1d' }
       }[zd || '1d'];
       if (!aralik) throw new Error('Desteklenmeyen zaman dilimi.');
@@ -499,24 +487,12 @@
         try {
           var mumlar = [];
           if (aday.kaynak === 'b') {
-            var hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
-            var binanceHata = null;
-            for (var h = 0; h < hosts.length; h++) {
-              try {
-                var rows = await this.getir(
-                  hosts[h] + '/api/v3/klines?symbol=' + encodeURIComponent(aday.sembol) +
-                  '&interval=' + aralik.binance + '&limit=1000',
-                  30000
-                );
-                if (!Array.isArray(rows) || rows.length < 80) throw new Error('Yeterli Binance geçmiş verisi yok.');
-                mumlar = rows.map(function (row) {
-                  return { t: Number(row[0]), o: Number(row[1]), h: Number(row[2]), l: Number(row[3]), c: Number(row[4]), v: Number(row[5]) };
-                });
-                break;
-              } catch (eBinance) { binanceHata = eBinance; }
+            mumlar = await this.binance(aday.sembol, aralik.binance, 1000);
+            if (!Array.isArray(mumlar) || mumlar.length < 80) {
+              throw new Error('Yeterli Binance geçmiş verisi yok.');
             }
-            if (!mumlar.length) throw binanceHata || new Error('Binance geçmiş verisi alınamadı.');
           } else {
+            if (!aralik.yahoo) throw new Error('4 saatlik geçmiş yalnızca Binance kripto için desteklenir.');
             var yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
               encodeURIComponent(aday.sembol) + '?interval=' + aralik.yahoo[0] + '&range=' + aralik.yahoo[1];
             var controller = new AbortController();
