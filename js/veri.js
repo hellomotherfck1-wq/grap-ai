@@ -92,6 +92,9 @@ const Veri = {
     }
     if (ham.endsWith('.IS')) return 'Hisse';
     if (ham.endsWith('USDT')) return 'Kripto';
+    const code = ham.replace(/[^A-Z0-9]/g, '');
+    const bistList = window.TahminAI && Array.isArray(window.TahminAI.LISTE) ? window.TahminAI.LISTE : [];
+    if (code && bistList.some(item => String(item.q || '').toUpperCase() === code)) return 'Hisse';
     return 'Diğer';
   },
 
@@ -211,7 +214,7 @@ const Veri = {
     for (const a of l) {
       try {
         const sembol = String(a.sembol || '').toUpperCase();
-        const hisse = /BIST hissesi|ABD hissesi/i.test(String(a.tur || '')) || sembol.endsWith('.IS');
+        const hisse = /BIST hissesi|ABD hissesi|Hisse \/ diğer/i.test(String(a.tur || '')) || sembol.endsWith('.IS');
         const etkinZd = hisse ? '1d' : istenenZd;
         if (a.kaynak !== 'b' && etkinZd === '4h') {
           throw new Error('4 saatlik veri yalnızca kripto varlıklar için kullanılabilir.');
