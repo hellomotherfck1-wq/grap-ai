@@ -202,12 +202,17 @@ function adminKaydi(asset) {
 function bist100Eslesme(girdi) {
   const liste = window.TahminAI && Array.isArray(window.TahminAI.LISTE)
     ? window.TahminAI.LISTE : [];
+  const raw = String(girdi || '').trim().toUpperCase();
+  const kok = raw.endsWith('.IS') ? raw.slice(0, -3) : raw;
+  const ham = kok.replaceAll(' ', '');
+  const norm = Veri.norm(kok).replaceAll(' ', '');
+  if (ham === 'BIST100' || ham === 'XU100' || norm === 'bist100' || norm === 'xu100') {
+    return { q: 'XU100', ad: 'BIST 100', index: true };
+  }
   if (!liste.length) return null;
-  const ham = String(girdi || '').trim().toUpperCase().replace(/\.IS$/i, '').replace(/\s+/g, '');
-  const norm = Veri.norm(String(girdi || '').replace(/\.IS$/i, ''));
   return liste.find(item =>
     String(item.q || '').toUpperCase() === ham ||
-    (item.ad && Veri.norm(item.ad) === norm)
+    (item.ad && Veri.norm(item.ad) === Veri.norm(kok))
   ) || null;
 }
 
@@ -243,6 +248,10 @@ function bist100OnerileriDoldur() {
     ? window.TahminAI.LISTE : [];
   if (!alan || !liste.length) return;
   alan.replaceChildren();
+  const endeks = document.createElement('option');
+  endeks.value = 'BIST100';
+  endeks.label = 'BIST 100 Endeksi';
+  alan.appendChild(endeks);
   liste.forEach(function (item) {
     const option = document.createElement('option');
     option.value = String(item.q || '');
@@ -255,7 +264,8 @@ function digerZamanDilimleriGuncelle(girdi, tercih) {
   const select = el('ara-diger-zd');
   if (!select || typeof Veri === 'undefined' || typeof Veri.zamanDilimleri !== 'function') return;
   const piyasa = Veri.piyasaTahmini(girdi || '');
-  const secenekler = piyasa === 'Hisse' ? ['1d'] : ['15m', '1h', '1d'];
+  const bist100 = Boolean(bist100Eslesme(girdi));
+  const secenekler = piyasa === 'Hisse' || bist100 ? ['1d'] : ['15m', '1h', '1d'];
   const mevcut = String(tercih || select.value || '');
   const etiketler = { '15m': '15 dakikalık', '1h': '1 saatlik', '1d': 'Günlük' };
   select.replaceChildren();
