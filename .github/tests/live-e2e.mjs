@@ -367,30 +367,45 @@ try {
   check('Araştırma raporunda fiyat verisi var', /Son fiyat:.*\d/.test(researchText), researchText.split('\n').find(line => line.includes('Son fiyat')) || 'Fiyat satırı bulunamadı');
 
   await page.locator('nav button[data-git="yukle"]').click();
-  await page.locator('#ara-ad').fill('THYAO.IS');
-  const bistChartTimeframes = await page.locator('#ara-zd option').evaluateAll(options => options.map(option => option.value));
-  check('Hisse grafik aramasında yalnızca günlük zaman dilimi sunuluyor',
+  const bistChartTimeframes = await page.locator('#ara-bist-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Ara ekranında BIST 100 için yalnızca günlük zaman dilimi var',
     bistChartTimeframes.length === 1 && bistChartTimeframes[0] === '1d',
     JSON.stringify(bistChartTimeframes));
-  await page.locator('#ara-zd').selectOption('1d');
-  await page.locator('#ara-ad').fill('BTCUSDT');
-  const cryptoChartTimeframes = await page.locator('#ara-zd option').evaluateAll(options => options.map(option => option.value));
-  check('Kripto grafik aramasında 15m, 1h, 4h ve 1d seçenekleri var',
+  const cryptoChartTimeframes = await page.locator('#ara-kripto-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Ara ekranında kripto için 15m, 1h, 4h ve 1d seçenekleri var',
     JSON.stringify(cryptoChartTimeframes) === JSON.stringify(['15m', '1h', '4h', '1d']),
     JSON.stringify(cryptoChartTimeframes));
-  await page.locator('#ara-zd').selectOption('4h');
-  await page.locator('#ara-ad').fill('THYAO.IS');
-  await page.locator('#ara-zd').selectOption('1d');
-  await page.locator('#ara-btn').click();
+
+  await page.locator('#ara-kripto-ad').fill('THYAO.IS');
+  await page.locator('#ara-kripto-btn').click();
+  await page.waitForFunction(() =>
+    (document.querySelector('#ara-kripto-durum')?.textContent || '').includes('⚠️')
+  );
+  const cryptoIsolation = await page.locator('#ara-kripto-durum').innerText();
+  check('Kripto arama alanı BIST hisselerini reddediyor',
+    cryptoIsolation.includes('yalnızca kripto'), cryptoIsolation);
+
+  await page.locator('#ara-bist-ad').fill('BTCUSDT');
+  await page.locator('#ara-bist-btn').click();
+  await page.waitForFunction(() =>
+    (document.querySelector('#ara-bist-durum')?.textContent || '').includes('⚠️')
+  );
+  const bistIsolation = await page.locator('#ara-bist-durum').innerText();
+  check('BIST 100 arama alanı coin sembollerini reddediyor',
+    bistIsolation.includes('yalnızca BIST 100'), bistIsolation);
+
+  await page.locator('#ara-bist-ad').fill('THYAO.IS');
+  await page.locator('#ara-bist-zd').selectOption('1d');
+  await page.locator('#ara-bist-btn').click();
 
   await page.waitForFunction(() => {
-    const searchStatus = document.querySelector('#ara-durum')?.textContent || '';
+    const searchStatus = document.querySelector('#ara-bist-durum')?.textContent || '';
     const analysisStatus = document.querySelector('#analiz-durum')?.textContent || '';
     return searchStatus.includes('⚠️') || analysisStatus.includes('Analiz tamamlandı');
   }, null, { timeout: 120000 });
 
   const chartStatus = await page.locator('#analiz-durum').innerText();
-  const searchStatus = await page.locator('#ara-durum').innerText();
+  const searchStatus = await page.locator('#ara-bist-durum').innerText();
   const canvasCount = await page.locator('#tuval-alan canvas').count();
   check('THYAO.IS grafik araması', chartStatus.includes('Analiz tamamlandı'), chartStatus.includes('Analiz tamamlandı') ? chartStatus : searchStatus);
   check('Arama durum mesajı tamamlandı', searchStatus.includes('Analiz tamamlandı'), searchStatus);
