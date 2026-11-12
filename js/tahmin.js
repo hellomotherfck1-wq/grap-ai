@@ -444,8 +444,10 @@
       genelKarar: s.karar,
       teknikKarar: panel.teknik ? panel.teknik.karar : null,
       hacimSkor: panel.hacim ? panel.hacim.skor : null,
+      hacimVar: !!(panel.hacim && panel.hacim.var),
       hacimKarar: panel.hacim && panel.hacim.var
-        ? (panel.hacim.skor > 0 ? 'AL' : panel.hacim.skor < 0 ? 'SAT' : 'BEKLE') : 'BEKLE',
+        ? (panel.hacim.skor > 0 ? 'AL' : panel.hacim.skor < 0 ? 'SAT' : 'BEKLE') : null,
+      volumeModelVersion: panel.hacim && panel.hacim.var ? 'volume-heuristic-v1' : null,
       hataPayi: panel.denetci ? panel.denetci.hata : null,
       denetciSorunSayisi: panel.denetci ? panel.denetci.sorunSayisi : null,
       ozet: panel.ozet,
