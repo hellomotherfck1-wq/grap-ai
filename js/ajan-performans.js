@@ -853,6 +853,7 @@
   function render(records) {
     var root = document.getElementById('ajan-performans-panel');
     if (!root) return;
+    var all = Array.isArray(records) ? records : [];
     root.replaceChildren();
     var card = el('div', 'kart ajan-performans');
     var header = el('div', 'performans-baslik');
@@ -899,7 +900,6 @@
     status.setAttribute('aria-live', 'polite');
     card.appendChild(status);
 
-    var all = records;
     var completedTrades = all.filter(function (r) {
       return r.decision === 'AL' && r.tradeStatus === 'completed' && r.tradeResult;
     });
