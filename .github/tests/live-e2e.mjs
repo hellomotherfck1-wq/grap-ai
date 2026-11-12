@@ -231,6 +231,10 @@ try {
     return {
       storedOnce: stored.length === 1,
       rawCandlesNotStored: stored.length === 1 && !Array.isArray(stored[0].mumlar),
+      agentVersionsSaved: stored.length === 1 &&
+        stored[0].generalAgentVersion === window.Ajan.surumler.general &&
+        stored[0].technicalAgentVersion === window.Ajan.surumler.technical &&
+        stored[0].committeeVersion === window.Ajan.surumler.committee,
       scanCount: scanCount,
       scanStored: scanStored,
       waitStored: waitStored,
@@ -269,6 +273,8 @@ try {
     performanceChecks.retentionDays === 365 &&
     performanceChecks.defaultCostPct === 0.20,
     JSON.stringify(performanceChecks));
+  check('Her ajan için ayrı sürüm bilgisi kaydediliyor',
+    performanceChecks.agentVersionsSaved, JSON.stringify(performanceChecks));
   check('Canlı sinyal değerlendirmesi sonraki mum açılışını kullanıyor',
     performanceChecks.targetAtNextOpen, JSON.stringify(performanceChecks));
   check('Performans testinde aynı mum stop/hedef çakışmasında stop öncelikli',
@@ -282,22 +288,101 @@ try {
     performanceChecks.allVotesSaved, JSON.stringify(performanceChecks));
   check('Hacim verisi olmayan coine sahte BEKLE oyu yazılmıyor',
     performanceChecks.noVolumeSaved, JSON.stringify(performanceChecks));
+  const agentBreakdownChecks = await page.evaluate(() => {
+    const P = window.AjanPerformans;
+    const base = {
+      market: 'Kripto', timeframe: '1h', directionStatus: 'completed',
+      costPct: 0.2, generalDecision: 'AL', technicalDecision: 'SAT',
+      volumeDecision: 'AL', volumeAvailable: true, decision: 'AL',
+      generalAgentVersion: 'general-v1', technicalAgentVersion: 'technical-v1',
+      volumeModelVersion: 'volume-v1', committeeVersion: 'committee-v1'
+    };
+    const rows = [
+      Object.assign({}, base, {
+        symbol: 'E2EOVERLAPUSDT', signalAt: 1000, forwardPct: 1,
+        directionResult: { exitAt: 3601000 }
+      }),
+      Object.assign({}, base, {
+        symbol: 'E2EOVERLAPUSDT', signalAt: 1801000, forwardPct: -1,
+        generalAgentVersion: 'general-v2',
+        directionResult: { exitAt: 5401000 }
+      }),
+      Object.assign({}, base, {
+        symbol: 'E2EOVERLAPUSDT', signalAt: 7201000, forwardPct: -1,
+        generalDecision: 'SAT', directionResult: { exitAt: 10801000 }
+      }),
+      Object.assign({}, base, {
+        symbol: 'E2EVERSIONUSDT', timeframe: '4h', signalAt: 1000,
+        forwardPct: 1, generalAgentVersion: 'general-v2',
+        directionResult: { exitAt: 14401000 }
+      }),
+      Object.assign({}, base, {
+        symbol: 'E2EBIST.IS', market: 'BIST', timeframe: '1d', signalAt: 1000,
+        forwardPct: -1, generalDecision: 'SAT',
+        generalAgentVersion: 'general-bist-v1',
+        directionResult: { exitAt: 86401000 }
+      }),
+      Object.assign({}, base, {
+        symbol: 'E2EUNKNOWNUSDT', signalAt: 1000, forwardPct: 1,
+        directionResult: null
+      }),
+      Object.assign({}, base, {
+        symbol: 'E2EWAITUSDT', signalAt: 1000, generalDecision: 'BEKLE',
+        forwardPct: 1, directionResult: { exitAt: 36001000 }
+      })
+    ];
+    const stats = P.ajanIstatistik(rows, 'generalDecision');
+    const groups = P.ajanKirilimi(rows);
+    return {
+      rawCount: stats.rawCount,
+      independentCount: stats.count,
+      overlapExcluded: stats.overlapExcluded,
+      unknownHorizon: stats.unknownHorizon,
+      separateMarketAndTimeframe: groups.some(row =>
+        row.agentKey === 'generalDecision' && row.market === 'BIST' && row.timeframe === '1d'),
+      separateAgentVersions: groups.some(row =>
+        row.agentKey === 'generalDecision' && row.version === 'general-v1') &&
+        groups.some(row => row.agentKey === 'generalDecision' && row.version === 'general-v2'),
+      waitVotesShownSeparately: groups.some(row =>
+        row.agentKey === 'generalDecision' && row.votes.BEKLE === 1),
+      crossVersionOverlapExcluded: groups.some(row =>
+        row.agentKey === 'generalDecision' && row.market === 'Kripto' &&
+        row.timeframe === '1h' && row.version === 'general-v2' &&
+        row.stats.count === 0 && row.stats.overlapExcluded === 1)
+    };
+  });
+  check('Çakışan 10 mumluk sinyal pencereleri bağımsız örnek sayılmıyor',
+    agentBreakdownChecks.rawCount === 6 && agentBreakdownChecks.independentCount === 4 &&
+    agentBreakdownChecks.overlapExcluded === 1 && agentBreakdownChecks.unknownHorizon === 1,
+    JSON.stringify(agentBreakdownChecks));
+  check('Ajan performansı piyasa, periyot ve sürüme göre ayrılıyor',
+    agentBreakdownChecks.separateMarketAndTimeframe && agentBreakdownChecks.separateAgentVersions,
+    JSON.stringify(agentBreakdownChecks));
+  check('BEKLE oyları yön isabetinden ayrı gösteriliyor',
+    agentBreakdownChecks.waitVotesShownSeparately && agentBreakdownChecks.crossVersionOverlapExcluded,
+    JSON.stringify(agentBreakdownChecks));
+
   const volumeBreakdownChecks = await page.evaluate(() => {
     const groups = window.AjanPerformans.hacimKirilimi([
-      { market: 'Kripto', timeframe: '1h', volumeDecision: 'AL', volumeAvailable: true,
-        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: 1, costPct: 0.2 },
-      { market: 'Kripto', timeframe: '1h', volumeDecision: 'SAT', volumeAvailable: true,
-        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: -1, costPct: 0.2 },
-      { market: 'BIST', timeframe: '1d', volumeDecision: 'AL', volumeAvailable: true,
-        volumeModelVersion: 'legacy-test', directionStatus: 'completed', forwardPct: -1, costPct: 0.2 },
-      { market: 'Kripto', timeframe: '1h', volumeDecision: 'AL', volumeAvailable: false,
-        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: 1, costPct: 0.2 },
-      { market: 'Kripto', timeframe: '1h', volumeDecision: 'BEKLE', volumeAvailable: true,
-        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: -1, costPct: 0.2 }
+      { symbol: 'BTCUSDT', market: 'Kripto', timeframe: '1h', signalAt: 1000,
+        volumeDecision: 'AL', volumeAvailable: true, volumeModelVersion: 'volume-heuristic-v1',
+        directionStatus: 'completed', forwardPct: 1, costPct: 0.2, directionResult: { exitAt: 3601000 } },
+      { symbol: 'ETHUSDT', market: 'Kripto', timeframe: '1h', signalAt: 1000,
+        volumeDecision: 'SAT', volumeAvailable: true, volumeModelVersion: 'volume-heuristic-v1',
+        directionStatus: 'completed', forwardPct: -1, costPct: 0.2, directionResult: { exitAt: 3601000 } },
+      { symbol: 'THYAO.IS', market: 'BIST', timeframe: '1d', signalAt: 1000,
+        volumeDecision: 'AL', volumeAvailable: true, volumeModelVersion: 'legacy-test',
+        directionStatus: 'completed', forwardPct: -1, costPct: 0.2, directionResult: { exitAt: 86401000 } },
+      { symbol: 'SOLUSDT', market: 'Kripto', timeframe: '1h', signalAt: 1000,
+        volumeDecision: 'AL', volumeAvailable: false, volumeModelVersion: 'volume-heuristic-v1',
+        directionStatus: 'completed', forwardPct: 1, costPct: 0.2, directionResult: { exitAt: 3601000 } },
+      { symbol: 'ADAUSDT', market: 'Kripto', timeframe: '1h', signalAt: 1000,
+        volumeDecision: 'BEKLE', volumeAvailable: true, volumeModelVersion: 'volume-heuristic-v1',
+        directionStatus: 'completed', forwardPct: -1, costPct: 0.2, directionResult: { exitAt: 3601000 } }
     ]);
     return groups.map(group => ({
       market: group.market, timeframe: group.timeframe, version: group.version,
-      count: group.stats.count, correct: group.stats.correct,
+      count: group.stats.count, rawCount: group.stats.rawCount, correct: group.stats.correct,
       wrong: group.stats.wrong, flat: group.stats.flat
     }));
   });

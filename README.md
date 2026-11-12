@@ -59,7 +59,9 @@ Ajan haberleri tarih ve kaynak bağlantısıyla gösterir; tekrar eden başlıkl
 - Genel analiz, teknik, hacim ve nihai kurulun yön isabeti kaydedilen tüm AL/SAT oyları için 10 kapanmış mum sonraki fiyat yönüyle ölçülür. BEKLE kararları kazanma oranına eklenmez; düşüşten kaçınma / yükseliş kaçırma olarak raporlanır.
 - Denetçi ajanının Düşük/Orta/Yüksek risk seviyesi ve bulgu sayısı saklanır; her risk seviyesinden sonra 10 mumdaki düşüş/yükseliş dağılımı ayrı gösterilir. F/K ajanının AL → BEKLE veto kararları da sonraki fiyat hareketiyle karşılaştırılır.
 - Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu eksik açıkça belirtilir. Grafik analizinde F/K sonucu sonradan kararı değiştirirse aynı sinyal kaydı güncellenir.
-- 30 işlemden önce başarı oranı örneklem yetersiz olarak işaretlenir; Wilson güven aralığı gösterilir.
+- Ajan yön isabeti piyasa, zaman dilimi ve her ajanın kendi sürümüne göre ayrı gösterilir. AL/SAT oyları, 10 kapanmış mum sonrası fiyat yönüyle ölçülür; BEKLE oyları ayrı sayılır.
+- Aynı sembol/periyotta ileriye dönük 10 mum pencereleri çakışan sinyaller bağımsız örnek sayılmaz. İleri dönem bitiş zamanı eksik eski kayıtlar bağımsız örnek hesabına katılmaz; 30'dan az bağımsız örnek güvenilir başarı oranı sayılmaz.
+- Spot AL işlem kazanma oranında 30 işlemden önce örneklem yetersiz olarak işaretlenir; Wilson güven aralığı gösterilir.
 - Kayıtlar yalnızca bu cihaz/tarayıcıda bulunur. Tarayıcı verisi temizlenirse kaybolabilir; CSV dışa aktarımı vardır. 365 günden eski kayıtlar otomatik silinir.
 - Ücretsiz Yahoo geçmiş sınırları yaklaşık 15 dakika için 30 gün, 1 saat için 3 ay, günlük için 2 yıldır; Binance geçmişi en fazla 1.000 mumdur. Kayıtlar 365 gün saklansa da sonuçları geciktirmeden güncellemek gerekir; kaynak geçmişi dışına çıkan sonuçlar "veri aralığı dışında" olarak işaretlenir.
 
