@@ -69,7 +69,9 @@
     const bistList = typeof window !== 'undefined' && window.TahminAI && Array.isArray(window.TahminAI.LISTE)
       ? window.TahminAI.LISTE : [];
     const bistItem = kod && bistList.find(item => String(item.q || '').toUpperCase() === kod);
-    if (this.harita[n]) {
+    if (ham.endsWith('.IS')) {
+      adaylar.push({ kaynak: 'y', sembol: ham, ad: ham.slice(0, -3), tur: 'BIST hissesi' });
+    } else if (this.harita[n]) {
       adaylar.push(this.harita[n]);
     } else if (bistItem) {
       adaylar.push({ kaynak: 'y', sembol: kod + '.IS', ad: bistItem.ad || kod, tur: 'BIST hissesi' });
