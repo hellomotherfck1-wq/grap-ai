@@ -100,6 +100,29 @@ try {
   check('Risk/kazanç 1:1,5 altındaysa BEKLE', decisionRules.weakRR === 'BEKLE', JSON.stringify(decisionRules));
 
   await page.locator('nav button[data-git="sonuc"]').click();
+  const performanceInitDebug = await page.evaluate(async () => {
+    const root = document.getElementById('ajan-performans-panel');
+    let rows = null;
+    let error = null;
+    try {
+      if (window.AjanPerformans && typeof window.AjanPerformans.yenile === 'function') {
+        rows = (await window.AjanPerformans.yenile()).length;
+      }
+    } catch (e) {
+      error = e && e.message ? e.message : String(e);
+    }
+    return {
+      api: typeof window.AjanPerformans,
+      root: !!root,
+      rootHtml: root ? root.innerHTML.slice(0, 180) : null,
+      button: !!document.getElementById('ajan-performans-guncelle'),
+      rows: rows,
+      error: error,
+      readyState: document.readyState
+    };
+  });
+  check('Ajan performans paneli tanılama', performanceInitDebug.api === 'object' &&
+    performanceInitDebug.root && performanceInitDebug.button, JSON.stringify(performanceInitDebug));
   await page.locator('#ajan-performans-guncelle').waitFor({ state: 'attached', timeout: 15000 });
   await page.setViewportSize({ width: 390, height: 844 });
   const performanceUI = await page.evaluate(() => ({
