@@ -13,6 +13,8 @@
   var BATCH_SIZE = 50;
   var client = null;
   var lastSyncFingerprint = null;
+  var lastPruneAt = 0;
+  var ephemeralDeviceId = null;
   var initError = null;
 
   function uuid() {
@@ -33,7 +35,8 @@
       localStorage.setItem(DEVICE_KEY, saved);
       return saved;
     } catch (e) {
-      return uuid();
+      if (!ephemeralDeviceId) ephemeralDeviceId = uuid();
+      return ephemeralDeviceId;
     }
   }
 
@@ -155,8 +158,13 @@
     return isAdmin().then(function (admin) {
       if (!admin) return { records: [], isAdmin: false, error: null };
       var cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
-      return client.rpc('grap_ai_shared_signals_prune').then(function (pruneResult) {
-        if (pruneResult.error) throw pruneResult.error;
+      var prune = Date.now() - lastPruneAt < 24 * 60 * 60 * 1000
+        ? Promise.resolve()
+        : client.rpc('grap_ai_shared_signals_prune').then(function (pruneResult) {
+            if (pruneResult.error) throw pruneResult.error;
+            lastPruneAt = Date.now();
+          });
+      return prune.then(function () {
         var offset = 0;
         var rows = [];
         function readPage() {
@@ -195,7 +203,6 @@
       });
     });
   }
-
   if (window.supabase && typeof window.supabase.createClient === 'function') {
     try {
       client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
