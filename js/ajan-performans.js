@@ -775,7 +775,8 @@
           allCalls.push(record);
         }
       });
-      // Sinyal pencerelerini sürümler arasında da tekilleştir.
+      // Sinyal pencerelerini tüm sürümler arasında tekilleştir; aynı piyasa
+      // hareketi iki farklı model sürümüne iki bağımsız başarı yazmasın.
       var selection = selectIndependentCalls(allCalls);
       Object.keys(groups).forEach(function (key) {
         var group = groups[key];
