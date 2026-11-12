@@ -949,17 +949,16 @@
       ['Denetçi bulgusu', String(all.reduce(function (sum, r) { return sum + (r.auditorWarningCount || 0); }, 0))],
       ['Veri aralığı dışında', String(expired)]
     ].forEach(function (x) { grid.appendChild(kpi(x[0], x[1])); });
-    var cihazlar = Object.create(null), cihazSira = 0;
+    var cihazlar = Object.create(null);
     all.forEach(function (record) {
       (Array.isArray(record.deviceIds) ? record.deviceIds : (record.deviceId ? [record.deviceId] : []))
-        .forEach(function (id) {
-          if (id && !cihazlar[id]) {
-            cihazSira++;
-            cihazlar[id] = 'Cihaz ' + cihazSira;
-          }
-        });
+        .forEach(function (id) { if (id) cihazlar[id] = true; });
     });
-    var cihazSayisi = Object.keys(cihazlar).length;
+    var cihazKimlikleri = Object.keys(cihazlar).sort();
+    cihazKimlikleri.forEach(function (id, index) {
+      cihazlar[id] = 'Cihaz ' + (index + 1) + ' · ' + id.slice(0, 6);
+    });
+    var cihazSayisi = cihazKimlikleri.length;
     if (cihazSayisi) grid.appendChild(kpi('Ortak havuz cihazı', String(cihazSayisi)));
     card.appendChild(grid);
 
@@ -990,7 +989,7 @@
         ' · sonrasında düşüş: ' + fkAvoid + ' · yükseliş: ' + fkMiss + '.'));
     }
 
-    card.appendChild(el('h4', 'backtest-trades-title', 'Son sinyaller'));
+    card.appendChild(el('h4', 'backtest-trades-title', ortakGorunum ? 'Son sinyaller · cihazlar arası' : 'Son sinyaller'));
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), row = el('tr');
@@ -1000,7 +999,7 @@
     resultHeaders.forEach(function (x) { row.appendChild(el('th', '', x)); });
     head.appendChild(row); table.appendChild(head);
     var body = el('tbody');
-    all.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 15).forEach(function (r) {
+    all.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 50).forEach(function (r) {
       var tr = el('tr');
       var net = r.decision === 'SAT' && r.spotResult && num(r.spotResult.saleAdvantagePct)
         ? pct(r.spotResult.saleAdvantagePct) + ' (satış/tutma)'
