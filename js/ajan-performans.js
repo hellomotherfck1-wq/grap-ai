@@ -1244,6 +1244,13 @@
     });
   }
 
+  function refreshView() {
+    return allRecords().then(function (records) {
+      render(records);
+      return records;
+    });
+  }
+
   window.AjanPerformans = {
     kaydet: save,
     kaydetAnaliz: saveAnalysis,
@@ -1254,6 +1261,7 @@
     ajanIstatistik: agentStats,
     hacimKirilimi: volumeBreakdown,
     guncelleSonuclar: updateResults,
+    yenile: refreshView,
     maliyetOku: function () { return currentCostPct; },
     ayarlar: { saklamaGun: 365, ufukMumu: HORIZON, varsayilanMaliyetYuzde: DEFAULT_COST }
   };
