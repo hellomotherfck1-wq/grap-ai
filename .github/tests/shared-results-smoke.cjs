@@ -23,7 +23,9 @@ assert.ok(sharedScript < performanceScript && performanceScript < adminScript, '
 
 assert.ok(helper.includes("rpc('grap_ai_shared_signals_upsert'"), 'Devices must send records through the insert RPC');
 assert.ok(helper.includes("rpc('grap_ai_shared_signals_patch'"), 'Admin must sync evaluation patches through RPC');
-assert.ok(helper.includes("if (!admin) return { records: [], isAdmin: false"), 'Non-admin clients must not query shared rows');
+assert.ok(helper.includes("if (!adminAuthorized)"), 'Non-admin clients must not query shared rows before admin verification');
+assert.ok(helper.includes("setAdminAccess: function (allowed)"), 'Admin module must explicitly grant shared-pool UI access only after role verification');
+assert.ok(admin.includes("ortakHavuzYetkisi(true)") && admin.includes("ortakHavuzYetkisi(false)"), 'Admin login/logout must toggle shared-pool visibility');
 assert.ok(helper.includes(".from(TABLE)"), 'Admin must read the shared table');
 assert.ok(admin.includes('window.GrapAISharedResults.client'), 'Admin login must reuse the shared Supabase session');
 assert.ok(performance.includes('shared.syncLocal(local)'), 'Existing local records must be backfilled');
