@@ -76,66 +76,92 @@
     return eventKaydet('analiz', assetName || 'Ekran görüntüsü');
   };
 
+  let istatistikYukleniyor = false;
+
   async function istatistikYukle() {
     const ist = $('istatistikler');
     const sonlar = $('son-analizler');
-    if (!ist || !sonlar) return;
+    if (!ist || !sonlar || !supabase || istatistikYukleniyor) return;
 
-    ist.replaceChildren();
-    sonlar.replaceChildren();
-    ist.textContent = 'İstatistikler yükleniyor…';
-
-    const bugun = tarihBaslangici(0);
-    const dun = tarihBaslangici(1);
-    const yediGun = tarihBaslangici(7);
-
-    const { data: events, error } = await supabase
-      .from('events')
-      .select('event_type, asset_name, created_at')
-      .gte('created_at', yediGun)
-      .order('created_at', { ascending: false })
-      .limit(2000);
-
-    if (error) {
-      ist.textContent = 'İstatistikler yüklenemedi: ' + error.message;
-      sonlar.textContent = 'events tablosu ve Supabase RLS izinlerini kontrol et.';
-      return;
+    istatistikYukleniyor = true;
+    const yenileBtn = $('admin-yenile-btn');
+    const guncelleme = $('admin-son-guncelleme');
+    if (yenileBtn) {
+      yenileBtn.disabled = true;
+      yenileBtn.textContent = 'YENİLENİYOR…';
     }
 
-    const liste = Array.isArray(events) ? events : [];
-    const ziyaret = liste.filter(x => x.event_type === 'visit');
-    const analizler = liste.filter(x => x.event_type === 'analiz');
-    const bugunZiyaret = ziyaret.filter(x => x.created_at >= bugun).length;
-    const dunZiyaret = ziyaret.filter(x => x.created_at >= dun && x.created_at < bugun).length;
-    const yediZiyaret = ziyaret.length;
-    const bugunAnaliz = analizler.filter(x => x.created_at >= bugun).length;
+    try {
+      ist.replaceChildren();
+      sonlar.replaceChildren();
+      ist.textContent = 'İstatistikler yükleniyor…';
 
-    ist.replaceChildren();
-    satir(ist, 'Bugün ziyaret', bugunZiyaret);
-    satir(ist, 'Dün ziyaret', dunZiyaret);
-    satir(ist, 'Son 7 gün ziyaret', yediZiyaret);
-    satir(ist, 'Bugün analiz', bugunAnaliz);
-    satir(ist, 'Son 7 gün analiz', analizler.length);
+      const bugun = tarihBaslangici(0);
+      const dun = tarihBaslangici(1);
+      const yediGun = tarihBaslangici(7);
 
-    if (!analizler.length) {
-      sonlar.textContent = 'Son 7 günde kayıtlı analiz bulunamadı.';
-      return;
+      const { data: events, error } = await supabase
+        .from('events')
+        .select('event_type, asset_name, created_at')
+        .gte('created_at', yediGun)
+        .order('created_at', { ascending: false })
+        .limit(2000);
+
+      if (error) {
+        ist.textContent = 'İstatistikler yüklenemedi: ' + error.message;
+        sonlar.textContent = 'events tablosu ve Supabase RLS izinlerini kontrol et.';
+        return;
+      }
+
+      const liste = Array.isArray(events) ? events : [];
+      const ziyaret = liste.filter(x => x.event_type === 'visit');
+      const analizler = liste.filter(x => x.event_type === 'analiz');
+      const bugunZiyaret = ziyaret.filter(x => x.created_at >= bugun).length;
+      const dunZiyaret = ziyaret.filter(x => x.created_at >= dun && x.created_at < bugun).length;
+      const yediZiyaret = ziyaret.length;
+      const bugunAnaliz = analizler.filter(x => x.created_at >= bugun).length;
+
+      ist.replaceChildren();
+      satir(ist, 'Bugün ziyaret', bugunZiyaret);
+      satir(ist, 'Dün ziyaret', dunZiyaret);
+      satir(ist, 'Son 7 gün ziyaret', yediZiyaret);
+      satir(ist, 'Bugün analiz', bugunAnaliz);
+      satir(ist, 'Son 7 gün analiz', analizler.length);
+
+      if (!analizler.length) {
+        sonlar.textContent = 'Son 7 günde kayıtlı analiz bulunamadı.';
+      } else {
+        analizler.slice(0, 30).forEach(e => {
+          const d = document.createElement('div');
+          d.className = 'son-analiz-satiri';
+          const t = document.createElement('time');
+          const tarih = new Date(e.created_at);
+          t.dateTime = e.created_at;
+          t.textContent = tarih.toLocaleString('tr-TR');
+          const ad = document.createElement('strong');
+          ad.textContent = ' — ' + (e.asset_name || 'Ekran görüntüsü');
+          d.append(t, ad);
+          sonlar.appendChild(d);
+        });
+      }
+
+      if (guncelleme) {
+        guncelleme.textContent = 'Son güncelleme: ' + new Date().toLocaleString('tr-TR');
+      }
+    } catch (e) {
+      ist.textContent = 'İstatistikler yüklenemedi: ' + (e.message || String(e));
+      sonlar.textContent = 'Bağlantıyı ve Supabase izinlerini kontrol et.';
+      if (guncelleme) {
+        guncelleme.textContent = 'Son kontrol: ' + new Date().toLocaleString('tr-TR');
+      }
+    } finally {
+      istatistikYukleniyor = false;
+      if (yenileBtn) {
+        yenileBtn.disabled = false;
+        yenileBtn.textContent = '↻ ÖZETİ YENİLE';
+      }
     }
-
-    analizler.slice(0, 30).forEach(e => {
-      const d = document.createElement('div');
-      d.className = 'son-analiz-satiri';
-      const t = document.createElement('time');
-      const tarih = new Date(e.created_at);
-      t.dateTime = e.created_at;
-      t.textContent = tarih.toLocaleString('tr-TR');
-      const ad = document.createElement('strong');
-      ad.textContent = ' — ' + (e.asset_name || 'Ekran görüntüsü');
-      d.append(t, ad);
-      sonlar.appendChild(d);
-    });
   }
-
   async function sessionKontrol(oturum) {
     try {
       let session = oturum || null;
@@ -193,6 +219,9 @@
 
       const girisBtn = $('admin-giris-btn');
       const cikisBtn = $('admin-cikis-btn');
+      const yenileBtn = $('admin-yenile-btn');
+
+      if (yenileBtn) yenileBtn.addEventListener('click', () => istatistikYukle());
 
       if (girisBtn) girisBtn.addEventListener('click', async () => {
         if (girisBtn.disabled) return;
