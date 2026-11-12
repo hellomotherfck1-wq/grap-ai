@@ -1218,6 +1218,7 @@
   function init() {
     var root = document.getElementById('ajan-performans-panel');
     if (!root) return;
+    render([]);
     openDB().then(prune).then(localRecords).then(function (local) {
       var shared = window.GrapAISharedResults;
       if (!shared || typeof shared.syncLocal !== 'function') {
