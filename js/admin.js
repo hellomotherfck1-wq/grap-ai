@@ -171,9 +171,11 @@
     }
 
     try {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-      });
+      supabase = window.GrapAISharedResults && window.GrapAISharedResults.client
+        ? window.GrapAISharedResults.client
+        : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+          });
       hazir = true;
 
       const girisBtn = $('admin-giris-btn');
