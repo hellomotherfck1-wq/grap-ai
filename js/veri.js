@@ -69,8 +69,11 @@ const Veri = {
     if (!n) return [];
     if (this.harita[n]) return [this.harita[n]];
     const ham = girdi.trim().toUpperCase();
-    if (/[.=^-]/.test(ham)) return [{ kaynak: 'y', sembol: ham, ad: ham, tur: 'Diğer' }];
     const kod = n.replace(/[^a-z0-9]/g, '').toUpperCase();
+    const bistList = window.TahminAI && Array.isArray(window.TahminAI.LISTE) ? window.TahminAI.LISTE : [];
+    const bistItem = kod && bistList.find(item => String(item.q || '').toUpperCase() === kod);
+    if (bistItem) return [{ kaynak: 'y', sembol: kod + '.IS', ad: bistItem.ad || kod, tur: 'BIST hissesi' }];
+    if (/[.=^-]/.test(ham)) return [{ kaynak: 'y', sembol: ham, ad: ham, tur: 'Diğer' }];
     const l = [];
     if (kod.length >= 2 && kod.length <= 10) {
       l.push({ kaynak: 'b', sembol: kod.endsWith('USDT') ? kod : kod + 'USDT', ad: kod, tur: 'Kripto' });
