@@ -15,6 +15,7 @@
   var lastSyncFingerprint = null;
   var lastPruneAt = 0;
   var ephemeralDeviceId = null;
+  var adminAuthorized = false;
   var initError = null;
 
   function uuid() {
@@ -56,9 +57,7 @@
   }
 
   function isAdmin() {
-    return getSession().then(function (session) {
-      return !!(session && isAdminUser(session.user));
-    }).catch(function () { return false; });
+    return Promise.resolve(adminAuthorized);
   }
 
   function fingerprint(records) {
@@ -155,52 +154,52 @@
   }
 
   function adminRecords() {
-    return isAdmin().then(function (admin) {
-      if (!admin) return { records: [], isAdmin: false, error: null };
-      var cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
-      var prune = Date.now() - lastPruneAt < 24 * 60 * 60 * 1000
-        ? Promise.resolve()
-        : client.rpc('grap_ai_shared_signals_prune').then(function (pruneResult) {
-            if (pruneResult.error) throw pruneResult.error;
-            lastPruneAt = Date.now();
-          });
-      return prune.then(function () {
-        var offset = 0;
-        var rows = [];
-        function readPage() {
-          return client.from(TABLE)
-            .select('signal_id, device_id, device_ids, payload, created_at, updated_at')
-            .gte('created_at', cutoff)
-            .order('signal_at', { ascending: false })
-            .range(offset, offset + 999)
-            .then(function (result) {
-              if (result.error) throw result.error;
-              var page = Array.isArray(result.data) ? result.data : [];
-              rows = rows.concat(page);
-              offset += page.length;
-              if (page.length === 1000 && offset < 50000) return readPage();
-              return rows;
-            });
-        }
-        return readPage().then(function (data) {
-          var records = data.map(function (row) {
-            var payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
-            var dbCreated = Date.parse(row.created_at) || Date.now();
-            var dbUpdated = Date.parse(row.updated_at) || dbCreated;
-            return Object.assign({}, payload, {
-              id: row.signal_id,
-              deviceId: row.device_id || null,
-              deviceIds: Array.isArray(row.device_ids) ? row.device_ids : [],
-              sharedPool: true,
-              createdAt: Number(payload.createdAt) || dbCreated,
-              updatedAt: Number(payload.updatedAt) || dbUpdated
-            });
-          });
-          return { records: records, isAdmin: true, error: null };
+    if (!adminAuthorized) {
+      return Promise.resolve({ records: [], isAdmin: false, error: null });
+    }
+    var cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+    var prune = Date.now() - lastPruneAt < 24 * 60 * 60 * 1000
+      ? Promise.resolve()
+      : client.rpc('grap_ai_shared_signals_prune').then(function (pruneResult) {
+          if (pruneResult.error) throw pruneResult.error;
+          lastPruneAt = Date.now();
         });
-      }).catch(function (error) {
-        return { records: [], isAdmin: true, error: error && error.message ? error.message : String(error) };
+    return prune.then(function () {
+      var offset = 0;
+      var rows = [];
+      function readPage() {
+        return client.from(TABLE)
+          .select('signal_id, device_id, device_ids, payload, created_at, updated_at')
+          .gte('created_at', cutoff)
+          .order('signal_at', { ascending: false })
+          .range(offset, offset + 999)
+          .then(function (result) {
+            if (result.error) throw result.error;
+            var page = Array.isArray(result.data) ? result.data : [];
+            rows = rows.concat(page);
+            offset += page.length;
+            if (page.length === 1000 && offset < 50000) return readPage();
+            return rows;
+          });
+      }
+      return readPage().then(function (data) {
+        var records = data.map(function (row) {
+          var payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+          var dbCreated = Date.parse(row.created_at) || Date.now();
+          var dbUpdated = Date.parse(row.updated_at) || dbCreated;
+          return Object.assign({}, payload, {
+            id: row.signal_id,
+            deviceId: row.device_id || null,
+            deviceIds: Array.isArray(row.device_ids) ? row.device_ids : [],
+            sharedPool: true,
+            createdAt: Number(payload.createdAt) || dbCreated,
+            updatedAt: Number(payload.updatedAt) || dbUpdated
+          });
+        });
+        return { records: records, isAdmin: true, error: null };
       });
+    }).catch(function (error) {
+      return { records: [], isAdmin: true, error: error && error.message ? error.message : String(error) };
     });
   }
   if (window.supabase && typeof window.supabase.createClient === 'function') {
@@ -223,6 +222,7 @@
     syncLocal: syncLocal,
     adminRecords: adminRecords,
     patchMany: patchMany,
+    setAdminAccess: function (allowed) { adminAuthorized = Boolean(allowed); },
     hata: function () { return initError; }
   };
 })();
