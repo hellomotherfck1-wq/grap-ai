@@ -8,7 +8,7 @@
   <meta name="color-scheme" content="dark">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/stil.css?v=6">
+  <link rel="stylesheet" href="css/stil.css?v=7">
   <title>Graph AI — Piyasa Analizi</title>
 </head>
 <body>
@@ -127,8 +127,8 @@
     </section>
 
     <section id="ayarlar" class="ekran">
-      <h2>Admin paneli</h2>
-      <div id="admin-giris" class="kart">
+      <h2>Yönetici paneli</h2>
+      <div id="admin-giris" class="kart admin-giris-karti">
         <p class="alt">Yalnızca yönetici yetkisi tanımlanmış Supabase hesabı giriş yapabilir.</p>
         <label for="admin-email">E-posta</label>
         <input id="admin-email" class="form-alani" type="email" autocomplete="username" placeholder="E-posta adresi">
@@ -139,17 +139,116 @@
       </div>
 
       <div id="admin-panel" hidden>
+        <div class="kart admin-ust-kart">
+          <div class="admin-panel-baslik">
+            <div>
+              <h3>Kontrol merkezi</h3>
+              <p class="alt">Uygulama kullanımı ve yönetici araçları</p>
+            </div>
+            <span class="admin-yetki-etiketi">Yönetici erişimi</span>
+          </div>
+          <div class="admin-panel-eylemler">
+            <button type="button" id="admin-yenile-btn" class="buton ikincil-buton">↻ ÖZETİ YENİLE</button>
+            <button type="button" id="admin-cikis-btn" class="buton tehlike-buton">GÜVENLİ ÇIKIŞ</button>
+          </div>
+          <p id="admin-son-guncelleme" class="admin-guncelleme" role="status" aria-live="polite">Henüz güncellenmedi.</p>
+        </div>
+
         <div class="kart">
-          <h3>Günlük özet</h3>
+          <h3>📊 Günlük özet</h3>
           <div id="istatistikler" class="istatistikler"></div>
         </div>
+
         <div class="kart">
-          <h3>Son analizler</h3>
+          <h3>🕒 Son analizler</h3>
           <div id="son-analizler" class="son-analizler"></div>
         </div>
-        <button type="button" id="admin-cikis-btn" class="buton tehlike-buton">ÇIKIŞ YAP</button>
+
+        <details class="kart admin-notlar" id="admin-gelistirme-notlari">
+          <summary>
+            <span>🗂️ Eski geliştirme notları</span>
+            <span class="admin-not-sayac">8 başlık · açmak için dokun</span>
+          </summary>
+          <p class="alt admin-not-aciklama">Grap-AI için daha önce alınan teknik kararlar ve geliştirme kayıtları burada saklanır. Başlıkları tek tek açıp kapatabilirsin.</p>
+
+          <details class="admin-not-grup">
+            <summary>1. Piyasalar ve zaman dilimleri</summary>
+            <ul>
+              <li>Kripto analizleri Binance Spot verileriyle 15 dakika, 1 saat, 4 saat ve günlük periyotlarda çalışır.</li>
+              <li>BIST 100 analizleri yalnızca günlük (1D) periyottadır.</li>
+              <li>Vadeli işlemler, futures ve kaldıraçlı işlem akışı kullanılmaz; kripto tarafında spot yaklaşım korunur.</li>
+            </ul>
+          </details>
+
+          <details class="admin-not-grup">
+            <summary>2. AL / SAT karar güvenliği</summary>
+            <ul>
+              <li>Karar hesabında tamamlanmış mumlar esas alınır; açık mumdan kesin sinyal üretilmez.</li>
+              <li>Hacim teyidi ve en az 1:1,5 risk/kazanç koşulu aranır.</li>
+              <li>Veri eksikse, ajanlar çelişiyorsa veya sonuç belirsizse güvenli karar BEKLE'dir.</li>
+              <li>Ek doğrulama ajanları tek başına AL veya SAT oluşturmaz; gerektiğinde mevcut kararı BEKLE'ye düşürür.</li>
+            </ul>
+          </details>
+
+          <details class="admin-not-grup">
+            <summary>3. Kripto Intelligence ve Spot ajanları</summary>
+            <ul>
+              <li>Coin taraması 216 adayı kapsar; önce 1 saatlik tarama yapılır, ilk 20 aday 1 günlük, 4 saatlik ve 15 dakikalık verilerle derinleştirilir.</li>
+              <li>Order Flow, Binance mumlarındaki gerçekleşmiş alıcı hacmini ölçer; gizli emir veya balina kimliği tespiti iddiasında bulunmaz.</li>
+              <li>BTC/ETH eğilimi ve piyasa geneli, tek bir coinin sinyalini doğrulamak veya BEKLE'ye düşürmek için bağlam sağlar.</li>
+              <li>Futures, fonlama oranı ve açık pozisyon verileri kullanılmaz.</li>
+            </ul>
+          </details>
+
+          <details class="admin-not-grup">
+            <summary>4. BIST araştırma ve haber ajanı</summary>
+            <ul>
+              <li>Ücretsiz fiyat ve hacim verilerinden RSI, EMA ve benzeri göstergeler hesaplanır; KAP bildirimleri şirket araştırmasına bağlam sağlar.</li>
+              <li>Haber taraması KAP, Google News RSS ve Yahoo Finance başlıklarından yararlanır.</li>
+              <li>Haber ajanı başlık ve kısa açıklamayı sınıflandırır; haberin tam metnini okuduğunu iddia etmez.</li>
+              <li>Kaynak veri yoksa F/K, kâr veya adil değer gibi finansal sayılar uydurulmaz; eksik veri açıkça belirtilir.</li>
+            </ul>
+          </details>
+
+          <details class="admin-not-grup">
+            <summary>5. Ajan performans karnesi</summary>
+            <ul>
+              <li>AL/SAT yön başarısı, sinyalden sonraki 10 kapanmış mumun fiyat hareketiyle ölçülür. BEKLE oyları ayrı tutulur.</li>
+              <li>Çakışan 10 mumluk ölçüm pencereleri bağımsız örnek sayılmaz; sonuçlar piyasa, periyot, ajan ve ajan sürümüne göre ayrılır.</li>
+              <li>30'dan az bağımsız örnek güvenilir başarı oranı için yeterli değildir. Yön isabeti, gerçek portföy kârı veya net işlem getirisi değildir.</li>
+              <li>Ham mum verileri performans kaydı olarak saklanmaz; eski ve ölçüm bitiş zamanı eksik kayıtlar bağımsız örnek hesabına alınmayabilir.</li>
+            </ul>
+          </details>
+
+          <details class="admin-not-grup">
+            <summary>6. Cihazlar arası ortak sonuç havuzu</summary>
+            <ul>
+              <li>Cihazların sinyal ve değerlendirme kayıtları Supabase ortak havuzunda birleştirilir; ortak kayıtları yalnızca admin yetkili hesap okuyabilir.</li>
+              <li>Her cihaz, kendi eski yerel kayıtlarını eşitleyebilmek için güncel uygulamayı en az bir kez açmalıdır.</li>
+              <li>365 günden eski kayıtlar saklama sınırının dışındadır. Eski kayıtlarda ölçüm bitiş bilgisi yoksa bağımsız örnek sayısına girmeyebilir.</li>
+            </ul>
+          </details>
+
+          <details class="admin-not-grup">
+            <summary>7. Giriş ve veri güvenliği</summary>
+            <ul>
+              <li>Yönetici girişi Supabase e-posta/şifre oturumuyla yapılır; yetki sunucu tarafındaki <code>app_metadata.role = admin</code> alanından doğrulanır.</li>
+              <li>Tarayıcıda yalnızca anon/publishable anahtar bulunur. <code>service_role</code> anahtarı HTML veya JavaScript dosyalarına eklenmez.</li>
+              <li>Ortak havuzun okuma erişimi RLS ve admin kontrolüyle sınırlandırılır; cihazlardan gelen kayıtlar kontrollü RPC üzerinden alınır.</li>
+            </ul>
+          </details>
+
+          <details class="admin-not-grup">
+            <summary>8. Sonraki geliştirme adımı</summary>
+            <ul>
+              <li>Önce 1–2 hafta boyunca yeterli sayıda bağımsız sinyal ve 10 mumluk değerlendirme birikmesi beklenir.</li>
+              <li>Ardından hangi ajanın hangi piyasada ve periyotta zayıf kaldığı performans tablosundan belirlenir.</li>
+              <li>AL/SAT eşikleri rastgele değiştirilmez; yalnızca ölçümle kanıtlanan sorun için hedefli kod değişikliği ve test hazırlanır.</li>
+            </ul>
+          </details>
+        </details>
       </div>
-      <p class="alt">Admin istatistikleri Supabase bağlantısı ve veritabanı izinleri gerektirir.</p>
+      <p class="alt">Yönetici istatistikleri ve ortak sonuç kayıtları yalnızca yetkili Supabase hesabıyla görüntülenir.</p>
     </section>
   </main>
 
@@ -186,6 +285,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/ortak-sonuc-havuzu.js?v=1"></script>
   <script src="js/ajan-performans.js?v=15"></script>
-  <script src="js/admin.js"></script>
+  <script src="js/admin.js?v=2"></script>
 </body>
 </html>

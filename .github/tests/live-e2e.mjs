@@ -1316,8 +1316,37 @@ try {
   const adminUI = await page.locator('#admin-giris').isVisible() &&
     await page.locator('#admin-email').count() === 1 &&
     await page.locator('#admin-sifre').count() === 1 &&
-    await page.locator('#admin-giris-btn').count() === 1;
-  check('Admin giriş ekranı yükleniyor', adminUI, adminUI ? 'E-posta, şifre ve giriş kontrolleri hazır' : 'Admin giriş alanları eksik');
+    await page.locator('#admin-giris-btn').count() === 1 &&
+    await page.locator('#admin-yenile-btn').count() === 1 &&
+    await page.locator('#admin-gelistirme-notlari').count() === 1 &&
+    await page.locator('#admin-panel').isHidden();
+  check('Admin giriş ekranı ve yönetici araçları hazır', adminUI,
+    adminUI ? 'Giriş, yenileme ve yöneticiye özel not alanları hazır' : 'Admin arayüzünde eksik alan var');
+  const adminNotes = await page.evaluate(() => {
+    const notes = document.getElementById('admin-gelistirme-notlari');
+    const groups = notes ? Array.from(notes.querySelectorAll(':scope > details.admin-not-grup')) : [];
+    const initiallyCollapsed = !!notes && !notes.open;
+    if (notes) notes.open = true;
+    const expands = !!notes && notes.open;
+    const hasPerformance = (notes?.textContent || '').includes('30\'dan az bağımsız örnek');
+    const hasSecurity = (notes?.textContent || '').includes('service_role');
+    if (notes) notes.open = false;
+    return {
+      insideAdmin: !!notes && !!notes.closest('#admin-panel'),
+      parentHidden: !!notes && notes.closest('#admin-panel').hidden,
+      initiallyCollapsed,
+      expands,
+      collapses: !!notes && !notes.open,
+      groupCount: groups.length,
+      hasPerformance,
+      hasSecurity
+    };
+  });
+  check('Eski geliştirme notları admin panelinde açılır-kapanır ve gruplu',
+    adminNotes.insideAdmin && adminNotes.parentHidden && adminNotes.initiallyCollapsed &&
+      adminNotes.expands && adminNotes.collapses && adminNotes.groupCount === 8 &&
+      adminNotes.hasPerformance && adminNotes.hasSecurity,
+    JSON.stringify(adminNotes));
 
   await page.locator('nav button[data-git="strateji"]').click();
   await page.setViewportSize({ width: 390, height: 844 });
