@@ -304,6 +304,7 @@ try {
       }),
       Object.assign({}, base, {
         symbol: 'E2EOVERLAPUSDT', signalAt: 1801000, forwardPct: -1,
+        generalAgentVersion: 'general-v2',
         directionResult: { exitAt: 5401000 }
       }),
       Object.assign({}, base, {
@@ -343,7 +344,11 @@ try {
         row.agentKey === 'generalDecision' && row.version === 'general-v1') &&
         groups.some(row => row.agentKey === 'generalDecision' && row.version === 'general-v2'),
       waitVotesShownSeparately: groups.some(row =>
-        row.agentKey === 'generalDecision' && row.votes.BEKLE === 1)
+        row.agentKey === 'generalDecision' && row.votes.BEKLE === 1),
+      crossVersionOverlapExcluded: groups.some(row =>
+        row.agentKey === 'generalDecision' && row.market === 'Kripto' &&
+        row.timeframe === '1h' && row.version === 'general-v2' &&
+        row.stats.count === 0 && row.stats.overlapExcluded === 1)
     };
   });
   check('Çakışan 10 mumluk sinyal pencereleri bağımsız örnek sayılmıyor',
@@ -354,7 +359,8 @@ try {
     agentBreakdownChecks.separateMarketAndTimeframe && agentBreakdownChecks.separateAgentVersions,
     JSON.stringify(agentBreakdownChecks));
   check('BEKLE oyları yön isabetinden ayrı gösteriliyor',
-    agentBreakdownChecks.waitVotesShownSeparately, JSON.stringify(agentBreakdownChecks));
+    agentBreakdownChecks.waitVotesShownSeparately && agentBreakdownChecks.crossVersionOverlapExcluded,
+    JSON.stringify(agentBreakdownChecks));
 
   const volumeBreakdownChecks = await page.evaluate(() => {
     const groups = window.AjanPerformans.hacimKirilimi([
