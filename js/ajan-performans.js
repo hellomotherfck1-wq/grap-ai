@@ -81,15 +81,11 @@
         byId[record.id] = record;
         return;
       }
-      var localTime = Number(record.updatedAt || record.createdAt) || 0;
-      var sharedTime = Number(shared.updatedAt || shared.createdAt) || 0;
-      byId[record.id] = localTime >= sharedTime
-        ? Object.assign({}, shared, record, {
-            deviceId: shared.deviceId || null,
-            deviceIds: shared.deviceIds || [],
-            sharedPool: true
-          })
-        : Object.assign({}, record, shared, { sharedPool: true });
+      byId[record.id] = Object.assign({}, record, shared, {
+        deviceId: shared.deviceId || null,
+        deviceIds: shared.deviceIds || [],
+        sharedPool: true
+      });
     });
     return Object.keys(byId).map(function (key) { return byId[key]; })
       .sort(function (a, b) { return (Number(b.signalAt) || 0) - (Number(a.signalAt) || 0); });
@@ -454,8 +450,16 @@
     patch.waitResult = null;
     return patchRecord(id, patch).then(function (updated) {
       var shared = window.GrapAISharedResults;
-      var remote = shared && typeof shared.patchMany === 'function'
-        ? shared.patchMany([{ id: id, patch: patch }]) : Promise.resolve({ ok: true });
+      var remote = Promise.resolve({ ok: true });
+      if (shared && updated && typeof shared.kaydet === 'function') {
+        remote = shared.isAdmin().then(function (admin) {
+          return admin && typeof shared.patchMany === 'function'
+            ? shared.patchMany([{ id: id, patch: patch }])
+            : shared.kaydet([updated]);
+        });
+      } else if (shared && typeof shared.patchMany === 'function') {
+        remote = shared.patchMany([{ id: id, patch: patch }]);
+      }
       return Promise.resolve(remote).then(function () {
         return allRecords().then(function (records) {
           render(records);
