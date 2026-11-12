@@ -385,6 +385,10 @@ try {
   const otherMarketTimeframes = await page.locator('#ara-diger-zd option').evaluateAll(options => options.map(option => option.value));
   check('Diğer piyasalarda emtia için 15m, 1h ve 1d korunuyor',
     JSON.stringify(otherMarketTimeframes) === JSON.stringify(['15m', '1h', '1d']), JSON.stringify(otherMarketTimeframes));
+  await page.locator('#ara-diger-ad').fill('BIST100');
+  const bistIndexTimeframes = await page.locator('#ara-diger-zd option').evaluateAll(options => options.map(option => option.value));
+  check('BIST 100 endeksi de yalnızca günlük periyotta kalıyor',
+    JSON.stringify(bistIndexTimeframes) === JSON.stringify(['1d']), JSON.stringify(bistIndexTimeframes));
 
   await page.locator('#ara-kripto-ad').fill('THYAO.IS');
   await page.locator('#ara-kripto-btn').click();
