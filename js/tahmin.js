@@ -6,8 +6,10 @@
 (function () {
   'use strict';
 
-  var KEY = 'graphai_tahmin_v1';
-  var BUGUN_KEY = 'graphai_tahmin_bugun';
+  var KEY = 'graphai_tahmin_daily_v2';
+  var BUGUN_KEY = 'graphai_tahmin_daily_v2_bugun';
+  var BIST_ZD = '1d';
+  var BIST_AGENT_VERSION = 'tahmin-v1.4-daily';
 
   /** BIST 100 — uygulamadaki bist100.js ile aynı liste */
   var LISTE = [
@@ -389,6 +391,7 @@
   }
 
   async function taraBir(item, zd) {
+    zd = BIST_ZD;
     if (typeof Veri === 'undefined' || typeof Veri.ara !== 'function') {
       throw new Error('Veri modülü yok');
     }
@@ -504,7 +507,7 @@
   }
 
   async function bugunUret(zd, onProgress) {
-    zd = zd || '1h';
+    zd = BIST_ZD;
     var adaylar = [];
     var hatalar = [];
 
@@ -531,7 +534,7 @@
         source: 'BIST tarama',
         market: 'BIST',
         timeframe: zd,
-        agentVersion: 'tahmin-v1.3'
+        agentVersion: BIST_AGENT_VERSION
       });
     }
 
@@ -572,7 +575,7 @@
       secim: secim,
       adaylar: adaylar.map(kisaOzet),
       hatalar: hatalar,
-      ajanSurum: 'tahmin-v1.2'
+      ajanSurum: BIST_AGENT_VERSION
     };
 
     var hafiza = okuHafiza();
@@ -789,11 +792,7 @@
     sec.innerHTML =
       '<h2>Tahmin AI</h2>' +
       '<p class="alt">BIST 100’deki tüm hisseleri tarar; Teknik, Hacim ve Denetçi ajanlarına sorar; en yüksek skorlu kurulumu seçer. Hafıza bu cihazda saklanır.</p>' +
-      '<select id="tahmin-zd" style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #2a333d;background:#1a222c;color:#e6edf3;font-size:16px">' +
-      '<option value="1h">1 saatlik</option>' +
-      '<option value="1d" selected>Günlük</option>' +
-      '<option value="15m">15 dakikalık</option>' +
-      '</select>' +
+      '<p class="alt"><strong>Veri periyodu:</strong> Günlük (1D) — hisse analizinde sabit.</p>' +
       '<button type="button" id="tahmin-btn" class="buton">BUGÜNÜN TAHMİNİNİ ÜRET</button>' +
       '<p id="tahmin-durum" class="alt"></p>' +
       '<div id="tahmin-alan"></div>' +
@@ -819,8 +818,7 @@
         if (btn.disabled) return;
         btn.disabled = true;
         if (alan) alan.innerHTML = '';
-        var zdEl = document.getElementById('tahmin-zd');
-        var zd = zdEl ? zdEl.value : '1h';
+        var zd = BIST_ZD;
         bugunUret(zd, function (i, n, ad) {
           if (durum) durum.textContent = 'Taranıyor ' + i + '/' + n + ': ' + ad + '…';
         }).then(function (kayit) {
@@ -855,6 +853,8 @@
     bugunUret: bugunUret,
     taraBir: taraBir,
     ajanlaraSor: ajanlaraSor,
+    zamanDilimi: BIST_ZD,
+    agentVersion: BIST_AGENT_VERSION,
     okuHafiza: okuHafiza,
     okuBugunCache: okuBugunCache,
     sonDurum: null,
@@ -876,7 +876,7 @@
       if (ay) {
         var pp = document.createElement('p');
         pp.className = 'kart';
-        pp.textContent = 'Tahmin AI: yüklendi (v1.2 — BIST 100 tarama + ajan alışverişi)';
+        pp.textContent = 'Tahmin AI: yüklendi (v1.4 — BIST günlük tarama + ajan alışverişi)';
         ay.appendChild(pp);
       }
     } catch (e3) {}
