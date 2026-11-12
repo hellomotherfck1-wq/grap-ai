@@ -25,10 +25,11 @@
       <div class="kart">
         <label for="ara-ad">Varlık adı veya sembolü</label>
         <input id="ara-ad" class="form-alani" list="oneri" placeholder="Bitcoin, Pegasus, Altın, PGSUS.IS…" autocomplete="off">
-        <label for="ara-zd">Zaman dilimi</label>
+        <label id="ara-zd-label" for="ara-zd">Zaman dilimi (varlığa göre)</label>
         <select id="ara-zd" class="form-alani">
           <option value="15m">15 dakikalık</option>
           <option value="1h" selected>1 saatlik</option>
+          <option value="4h">4 saatlik</option>
           <option value="1d">Günlük</option>
         </select>
         <button type="button" id="ara-btn" class="buton">GRAFİĞİ BUL VE ANALİZ ET</button>
@@ -128,19 +129,19 @@
   <script src="js/tani.js"></script>
   <script src="js/cizim.js"></script>
   <script src="js/ocr.js?v=2"></script>
-  <script src="js/veri.js?v=3"></script>
+  <script src="js/veri.js?v=4"></script>
   <script src="js/liste.js"></script>
   <script src="js/bist100.js"></script>
   <script src="js/ajan.js?v=6"></script>
   <script src="js/ajan2.js?v=2"></script>
   <script src="js/ajan-fk.js?v=4"></script>
-  <script src="js/arayuz.js?v=12"></script>
-  <script src="js/tahmin.js?v=7"></script>
+  <script src="js/arayuz.js?v=13"></script>
+  <script src="js/tahmin.js?v=8"></script>
   <script src="js/bist-arastirma.js?v=3"></script>
   <script src="js/finansal-panel.js?v=7"></script>
   <script src="js/haber-ajani.js?v=1"></script>
   <script src="js/kripto-ajanlari.js?v=2"></script>
-  <script src="js/coin-tahmin.js?v=10"></script>
+  <script src="js/coin-tahmin.js?v=11"></script>
   <script src="js/ajan-performans.js?v=13"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/admin.js"></script>
