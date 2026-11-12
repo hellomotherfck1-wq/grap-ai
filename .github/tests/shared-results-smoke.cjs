@@ -33,6 +33,18 @@ assert.ok(performance.includes('shared.patchMany(remotePatches)'), 'Evaluation o
 assert.ok(performance.includes('Object.assign({}, record, shared'), 'The central shared record must remain the admin view source of truth');
 assert.ok(performance.includes('shared.kaydet([updated])'), 'A device must sync its own revised pending analysis');
 assert.ok(performance.includes('remote.then(function (result)'), 'Shared sync must not block local decision updates');
+const exportStart = performance.indexOf('function exportCSV(records)');
+const exportEnd = performance.indexOf('function saveEvaluation', exportStart);
+const exportBlock = performance.slice(exportStart, exportEnd);
+const columnsMatch = exportBlock.match(/var columns = (\[[\s\S]*?\]);/);
+const valuesMatch = exportBlock.match(/var values = (\[[\s\S]*?\]);/);
+assert.ok(columnsMatch && valuesMatch, 'CSV export must expose matching column and value arrays');
+const exportColumns = new Function('return ' + columnsMatch[1])();
+const exportValues = new Function('r', 'deviceIds', 'return ' + valuesMatch[1])({
+  signalAt: 0, sources: [], deepReasons: [], decision: 'BEKLE'
+}, []);
+assert.equal(exportColumns.length, exportValues.length, 'CSV header and row field counts must match');
+assert.ok(exportColumns.includes('deviceIds'), 'Full CSV export must include source device IDs');
 assert.ok(performance.includes('Ortak sonuç havuzu'), 'Admin shared-pool state must be visible in results');
 const renderStart = performance.indexOf('function render(records)');
 const allDeclaration = performance.indexOf('var all = Array.isArray(records) ? records : [];', renderStart);
