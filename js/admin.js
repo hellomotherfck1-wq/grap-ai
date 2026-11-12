@@ -50,6 +50,15 @@
     return roller.some(x => String(x).toLowerCase() === hedef);
   }
 
+  async function ortakHavuzYetkisi(izinli) {
+    if (window.GrapAISharedResults && typeof window.GrapAISharedResults.setAdminAccess === 'function') {
+      window.GrapAISharedResults.setAdminAccess(Boolean(izinli));
+    }
+    if (window.AjanPerformans && typeof window.AjanPerformans.yenile === 'function') {
+      try { await window.AjanPerformans.yenile(); } catch (e) {}
+    }
+  }
+
   async function eventKaydet(tip, asset) {
     if (!supabase || !hazir) return;
     try {
@@ -137,6 +146,7 @@
       }
 
       if (!session) {
+        await ortakHavuzYetkisi(false);
         giris.hidden = false;
         panel.hidden = true;
         return;
@@ -147,12 +157,14 @@
 
       if (!yetkiliMi(data.user)) {
         await supabase.auth.signOut();
+        await ortakHavuzYetkisi(false);
         giris.hidden = false;
         panel.hidden = true;
         mesaj('Bu hesapta yönetici yetkisi bulunmuyor. Supabase app_metadata.role alanı admin olmalı.', true);
         return;
       }
 
+      await ortakHavuzYetkisi(true);
       giris.hidden = true;
       panel.hidden = false;
       mesaj('Yönetici oturumu açık.');
@@ -208,6 +220,7 @@
         try {
           const { error } = await supabase.auth.signOut();
           if (error) throw error;
+          await ortakHavuzYetkisi(false);
           giris.hidden = false;
           panel.hidden = true;
           mesaj('Güvenli çıkış yapıldı.');
