@@ -6,7 +6,7 @@ const performance = fs.readFileSync('js/ajan-performans.js', 'utf8');
 const admin = fs.readFileSync('js/admin.js', 'utf8');
 const html = fs.readFileSync('index.html', 'utf8');
 const worker = fs.readFileSync('sw.js', 'utf8');
-const migrationPath = 'supabase/migrations/202611120001_shared_agent_results.sql';
+const migrationPath = 'supabase/migrations/20261112000100_shared_agent_results.sql';
 const sql = fs.readFileSync(migrationPath, 'utf8');
 const workflow = fs.readFileSync('.github/workflows/live-e2e.yml', 'utf8');
 
