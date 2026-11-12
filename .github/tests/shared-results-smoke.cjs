@@ -37,6 +37,8 @@ assert.ok(/revoke all on table public\.agent_signals_shared from anon, authentic
 assert.ok(/grant select on table public\.agent_signals_shared to authenticated/i.test(sql), 'Authenticated role must have SELECT subject to RLS');
 assert.ok(/grap_ai_shared_signals_upsert[\s\S]*security definer/i.test(sql), 'Public write must be handled by a constrained SECURITY DEFINER RPC');
 assert.ok(/grap_ai_shared_signals_patch[\s\S]*admin_required/i.test(sql), 'Result patches must require admin');
+assert.ok(sql.includes("'updatedAt', floor(extract(epoch from now()) * 1000)::bigint"), 'Remote result updates must refresh the payload timestamp');
+assert.ok(sql.includes("v_market = 'BIST' and v_timeframe <> '1d'"), 'BIST shared records must remain daily only');
 assert.ok(/grap_ai_shared_signals_prune[\s\S]*admin_required/i.test(sql), 'Retention cleanup must require admin');
 assert.ok(/grant execute on function public\.grap_ai_shared_signals_upsert\(jsonb\) to anon, authenticated/i.test(sql), 'Anonymous devices must be able to submit records');
 assert.ok(!/service_role\s*[:=]\s*['"][^'"]+/i.test(helper + admin + sql), 'No service_role secret may be shipped to browsers');
