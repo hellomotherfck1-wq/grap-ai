@@ -89,7 +89,8 @@
               [
                 'name', 'market', 'timeframe', 'signalAt', 'scanAt', 'price', 'stop', 'target', 'rr',
                 'decision', 'generalDecision', 'technicalDecision', 'volumeDecision',
-                'volumeScore', 'flowDecision', 'flowScore', 'flowAvailable',
+                'volumeScore', 'volumeAvailable', 'volumeModelVersion',
+                'flowDecision', 'flowScore', 'flowAvailable',
                 'marketRegime', 'mtfAlignment', 'sourceTimestamps',
                 'deepScan', 'deepVeto', 'deepReasons', 'finalReason',
                 'spotStatus', 'spotResult',
@@ -188,6 +189,8 @@
       technicalDecision: input.technicalDecision || null,
       volumeDecision: input.volumeDecision || null,
       volumeScore: num(input.volumeScore) ? input.volumeScore : null,
+      volumeAvailable: typeof input.volumeAvailable === 'boolean' ? input.volumeAvailable : null,
+      volumeModelVersion: input.volumeModelVersion || null,
       flowDecision: input.flowDecision || null,
       flowScore: num(input.flowScore) ? input.flowScore : null,
       flowAvailable: typeof input.flowAvailable === 'boolean' ? input.flowAvailable : null,
@@ -271,6 +274,8 @@
       technicalDecision: tech && tech.karar ? tech.karar : null,
       volumeDecision: voteFromVolume(volumeScore, !!(volume && volume.var)),
       volumeScore: volumeScore,
+      volumeAvailable: !!(volume && volume.var),
+      volumeModelVersion: volume && volume.var ? 'volume-heuristic-v1' : null,
       auditorError: auditMatch ? auditMatch[1].charAt(0).toLocaleUpperCase('tr-TR') + auditMatch[1].slice(1).toLocaleLowerCase('tr-TR') : null,
       auditorWarningCount: auditCountMatch ? Number(auditCountMatch[1]) : null
     };
@@ -294,6 +299,8 @@
       technicalDecision: votes.technicalDecision,
       volumeDecision: votes.volumeDecision,
       volumeScore: votes.volumeScore,
+      volumeAvailable: votes.volumeAvailable,
+      volumeModelVersion: votes.volumeModelVersion,
       auditorError: input.auditorError || votes.auditorError,
       auditorWarningCount: input.auditorWarningCount != null ? input.auditorWarningCount : votes.auditorWarningCount,
       score: y.uyum,
@@ -313,6 +320,13 @@
     var writes = [];
     candidates.forEach(function (c) {
       if (!c || !c.sembol || c.sembol === '—') return;
+      var volumeAvailable = typeof c.hacimVar === 'boolean'
+        ? c.hacimVar
+        : ['AL', 'SAT', 'BEKLE'].indexOf(c.hacimKarar) >= 0;
+      var volumeDecision = volumeAvailable
+        ? (['AL', 'SAT', 'BEKLE'].indexOf(c.hacimKarar) >= 0
+          ? c.hacimKarar : voteFromVolume(c.hacimSkor, true))
+        : null;
       var record = safeRecord({
         source: meta.source || 'Tarama',
         scanAt: scanAt,
@@ -328,8 +342,10 @@
         decision: c.karar,
         generalDecision: c.genelKarar,
         technicalDecision: c.teknikKarar,
-        volumeDecision: c.hacimKarar || voteFromVolume(c.hacimSkor, c.hacimSkor !== null && c.hacimSkor !== undefined),
-        volumeScore: c.hacimSkor,
+        volumeDecision: volumeDecision,
+        volumeScore: volumeAvailable && num(c.hacimSkor) ? c.hacimSkor : null,
+        volumeAvailable: volumeAvailable,
+        volumeModelVersion: volumeAvailable ? (c.volumeModelVersion || 'volume-heuristic-v1') : null,
         flowDecision: c.flow && c.flow.available ? c.flow.decision : null,
         flowScore: c.flow && c.flow.available ? c.flow.score : null,
         flowAvailable: c.flow ? !!c.flow.available : null,
@@ -574,7 +590,8 @@
   function agentStats(records, key) {
     var calls = records.filter(function (r) {
       return r.directionStatus === 'completed' &&
-        (r[key] === 'AL' || r[key] === 'SAT') && num(r.forwardPct);
+        (r[key] === 'AL' || r[key] === 'SAT') && num(r.forwardPct) &&
+        (key !== 'volumeDecision' || r.volumeAvailable !== false);
     });
     var correct = 0, wrong = 0, flat = 0;
     calls.forEach(function (r) {
@@ -584,6 +601,32 @@
     });
     var directional = correct + wrong;
     return { count: calls.length, correct: correct, wrong: wrong, flat: flat, rate: directional ? correct / directional * 100 : null };
+  }
+
+  function volumeBreakdown(records) {
+    var groups = Object.create(null);
+    (records || []).forEach(function (record) {
+      if (!record || record.directionStatus !== 'completed' ||
+          (record.volumeDecision !== 'AL' && record.volumeDecision !== 'SAT') ||
+          !num(record.forwardPct) || record.volumeAvailable === false) return;
+      var market = record.market || marketOf(record.symbol);
+      var timeframe = record.timeframe || '—';
+      var version = record.volumeModelVersion || 'Eski / sürümü bilinmiyor';
+      var key = version + '|' + market + '|' + timeframe;
+      if (!groups[key]) {
+        groups[key] = { version: version, market: market, timeframe: timeframe, records: [] };
+      }
+      groups[key].records.push(record);
+    });
+    return Object.keys(groups).sort().map(function (key) {
+      var group = groups[key];
+      return {
+        version: group.version,
+        market: group.market,
+        timeframe: group.timeframe,
+        stats: agentStats(group.records, 'volumeDecision')
+      };
+    });
   }
 
   function renderAgentTable(records) {
@@ -608,6 +651,37 @@
     });
     table.appendChild(body);
     wrap.appendChild(table);
+    return wrap;
+  }
+
+  function renderVolumeBreakdown(records) {
+    var rows = volumeBreakdown(records);
+    var wrap = el('div', 'backtest-table-wrap');
+    var table = el('table', 'backtest-trade-table');
+    var head = el('thead'), hr = el('tr');
+    ['Model sürümü', 'Piyasa', 'Periyot', 'Sinyal', 'Doğru', 'Yanlış', 'Yatay', 'İsabet'].forEach(function (label) {
+      hr.appendChild(el('th', '', label));
+    });
+    head.appendChild(hr);
+    table.appendChild(head);
+    var body = el('tbody');
+    rows.forEach(function (item) {
+      var stats = item.stats;
+      var version = item.version === 'volume-heuristic-v1'
+        ? 'Mevcut model v1' : item.version;
+      var tr = el('tr');
+      [
+        version, item.market, item.timeframe, String(stats.count),
+        String(stats.correct), String(stats.wrong), String(stats.flat),
+        stats.rate === null ? '—' : '%' + stats.rate.toFixed(1).replace('.', ',')
+      ].forEach(function (value) { tr.appendChild(el('td', '', value)); });
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    wrap.appendChild(table);
+    if (!rows.length) {
+      wrap.appendChild(el('p', 'backtest-not', 'Hacim ajanı için henüz tamamlanmış AL/SAT yön sinyali yok.'));
+    }
     return wrap;
   }
 
@@ -810,6 +884,10 @@
     card.appendChild(el('p', 'backtest-not', quality));
     card.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · sinyalden 10 mum sonra'));
     card.appendChild(renderAgentTable(all));
+    card.appendChild(el('p', 'backtest-not',
+      'Hacim ajanının doğru/yanlış hesabı yalnızca AL/SAT oylarını sayar; BEKLE ve veri yok oyları isabet hesabına girmez. Ölçüm, sinyalden sonraki 10 kapanmış mumun fiyat yönüne göredir; işlem kâr oranı değildir. Genel toplam farklı piyasa ve periyotları birleştirebilir.'));
+    card.appendChild(el('h4', 'backtest-trades-title', 'Hacim ajanı · model, piyasa ve periyot kırılımı'));
+    card.appendChild(renderVolumeBreakdown(all));
     card.appendChild(el('h4', 'backtest-trades-title', 'Spot AL: piyasa ve zaman dilimi ayrımı'));
     card.appendChild(renderBreakdown(all));
     card.appendChild(el('h4', 'backtest-trades-title', 'Spot SAT: satmak mı, tutmak mı?'));
@@ -870,7 +948,8 @@
 
   function exportCSV(records) {
     var columns = ['signalAt', 'scanAt', 'symbol', 'name', 'market', 'timeframe', 'decision', 'generalDecision',
-      'technicalDecision', 'volumeDecision', 'flowDecision', 'flowScore', 'flowAvailable',
+      'technicalDecision', 'volumeDecision', 'volumeScore', 'volumeAvailable', 'volumeModelVersion',
+      'flowDecision', 'flowScore', 'flowAvailable',
       'marketRegime', 'mtfAlignment', 'deepScan', 'deepVeto', 'deepReasons', 'finalReason',
       'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
       'costPct', 'tradeStatus', 'tradeOutcome', 'netPct', 'spotStatus', 'spotOutcome',
@@ -1060,6 +1139,8 @@
     guncelleKarar: updateDecision,
     listele: allRecords,
     sonucHesapla: evaluateSignal,
+    ajanIstatistik: agentStats,
+    hacimKirilimi: volumeBreakdown,
     guncelleSonuclar: updateResults,
     maliyetOku: function () { return currentCostPct; },
     ayarlar: { saklamaGun: 365, ufukMumu: HORIZON, varsayilanMaliyetYuzde: DEFAULT_COST }
