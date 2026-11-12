@@ -728,7 +728,7 @@
       'Toplam ' + (adaylar.length + hatalar.length) + ' coin listelendi: ' + adaylar.length +
         ' coin verisi incelendi, ' + hatalar.length + ' coin için veri alınamadı.',
       'Son karar dağılımı: ' + counts.AL + ' AL · ' + counts.SAT + ' SAT · ' + counts.BEKLE + ' BEKLE.',
-      deepCount + ' coin çoklu zaman dilimi ve Spot hacim verileriyle derin kontrolden geçti.',
+      deepCount + ' coin 15 dakika, 1 saat, 4 saat ve günlük verilerle Spot hacim kontrolünden geçti.',
       'Derin doğrulama almayan coinlerde AL/SAT sinyali gösterilmez; güvenlik için BEKLE yazılır.'
     ], '#2f81f7');
   }
@@ -928,7 +928,7 @@
 
     sec.innerHTML =
       '<h2>Coin Tahmin AI</h2>' +
-      '<p class="alt">216 coin Spot verileriyle taranır. En güçlü 20 aday ayrıca farklı zaman dilimleri, alım/satım hacmi ve BTC/ETH piyasa durumuyla kontrol edilir. Sonuçta botların AL/SAT/BEKLE oyları ve sistemin son kararı açıkça gösterilir.</p>' +
+      '<p class="alt">216 coin Spot verileriyle 1 saatlik hızlı taramada incelenir. En güçlü 20 aday 15 dakika, 1 saat, 4 saat ve günlük verilerle; alım/satım hacmi ve BTC/ETH piyasa durumuyla derin kontrolden geçer. Sonuçta botların AL/SAT/BEKLE oyları ve sistemin son kararı açıkça gösterilir.</p>' +
       '<button type="button" id="coin-tahmin-btn" class="buton">BUGÜNÜN COİN TARAMASINI BAŞLAT</button>' +
       '<p id="coin-tahmin-durum" class="alt"></p>' +
       '<div id="coin-tahmin-alan"></div>' +
