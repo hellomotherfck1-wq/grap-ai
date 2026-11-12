@@ -26,7 +26,7 @@ Graph AI, GitHub Pages üzerinde çalışan statik bir piyasa analiz uygulaması
 
 `js/bist-arastirma.js` teknik araştırmayı, `js/finansal-panel.js` ise ücretsiz temel araştırma panelini sağlar.
 
-- BIST taraması: uygulamadaki 100 sembollük liste üzerinden günlük veya saatlik teknik tarama.
+- BIST taraması: uygulamadaki 100 sembollük liste üzerinden yalnızca günlük (1D) teknik tarama.
 - Tarama tablosu: son fiyat, son mum değişimi, son hacim, 20 mum ortalama hacmi, hacim oranı, RSI, ortak karar ve skor.
 - Ücretsiz fiyat/hacim: Yahoo Finance herkese açık chart uçları; uygulamanın mevcut proxy'si üzerinden alınır. Gecikme, erişim kesintisi ve kullanım kısıtları olabilir.
 - Teknik göstergeler: RSI(14), EMA(20/50/100/200), 20/60 günlük getiri, son hacim/20 günlük ortalama hacim ve trend yönü tarayıcıda hesaplanır.
@@ -87,7 +87,7 @@ Admin kontrol merkezinde günlük ziyaret/analiz özeti, son analizler ve elle y
 ## Kontrol listesi
 
 - Varlık araması: `BTCUSDT`, `Bitcoin`, `PGSUS.IS`, `Pegasus`
-- Zaman aralığı: 15 dakika, 1 saat ve günlük
+- Zaman aralığı: kriptoda 15 dakika, 1 saat, 4 saat ve günlük; BIST 100'de yalnızca günlük
 - Görüntü analizi: mum okuma, isteğe bağlı yüksek/düşük fiyat kalibrasyonu
 - Sonuç ve geçmiş: tarayıcının yerel depolaması
 - Çevrimdışı: daha önce önbelleğe alınmış uygulama dosyaları
