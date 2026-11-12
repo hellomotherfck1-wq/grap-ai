@@ -333,6 +333,15 @@
     ];
   }
 
+  // Her ajanın sürümünü tek noktadan takip et. Algoritma değiştiğinde
+  // yalnızca değişen ajanın sürümünü artır.
+  A.surumler = Object.freeze({
+    general: 'analysis-v1',
+    technical: 'technical-groups-v1',
+    volume: 'volume-heuristic-v1',
+    auditor: 'auditor-check-v1',
+    committee: 'committee-consensus-v1'
+  });
   A.teknikAjani = teknikAjani;
   A.nihai = nihai;
   A.kartlar3 = kartlar3;
