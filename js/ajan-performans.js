@@ -871,7 +871,7 @@
     heading.appendChild(el('h3', '', '🏆 Ajanların ölçülen performansı'));
     var ortakGorunum = all.some(function (record) { return record && record.sharedPool; });
     heading.appendChild(el('p', 'backtest-not', ortakGorunum
-      ? 'Ortak sonuç havuzu · Ortak kayıtları yalnızca yönetici hesabı görebilir · sinyaller 365 gün saklanır · ham mumlar saklanmaz.'
+      ? 'Ortak sonuç havuzu · Ortak kayıtları yalnızca yönetici hesabı görebilir · cihaz etiketleri anonim tarayıcı profili kimliğidir · sinyaller 365 gün saklanır · ham mumlar saklanmaz.'
       : 'Sinyaller 365 gün saklanır · 216 coin taramasındaki geçerli adayların oyları tutulur · ham mumlar saklanmaz · bu cihazda.'));
     header.appendChild(heading);
 
