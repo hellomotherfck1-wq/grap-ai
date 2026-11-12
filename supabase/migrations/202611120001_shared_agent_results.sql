@@ -64,6 +64,7 @@ declare
   v_timeframe text;
   v_decision text;
   v_signal_at bigint;
+  v_price numeric;
   v_device_id uuid;
   v_signal_id text;
   v_rows integer;
@@ -86,6 +87,7 @@ begin
     begin
       v_device_id := (v_item ->> 'device_id')::uuid;
       v_signal_at := round((v_record ->> 'signalAt')::numeric)::bigint;
+      v_price := (v_record ->> 'price')::numeric;
     exception when others then
       continue;
     end;
@@ -96,7 +98,8 @@ begin
     v_decision := coalesce(v_record ->> 'decision', '');
 
     if v_device_id is null or v_symbol = '' or length(v_symbol) > 80
-      or v_signal_at is null or v_signal_at <= 0 then
+      or v_signal_at is null or v_signal_at <= 0
+      or v_price is null or v_price <= 0 then
       continue;
     end if;
     if v_market not in ('Kripto', 'BIST', 'Diğer') then
