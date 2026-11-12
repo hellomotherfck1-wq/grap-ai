@@ -704,9 +704,10 @@
     var independentSet = new Set(selection.independent);
     var overlapSet = new Set(selection.overlapExcluded);
     var unknownSet = new Set(selection.unknownHorizon);
-    var correct = 0, wrong = 0, flat = 0, overlapExcluded = 0, unknownHorizon = 0;
+    var correct = 0, wrong = 0, flat = 0, overlapExcluded = 0, unknownHorizon = 0, count = 0;
     (calls || []).forEach(function (r) {
       if (independentSet.has(r)) {
+        count++;
         if (Math.abs(r.forwardPct) <= (num(r.costPct) ? r.costPct : 0)) flat++;
         else if ((r[key] === 'AL' && r.forwardPct > 0) || (r[key] === 'SAT' && r.forwardPct < 0)) correct++;
         else wrong++;
@@ -716,7 +717,7 @@
     var directional = correct + wrong;
     return {
       rawCount: (calls || []).length,
-      count: independentSet.size,
+      count: count,
       overlapExcluded: overlapExcluded,
       unknownHorizon: unknownHorizon,
       correct: correct,
