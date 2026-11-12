@@ -198,6 +198,44 @@ function adminKaydi(asset) {
   }
 }
 
+/* ---------- Piyasa türüne göre zaman dilimi ---------- */
+function aramaPiyasaTuru(girdi) {
+  if (girdi && typeof girdi === 'object') {
+    if (girdi.kaynak === 'b' || girdi.tur === 'Kripto') return 'Kripto';
+    if (String(girdi.sembol || '').toUpperCase().endsWith('.IS') ||
+        /BIST hissesi|ABD hissesi/i.test(girdi.tur || '')) return 'Hisse';
+    return Veri.piyasaTahmini(girdi.sembol || girdi.ad || '');
+  }
+  return Veri.piyasaTahmini(girdi || '');
+}
+
+function zamanDilimleriGuncelle(girdi, tercih) {
+  const select = el('ara-zd');
+  if (!select || typeof Veri === 'undefined' || typeof Veri.zamanDilimleri !== 'function') return;
+  const piyasa = aramaPiyasaTuru(girdi);
+  const kaynak = girdi && typeof girdi === 'object' ? (girdi.sembol || girdi.ad || '') : girdi;
+  const secenekler = Veri.zamanDilimleri(kaynak);
+  const mevcut = String(tercih || select.value || '');
+  const etiketler = { '15m': '15 dakikalık', '1h': '1 saatlik', '4h': '4 saatlik', '1d': 'Günlük' };
+  select.replaceChildren();
+  secenekler.forEach(function (value) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = etiketler[value] || value;
+    select.appendChild(option);
+  });
+  const varsayilan = piyasa === 'Hisse' ? '1d' : '1h';
+  select.value = secenekler.indexOf(mevcut) >= 0 ? mevcut : varsayilan;
+  const label = el('ara-zd-label');
+  if (label) label.textContent = piyasa === 'Hisse'
+    ? 'Hisse zaman dilimi (sabit günlük)'
+    : piyasa === 'Kripto' ? 'Kripto zaman dilimi' : 'Zaman dilimi';
+}
+
+el('ara-ad').addEventListener('input', function () {
+  zamanDilimleriGuncelle(this.value);
+});
+
 /* ---------- İsimle arama ---------- */
 el('ara-btn').addEventListener('click', async () => {
   const ad = el('ara-ad').value.trim();
@@ -213,15 +251,17 @@ el('ara-btn').addEventListener('click', async () => {
   try {
     if (typeof Veri === 'undefined' || typeof Veri.ara !== 'function') throw new Error('Piyasa veri modülü yüklenemedi.');
     const v = await Veri.ara(ad, el('ara-zd').value, x => { dur.textContent = x; });
+    zamanDilimleriGuncelle(v, v.zd);
     const dn = Veri.donustur(v, 80);
     if (!dn || !Array.isArray(dn.m) || dn.m.length < 15) throw new Error('Analiz için yeterli piyasa verisi alınamadı.');
 
     const sonMum = dn.d[dn.d.length - 1];
-    const aralikMs = v.zd === '15m' ? 15 * 60 * 1000
-      : v.zd === '1h' ? 60 * 60 * 1000
-      : (v.kaynak === 'b' ? 24 * 60 * 60 * 1000
-        : (/\.IS$/i.test(v.sembol || '') && new Date(sonMum.t).getUTCHours() <= 2
-          ? 15 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000));
+    const aralikMs = ({
+      '15m': 15 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '4h': 4 * 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000
+    })[v.zd] || 24 * 60 * 60 * 1000;
     const sonMumAcik = !!(sonMum && Number.isFinite(sonMum.t) && Date.now() < sonMum.t + aralikMs);
     const trendMumlari = sonMumAcik ? dn.m.slice(0, -1) : dn.m;
     const t = Goruntu.trend(trendMumlari);
@@ -434,8 +474,9 @@ GrafikAI.araVarlik = function (sembol, zd) {
   const zaman = el('ara-zd');
   const arama = el('ara-btn');
   if (!alan || !zaman || !arama) return;
-  alan.value = String(sembol || '').replace(/\.IS$/i, '');
-  zaman.value = zd || '1d';
+  alan.value = String(sembol || '');
+  const varsayilan = Veri.piyasaTahmini(alan.value) === 'Hisse' ? '1d' : '1h';
+  zamanDilimleriGuncelle(alan.value, zd || varsayilan);
   ekranGoster('yukle');
   arama.click();
 };
