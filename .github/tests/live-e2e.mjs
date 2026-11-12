@@ -1026,7 +1026,7 @@ try {
     try {
       const stock = await Veri.ara('THYAO.IS', '15m');
       const bist100 = await Veri.ara('AEFES', '15m');
-      const crypto = await Veri.ara('BTCUSDT', '4h');
+      const crypto = await Veri.ara('BTC', '4h');
       return { stockTimeframe: stock.zd, bist100Timeframe: bist100.zd, bist100Symbol: bist100.sembol, cryptoTimeframe: crypto.zd, calls };
     } finally {
       Veri.binance = originalBinance;
