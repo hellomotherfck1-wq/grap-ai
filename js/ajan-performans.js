@@ -885,7 +885,7 @@
     card.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · sinyalden 10 mum sonra'));
     card.appendChild(renderAgentTable(all));
     card.appendChild(el('p', 'backtest-not',
-      'Hacim ajanının doğru/yanlış hesabı yalnızca AL/SAT oylarını sayar; BEKLE ve veri yok oyları isabet hesabına girmez. Ölçüm, sinyalden sonraki 10 kapanmış mumun fiyat yönüne göredir; işlem kâr oranı değildir. Genel toplam farklı piyasa ve periyotları birleştirebilir. Aynı coin için yakın zamanlı 10 mumluk pencereler örtüşebileceğinden örnekler tamamen bağımsız değildir.'));
+      'Hacim ajanının doğru/yanlış hesabı yalnızca AL/SAT oylarını sayar; BEKLE ve veri yok oyları isabet hesabına girmez. Maliyet eşiği içindeki yatay sonuçlar da doğru/yanlış oranının paydasına katılmaz, ayrı gösterilir. Ölçüm, sinyalden sonraki 10 kapanmış mumun fiyat yönüne göredir; işlem kâr oranı değildir. Genel toplam farklı piyasa ve periyotları birleştirebilir. Aynı coin için yakın zamanlı 10 mumluk pencereler örtüşebileceğinden örnekler tamamen bağımsız değildir.'));
     card.appendChild(el('h4', 'backtest-trades-title', 'Hacim ajanı · model, piyasa ve periyot kırılımı'));
     card.appendChild(renderVolumeBreakdown(all));
     card.appendChild(el('h4', 'backtest-trades-title', 'Spot AL: piyasa ve zaman dilimi ayrımı'));
