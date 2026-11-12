@@ -1054,22 +1054,27 @@
   }
 
   function exportCSV(records) {
-    var columns = ['signalAt', 'scanAt', 'symbol', 'name', 'market', 'timeframe', 'decision', 'generalDecision',
-      'technicalDecision', 'volumeDecision', 'volumeScore', 'volumeAvailable', 'volumeModelVersion',
-      'flowDecision', 'flowScore', 'flowAvailable',
-      'marketRegime', 'mtfAlignment', 'deepScan', 'deepVeto', 'deepReasons', 'finalReason',
-      'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
-      'costPct', 'tradeStatus', 'tradeOutcome', 'netPct', 'spotStatus', 'spotOutcome',
+    var columns = ['signalAt', 'scanAt', 'symbol', 'name', 'market', 'timeframe', 'decision',
+      'generalDecision', 'technicalDecision', 'volumeDecision', 'volumeScore', 'volumeAvailable',
+      'volumeModelVersion', 'flowDecision', 'flowScore', 'flowAvailable', 'marketRegime',
+      'mtfAlignment', 'deepScan', 'deepVeto', 'deepReasons', 'finalReason', 'auditorError',
+      'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target', 'costPct',
+      'tradeStatus', 'tradeOutcome', 'netPct', 'spotStatus', 'spotOutcome',
       'spotSaleAdvantagePct', 'spotHoldReturnPct', 'spotSellPrice', 'spotHoldPrice',
-      'directionStatus', 'forwardPct', 'waitResult', 'source'];
+      'directionStatus', 'forwardPct', 'waitResult', 'source', 'deviceIds'];
     var rows = [columns.join(';')];
     records.slice().sort(function (a, b) { return a.signalAt - b.signalAt; }).forEach(function (r) {
+      var deviceIds = Array.isArray(r.deviceIds) ? r.deviceIds : (r.deviceId ? [r.deviceId] : []);
       var values = [
         new Date(r.signalAt).toISOString(), r.scanAt ? new Date(r.scanAt).toISOString() : '',
         r.symbol, r.name, r.market, r.timeframe, r.decision,
-        r.generalDecision, r.technicalDecision, r.volumeDecision, r.flowDecision, r.flowScore, r.flowAvailable,
-        r.marketRegime, r.mtfAlignment, r.deepScan || '', r.deepVeto, (r.deepReasons || []).join('|'), r.finalReason || '',
-        r.auditorError, r.auditorWarningCount, r.fundamentalStatus, r.price, r.stop, r.target, r.costPct,
+        r.generalDecision, r.technicalDecision, r.volumeDecision,
+        r.volumeScore, r.volumeAvailable, r.volumeModelVersion,
+        r.flowDecision, r.flowScore, r.flowAvailable,
+        r.marketRegime, r.mtfAlignment, r.deepScan || '', r.deepVeto,
+        (r.deepReasons || []).join('|'), r.finalReason || '',
+        r.auditorError, r.auditorWarningCount, r.fundamentalStatus,
+        r.price, r.stop, r.target, r.costPct,
         r.decision === 'SAT' ? 'not-applicable' : r.tradeStatus,
         r.decision === 'AL' && r.tradeResult ? r.tradeResult.outcome : '',
         r.decision === 'AL' && r.tradeResult ? r.tradeResult.netPct : '',
@@ -1080,11 +1085,12 @@
         r.spotResult ? r.spotResult.sellPrice : '',
         r.spotResult ? r.spotResult.holdPrice : '',
         r.directionStatus, r.forwardPct == null ? '' : r.forwardPct,
-        r.waitResult || '', (r.sources || [r.source]).join('+')
+        r.waitResult || '', (r.sources || [r.source]).join('+'),
+        deviceIds.join('|')
       ];
       rows.push(values.map(function (v) {
-        var s = v == null ? '' : String(v);
-        return '"' + s.replace(/"/g, '""') + '"';
+        var value = v == null ? '' : String(v);
+        return '"' + value.replace(/"/g, '""') + '"';
       }).join(';'));
     });
     var blob = new Blob(['\uFEFF' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
