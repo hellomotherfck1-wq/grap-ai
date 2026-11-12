@@ -31,6 +31,11 @@ assert.ok(admin.includes('window.GrapAISharedResults.client'), 'Admin login must
 assert.ok(performance.includes('shared.syncLocal(local)'), 'Existing local records must be backfilled');
 assert.ok(performance.includes('shared.patchMany(remotePatches)'), 'Evaluation outcomes must sync in batches');
 assert.ok(performance.includes('Ortak sonuç havuzu'), 'Admin shared-pool state must be visible in results');
+const renderStart = performance.indexOf('function render(records)');
+const allDeclaration = performance.indexOf('var all = Array.isArray(records) ? records : [];', renderStart);
+const sharedSummary = performance.indexOf('var ortakGorunum = all.some', renderStart);
+assert.ok(renderStart >= 0 && allDeclaration >= renderStart && sharedSummary > allDeclaration,
+  'Result rows must be initialized before shared-pool summary reads them');
 assert.ok(performance.includes("'Cihaz ' + (index + 1)"), 'Admin result rows must identify the source device');
 assert.ok(performance.includes(".slice(0, 50)"), 'Admin result list must show a wider cross-device recent history');
 
