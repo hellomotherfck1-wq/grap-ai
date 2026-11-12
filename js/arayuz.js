@@ -198,147 +198,207 @@ function adminKaydi(asset) {
   }
 }
 
-/* ---------- Piyasa türüne göre zaman dilimi ---------- */
-function aramaPiyasaTuru(girdi) {
-  if (girdi && typeof girdi === 'object') {
-    if (girdi.kaynak === 'b' || girdi.tur === 'Kripto') return 'Kripto';
-    if (String(girdi.sembol || '').toUpperCase().endsWith('.IS') ||
-        /BIST hissesi|ABD hissesi|Hisse \/ diğer/i.test(girdi.tur || '')) return 'Hisse';
-    return Veri.piyasaTahmini(girdi.sembol || girdi.ad || '');
+/* ---------- Ayrı Kripto ve BIST 100 araması ---------- */
+function bist100Eslesme(girdi) {
+  const liste = window.TahminAI && Array.isArray(window.TahminAI.LISTE)
+    ? window.TahminAI.LISTE : [];
+  if (!liste.length) return null;
+  const ham = String(girdi || '').trim().toUpperCase().replace(/\\.IS$/i, '').replace(/\\s+/g, '');
+  const norm = Veri.norm(String(girdi || '').replace(/\\.IS$/i, ''));
+  return liste.find(item =>
+    String(item.q || '').toUpperCase() === ham ||
+    (item.ad && Veri.norm(item.ad) === norm)
+  ) || null;
+}
+
+async function kriptoVeriAra(girdi, zd, durum) {
+  const mapped = Veri.harita[Veri.norm(girdi)];
+  if ((mapped && mapped.kaynak !== 'b') || Veri.piyasaTahmini(girdi) === 'Hisse') {
+    throw new Error('Bu alan yalnızca kripto içindir. BIST 100 hisselerini alttaki ayrı alandan ara.');
   }
-  return Veri.piyasaTahmini(girdi || '');
+
+  let sembol = mapped && mapped.kaynak === 'b' ? mapped.sembol : null;
+  if (!sembol) {
+    if (durum) durum('Binance Spot coin listesi kontrol ediliyor…');
+    await Veri.listeYukle();
+    sembol = Veri.binanceBul(String(girdi || '').trim());
+  }
+  if (!sembol) {
+    throw new Error('Bu sembol Binance Spot kripto listesinde bulunamadı. BTC, ETH veya SOL gibi bir coin sembolü dene.');
+  }
+  return Veri.ara(sembol, zd, durum);
 }
 
-function zamanDilimleriGuncelle(girdi, tercih) {
-  const select = el('ara-zd');
-  if (!select || typeof Veri === 'undefined' || typeof Veri.zamanDilimleri !== 'function') return;
-  const piyasa = aramaPiyasaTuru(girdi);
-  const kaynak = girdi && typeof girdi === 'object' ? (girdi.sembol || girdi.ad || '') : girdi;
-  const secenekler = piyasa === 'Hisse' ? ['1d'] : Veri.zamanDilimleri(kaynak);
-  const mevcut = String(tercih || select.value || '');
-  const etiketler = { '15m': '15 dakikalık', '1h': '1 saatlik', '4h': '4 saatlik', '1d': 'Günlük' };
-  select.replaceChildren();
-  secenekler.forEach(function (value) {
+async function bist100VeriAra(girdi, durum) {
+  const item = bist100Eslesme(girdi);
+  if (!item) {
+    throw new Error('Bu alan yalnızca BIST 100 listesindeki hisseleri arar. Örnek: THYAO, ASELS veya Türk Hava Yolları.');
+  }
+  return Veri.ara(String(item.q).toUpperCase() + '.IS', '1d', durum);
+}
+
+function bist100OnerileriDoldur() {
+  const alan = el('bist100-oneri');
+  const liste = window.TahminAI && Array.isArray(window.TahminAI.LISTE)
+    ? window.TahminAI.LISTE : [];
+  if (!alan || !liste.length) return;
+  alan.replaceChildren();
+  liste.forEach(function (item) {
     const option = document.createElement('option');
-    option.value = value;
-    option.textContent = etiketler[value] || value;
-    select.appendChild(option);
+    option.value = String(item.q || '');
+    option.label = String(item.ad || item.q || '');
+    alan.appendChild(option);
   });
-  const varsayilan = piyasa === 'Hisse' ? '1d' : '1h';
-  select.value = secenekler.indexOf(mevcut) >= 0 ? mevcut : varsayilan;
-  const label = el('ara-zd-label');
-  if (label) label.textContent = piyasa === 'Hisse'
-    ? 'Hisse zaman dilimi (sabit günlük)'
-    : piyasa === 'Kripto' ? 'Kripto zaman dilimi' : 'Zaman dilimi';
 }
 
-el('ara-ad').addEventListener('input', function () {
-  zamanDilimleriGuncelle(this.value);
-});
+function grafikAra(ayar) {
+  const input = el(ayar.inputId);
+  const zaman = el(ayar.timeframeId);
+  const dur = el(ayar.statusId);
+  const btn = el(ayar.buttonId);
+  if (!input || !zaman || !dur || !btn) return;
 
-/* ---------- İsimle arama ---------- */
-el('ara-btn').addEventListener('click', async () => {
-  const ad = el('ara-ad').value.trim();
-  const dur = el('ara-durum');
-  const btn = el('ara-btn');
+  const ad = input.value.trim();
   if (!ad) {
-    dur.textContent = 'Önce bir varlık adı veya sembolü yaz.';
+    dur.textContent = ayar.market === 'BIST'
+      ? 'Önce BIST 100 hisse adı veya kodu yaz.'
+      : 'Önce bir coin adı veya sembolü yaz.';
     return;
   }
 
   btn.disabled = true;
   dur.textContent = 'Veri kaynağına bağlanılıyor…';
   try {
-    if (typeof Veri === 'undefined' || typeof Veri.ara !== 'function') throw new Error('Piyasa veri modülü yüklenemedi.');
-    const v = await Veri.ara(ad, el('ara-zd').value, x => { dur.textContent = x; });
-    zamanDilimleriGuncelle(v, v.zd);
-    const dn = Veri.donustur(v, 80);
-    if (!dn || !Array.isArray(dn.m) || dn.m.length < 15) throw new Error('Analiz için yeterli piyasa verisi alınamadı.');
-
-    const sonMum = dn.d[dn.d.length - 1];
-    const aralikMs = v.zd === '15m' ? 15 * 60 * 1000
-      : v.zd === '1h' ? 60 * 60 * 1000
-      : v.zd === '4h' ? 4 * 60 * 60 * 1000
-      : (v.kaynak === 'b' ? 24 * 60 * 60 * 1000
-        : (String(v.sembol || '').toUpperCase().endsWith('.IS') && new Date(sonMum.t).getUTCHours() <= 2
-          ? 15 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000));
-    const sonMumAcik = !!(sonMum && Number.isFinite(sonMum.t) && Date.now() < sonMum.t + aralikMs);
-    const trendMumlari = sonMumAcik ? dn.m.slice(0, -1) : dn.m;
-    const t = Goruntu.trend(trendMumlari);
-    const sinyalMumu = dn.d[dn.d.length - (sonMumAcik ? 2 : 1)] || null;
-    const meta = {
-      ad: v.ad, sembol: v.sembol, tur: v.tur, zd: v.zd, kaynak: v.kaynak,
-      sonMumZamani: sonMum ? sonMum.t : null,
-      sonMumAcik: sonMumAcik,
-      sinyalMumuZamani: sinyalMumu ? sinyalMumu.t : null,
-      sinyalFiyati: sinyalMumu ? sinyalMumu.c : null,
-      sinyalAralikMs: aralikMs,
-      market: /USDT$/i.test(v.sembol || '') ? 'Kripto' : /\.IS$/i.test(v.sembol || '') ? 'BIST' : 'Diğer',
-      fundamentalStatus: (v.kaynak !== 'b' &&
-        !/(kripto|coin|crypto|forex|emtia|endeks)/i.test(String(v.tur || '')) &&
-        !/(?:-USD|-USDT|-EUR|=X|=F)$/i.test(v.sembol || '') &&
-        String(v.sembol || '').charAt(0) !== '^') ? 'pending' : 'not-applicable',
-      veriAlimZamani: v.cekim instanceof Date ? v.cekim.getTime() : Date.now(),
-      mumSayisi: dn.d.length
-    };
-    const sonuc = goster(dn.m, t, dn.kal, [], [
-      kartYap('Grafik bilgisi', Veri.bilgi(v, dn.d), '#3988f7')
-    ], meta);
-    const fiyatAraligi = dn.kal.hi - dn.kal.lo;
-    if (sonuc.s.plan && Number.isFinite(fiyatAraligi) && fiyatAraligi > 0) {
-      meta.stopFiyat = dn.kal.lo + sonuc.s.plan.stop * fiyatAraligi;
-      meta.hedefFiyat = dn.kal.lo + sonuc.s.plan.t1 * fiyatAraligi;
-      meta.rr = sonuc.s.plan.rr;
-    } else {
-      meta.stopFiyat = null;
-      meta.hedefFiyat = null;
-      meta.rr = null;
+    if (typeof Veri === 'undefined' || typeof Veri.ara !== 'function') {
+      throw new Error('Piyasa veri modülü yüklenemedi.');
     }
-
-    if (window.BistArastirma && typeof window.BistArastirma.grafikOzet === 'function' &&
-        String(v.sembol || '').toUpperCase().endsWith('.IS')) {
-      const arastirmaKutusu = document.createElement('div');
-      arastirmaKutusu.className = 'kart';
-      arastirmaKutusu.textContent = '🔎 Araştırma ajanı finansal göstergeleri ve güncel haber başlıklarını tarıyor…';
-      el('tuval-alan').appendChild(arastirmaKutusu);
-      window.BistArastirma.grafikOzet(v, dn, sonuc, arastirmaKutusu).catch(function (e) {
-        arastirmaKutusu.textContent = 'Araştırma ajanı şu anda veri alamadı: ' + (e && e.message ? e.message : String(e));
-      });
-    }
-
-    const tamam = 'Analiz tamamlandı: ' + v.ad + ' (' + v.sembol + ').';
-    el('analiz-durum').textContent = tamam;
-    dur.textContent = tamam;
-    analizKaydet({
-      ad: v.ad,
-      sembol: v.sembol,
-      kaynak: v.kaynak === 'b' ? 'Binance' : 'Yahoo Finance',
-      zd: v.zd,
-      fiyat: dn.d.length ? dn.d[dn.d.length - 1].c : null,
-      sinyalMumuZamani: meta.sinyalMumuZamani,
-      sinyalFiyati: meta.sinyalFiyati,
-      sinyalAralikMs: meta.sinyalAralikMs,
-      stopFiyat: meta.stopFiyat,
-      hedefFiyat: meta.hedefFiyat,
-      rr: meta.rr,
-      market: meta.market,
-      fundamentalStatus: meta.fundamentalStatus
-    }, sonuc);
-    adminKaydi(v.ad);
-    ekranGoster('analiz');
   } catch (e) {
-    const hataMetni = e && e.message ? e.message : String(e);
-    dur.textContent = '⚠️ ' + hataMetni +
-      ' İnternet bağlantını ve sembolü kontrol et. Örnek: PGSUS.IS veya BTCUSDT.';
-    el('analiz-durum').textContent = 'Analiz yapılamadı: ' + hataMetni;
-  } finally {
+    dur.textContent = '⚠️ ' + (e && e.message ? e.message : String(e));
     btn.disabled = false;
+    return;
   }
+
+  (async function () {
+    try {
+      const zd = ayar.market === 'BIST' ? '1d' : zaman.value;
+      const v = ayar.market === 'BIST'
+        ? await bist100VeriAra(ad, x => { dur.textContent = x; })
+        : await kriptoVeriAra(ad, zd, x => { dur.textContent = x; });
+      const dn = Veri.donustur(v, 80);
+      if (!dn || !Array.isArray(dn.m) || dn.m.length < 15) {
+        throw new Error('Analiz için yeterli piyasa verisi alınamadı.');
+      }
+
+      const sonMum = dn.d[dn.d.length - 1];
+      const aralikMs = v.zd === '15m' ? 15 * 60 * 1000
+        : v.zd === '1h' ? 60 * 60 * 1000
+        : v.zd === '4h' ? 4 * 60 * 60 * 1000
+        : (v.kaynak === 'b' ? 24 * 60 * 60 * 1000
+          : (String(v.sembol || '').toUpperCase().endsWith('.IS') && new Date(sonMum.t).getUTCHours() <= 2
+            ? 15 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000));
+      const sonMumAcik = !!(sonMum && Number.isFinite(sonMum.t) && Date.now() < sonMum.t + aralikMs);
+      const trendMumlari = sonMumAcik ? dn.m.slice(0, -1) : dn.m;
+      const t = Goruntu.trend(trendMumlari);
+      const sinyalMumu = dn.d[dn.d.length - (sonMumAcik ? 2 : 1)] || null;
+      const meta = {
+        ad: v.ad, sembol: v.sembol, tur: v.tur, zd: v.zd, kaynak: v.kaynak,
+        sonMumZamani: sonMum ? sonMum.t : null,
+        sonMumAcik: sonMumAcik,
+        sinyalMumuZamani: sinyalMumu ? sinyalMumu.t : null,
+        sinyalFiyati: sinyalMumu ? sinyalMumu.c : null,
+        sinyalAralikMs: aralikMs,
+        market: ayar.market,
+        fundamentalStatus: (v.kaynak !== 'b' &&
+          !/(kripto|coin|crypto|forex|emtia|endeks)/i.test(String(v.tur || '')) &&
+          !/(?:-USD|-USDT|-EUR|=X|=F)$/i.test(v.sembol || '') &&
+          String(v.sembol || '').charAt(0) !== '^') ? 'pending' : 'not-applicable',
+        veriAlimZamani: v.cekim instanceof Date ? v.cekim.getTime() : Date.now(),
+        mumSayisi: dn.d.length
+      };
+      const sonuc = goster(dn.m, t, dn.kal, [], [
+        kartYap('Grafik bilgisi', Veri.bilgi(v, dn.d), '#3988f7')
+      ], meta);
+      const fiyatAraligi = dn.kal.hi - dn.kal.lo;
+      if (sonuc.s.plan && Number.isFinite(fiyatAraligi) && fiyatAraligi > 0) {
+        meta.stopFiyat = dn.kal.lo + sonuc.s.plan.stop * fiyatAraligi;
+        meta.hedefFiyat = dn.kal.lo + sonuc.s.plan.t1 * fiyatAraligi;
+        meta.rr = sonuc.s.plan.rr;
+      } else {
+        meta.stopFiyat = null;
+        meta.hedefFiyat = null;
+        meta.rr = null;
+      }
+
+      if (window.BistArastirma && typeof window.BistArastirma.grafikOzet === 'function' &&
+          String(v.sembol || '').toUpperCase().endsWith('.IS')) {
+        const arastirmaKutusu = document.createElement('div');
+        arastirmaKutusu.className = 'kart';
+        arastirmaKutusu.textContent = '🔎 Araştırma ajanı finansal göstergeleri ve güncel haber başlıklarını tarıyor…';
+        el('tuval-alan').appendChild(arastirmaKutusu);
+        window.BistArastirma.grafikOzet(v, dn, sonuc, arastirmaKutusu).catch(function (e) {
+          arastirmaKutusu.textContent = 'Araştırma ajanı şu anda veri alamadı: ' + (e && e.message ? e.message : String(e));
+        });
+      }
+
+      const tamam = 'Analiz tamamlandı: ' + v.ad + ' (' + v.sembol + ').';
+      el('analiz-durum').textContent = tamam;
+      dur.textContent = tamam;
+      analizKaydet({
+        ad: v.ad,
+        sembol: v.sembol,
+        kaynak: v.kaynak === 'b' ? 'Binance Spot' : 'Yahoo Finance',
+        zd: v.zd,
+        fiyat: dn.d.length ? dn.d[dn.d.length - 1].c : null,
+        sinyalMumuZamani: meta.sinyalMumuZamani,
+        sinyalFiyati: meta.sinyalFiyati,
+        sinyalAralikMs: meta.sinyalAralikMs,
+        stopFiyat: meta.stopFiyat,
+        hedefFiyat: meta.hedefFiyat,
+        rr: meta.rr,
+        market: meta.market,
+        fundamentalStatus: meta.fundamentalStatus
+      }, sonuc);
+      adminKaydi(v.ad);
+      ekranGoster('analiz');
+    } catch (e) {
+      const hataMetni = e && e.message ? e.message : String(e);
+      dur.textContent = '⚠️ ' + hataMetni;
+      el('analiz-durum').textContent = 'Analiz yapılamadı: ' + hataMetni;
+    } finally {
+      btn.disabled = false;
+    }
+  })();
+}
+
+const KRIPTO_ARAMA = {
+  market: 'Kripto',
+  inputId: 'ara-kripto-ad',
+  timeframeId: 'ara-kripto-zd',
+  buttonId: 'ara-kripto-btn',
+  statusId: 'ara-kripto-durum'
+};
+const BIST_ARAMA = {
+  market: 'BIST',
+  inputId: 'ara-bist-ad',
+  timeframeId: 'ara-bist-zd',
+  buttonId: 'ara-bist-btn',
+  statusId: 'ara-bist-durum'
+};
+
+el('ara-kripto-btn').addEventListener('click', function () { grafikAra(KRIPTO_ARAMA); });
+el('ara-bist-btn').addEventListener('click', function () { grafikAra(BIST_ARAMA); });
+el('ara-kripto-ad').addEventListener('keydown', e => {
+  if (e.key === 'Enter') el('ara-kripto-btn').click();
+});
+el('ara-bist-ad').addEventListener('keydown', e => {
+  if (e.key === 'Enter') el('ara-bist-btn').click();
 });
 
-el('ara-ad').addEventListener('keydown', e => {
-  if (e.key === 'Enter') el('ara-btn').click();
-});
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bist100OnerileriDoldur, { once: true });
+} else {
+  bist100OnerileriDoldur();
+}
 
 /* ---------- Ekran görüntüsü modu ---------- */
 function resimTemizle() {
@@ -470,13 +530,26 @@ if ('serviceWorker' in navigator) {
     .catch(e => console.warn('Service Worker kaydedilemedi:', e));
 }
 GrafikAI.araVarlik = function (sembol, zd) {
-  const alan = el('ara-ad');
-  const zaman = el('ara-zd');
-  const arama = el('ara-btn');
+  const deger = String(sembol || '').trim();
+  const bistMi = /\\.IS$/i.test(deger) || Boolean(bist100Eslesme(deger));
+  if (bistMi) {
+    const alan = el('ara-bist-ad');
+    const zaman = el('ara-bist-zd');
+    const arama = el('ara-bist-btn');
+    if (!alan || !zaman || !arama) return;
+    alan.value = deger;
+    zaman.value = '1d';
+    ekranGoster('yukle');
+    arama.click();
+    return;
+  }
+
+  const alan = el('ara-kripto-ad');
+  const zaman = el('ara-kripto-zd');
+  const arama = el('ara-kripto-btn');
   if (!alan || !zaman || !arama) return;
-  alan.value = String(sembol || '');
-  const varsayilan = Veri.piyasaTahmini(alan.value) === 'Hisse' ? '1d' : '1h';
-  zamanDilimleriGuncelle(alan.value, zd || varsayilan);
+  alan.value = deger;
+  zaman.value = ['15m', '1h', '4h', '1d'].includes(zd) ? zd : '1h';
   ekranGoster('yukle');
   arama.click();
 };
