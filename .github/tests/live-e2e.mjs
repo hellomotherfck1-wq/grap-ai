@@ -376,6 +376,16 @@ try {
     JSON.stringify(cryptoChartTimeframes) === JSON.stringify(['15m', '1h', '4h', '1d']),
     JSON.stringify(cryptoChartTimeframes));
 
+  await page.locator('#ara-diger-panel summary').click();
+  await page.locator('#ara-diger-ad').fill('AAPL');
+  const usStockTimeframes = await page.locator('#ara-diger-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Diğer piyasalarda tanımlı ABD hisseleri günlük kalıyor',
+    JSON.stringify(usStockTimeframes) === JSON.stringify(['1d']), JSON.stringify(usStockTimeframes));
+  await page.locator('#ara-diger-ad').fill('Altın');
+  const otherMarketTimeframes = await page.locator('#ara-diger-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Diğer piyasalarda emtia için 15m, 1h ve 1d korunuyor',
+    JSON.stringify(otherMarketTimeframes) === JSON.stringify(['15m', '1h', '1d']), JSON.stringify(otherMarketTimeframes));
+
   await page.locator('#ara-kripto-ad').fill('THYAO.IS');
   await page.locator('#ara-kripto-btn').click();
   await page.waitForFunction(() =>
