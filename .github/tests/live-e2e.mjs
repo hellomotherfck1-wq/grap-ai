@@ -1039,35 +1039,6 @@ try {
     marketRouting.calls.some(call => call.source === 'Yahoo' && call.symbol === 'AEFES.IS' && call.timeframe === '1d') &&
     marketRouting.calls.some(call => call.source === 'Binance' && call.timeframe === '4h'),
     JSON.stringify(marketRouting));
-  const marketRouting = await page.evaluate(async () => {
-    const originalBinance = Veri.binance, originalYahoo = Veri.yahoo;
-    const calls = [];
-    const candles = Array.from({ length: 30 }, (_, i) => ({
-      t: Date.now() - (30 - i) * 86400000, o: 10, h: 11, l: 9, c: 10.5, v: 100
-    }));
-    Veri.binance = async (symbol, timeframe) => {
-      calls.push({ source: 'Binance', symbol, timeframe });
-      return candles;
-    };
-    Veri.yahoo = async (symbol, timeframe) => {
-      calls.push({ source: 'Yahoo', symbol, timeframe });
-      return candles;
-    };
-    try {
-      const stock = await Veri.ara('THYAO.IS', '15m');
-      const crypto = await Veri.ara('BTCUSDT', '4h');
-      return { stockTimeframe: stock.zd, cryptoTimeframe: crypto.zd, calls };
-    } finally {
-      Veri.binance = originalBinance;
-      Veri.yahoo = originalYahoo;
-    }
-  });
-  check('Veri yönlendiricisi hisseyi 1D’ye sabitliyor ve kriptoda 4H’yi koruyor',
-    marketRouting.stockTimeframe === '1d' && marketRouting.cryptoTimeframe === '4h' &&
-    marketRouting.calls.some(call => call.source === 'Yahoo' && call.timeframe === '1d') &&
-    marketRouting.calls.some(call => call.source === 'Binance' && call.timeframe === '4h'),
-    JSON.stringify(marketRouting));
-
   await page.locator('nav button[data-git="gecmis"]').click();
   const coinUI = await page.locator('#coin-tahmin-btn').count();
   const coinCount = await page.evaluate(() => window.CoinTahminAI.LISTE.length);
