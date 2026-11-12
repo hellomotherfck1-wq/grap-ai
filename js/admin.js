@@ -170,6 +170,7 @@
       mesaj('Yönetici oturumu açık.');
       await istatistikYukle();
     } catch (e) {
+      await ortakHavuzYetkisi(false);
       giris.hidden = false;
       panel.hidden = true;
       mesaj('Oturum kontrolü yapılamadı: ' + (e.message || String(e)), true);
