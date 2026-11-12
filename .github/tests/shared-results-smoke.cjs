@@ -31,6 +31,8 @@ assert.ok(admin.includes('window.GrapAISharedResults.client'), 'Admin login must
 assert.ok(performance.includes('shared.syncLocal(local)'), 'Existing local records must be backfilled');
 assert.ok(performance.includes('shared.patchMany(remotePatches)'), 'Evaluation outcomes must sync in batches');
 assert.ok(performance.includes('Ortak sonuç havuzu'), 'Admin shared-pool state must be visible in results');
+assert.ok(performance.includes("'Cihaz ' + (index + 1)"), 'Admin result rows must identify the source device');
+assert.ok(performance.includes(".slice(0, 50)"), 'Admin result list must show a wider cross-device recent history');
 
 assert.ok(sql.includes('enable row level security'), 'RLS must be enabled');
 assert.ok(/create policy agent_signals_shared_admin_read[\s\S]*for select[\s\S]*to authenticated/i.test(sql), 'Only authenticated users can reach the read policy');
@@ -41,6 +43,7 @@ assert.ok(/grap_ai_shared_signals_upsert[\s\S]*security definer/i.test(sql), 'Pu
 assert.ok(/grap_ai_shared_signals_patch[\s\S]*admin_required/i.test(sql), 'Result patches must require admin');
 assert.ok(sql.includes("'updatedAt', floor(extract(epoch from now()) * 1000)::bigint"), 'Remote result updates must refresh the payload timestamp');
 assert.ok(sql.includes("v_market = 'BIST' and v_timeframe <> '1d'"), 'BIST shared records must remain daily only');
+assert.ok(sql.includes("v_price is null or v_price <= 0"), 'Shared records must reject missing or invalid prices');
 assert.ok(/grap_ai_shared_signals_prune[\s\S]*admin_required/i.test(sql), 'Retention cleanup must require admin');
 assert.ok(/grant execute on function public\.grap_ai_shared_signals_upsert\(jsonb\) to anon, authenticated/i.test(sql), 'Anonymous devices must be able to submit records');
 assert.ok(!/service_role\s*[:=]\s*['"][^'"]+/i.test(helper + admin + sql), 'No service_role secret may be shipped to browsers');
