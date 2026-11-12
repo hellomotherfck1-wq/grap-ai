@@ -43,6 +43,15 @@ try {
     { timeout: 45000 }
   );
   check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma / Haber / Kripto ajanları');
+  const sharedPoolModule = await page.evaluate(() => ({
+    loaded: !!window.GrapAISharedResults,
+    save: typeof window.GrapAISharedResults?.kaydet,
+    adminRead: typeof window.GrapAISharedResults?.adminRecords,
+    patch: typeof window.GrapAISharedResults?.patchMany
+  }));
+  check('Ortak sonuç modülü yüklendi', sharedPoolModule.loaded &&
+    sharedPoolModule.save === 'function' && sharedPoolModule.adminRead === 'function' &&
+    sharedPoolModule.patch === 'function', JSON.stringify(sharedPoolModule));
   const spotOnlyAgents = await page.evaluate(() => ({
     orderFlow: typeof window.KriptoAjanlari.orderFlow,
     futuresAgent: typeof window.KriptoAjanlari.futuresOku
