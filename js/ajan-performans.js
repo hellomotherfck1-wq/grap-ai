@@ -674,48 +674,49 @@
     return { rate: p * 100, low: Math.max(0, center - margin) * 100, high: Math.min(1, center + margin) * 100 };
   }
 
-  function agentStats(records, key) {
-    var calls = (records || []).filter(function (r) {
-      return r.directionStatus === 'completed' &&
-        (r[key] === 'AL' || r[key] === 'SAT') && num(r.forwardPct) &&
-        (key !== 'volumeDecision' || r.volumeAvailable !== false);
-    });
-    // Aynı sembol/periyotta bir önceki 10 mumluk ölçüm bitmeden gelen
-    // yeni sinyali ikinci bağımsız örnek sayma.
-    var ordered = calls.slice().sort(function (a, b) {
+  function selectIndependentCalls(calls) {
+    var ordered = (calls || []).slice().sort(function (a, b) {
       return (Number(a.signalAt) || 0) - (Number(b.signalAt) || 0);
     });
     var lastEndByAsset = Object.create(null);
-    var independent = [];
-    var overlapExcluded = 0;
-    var unknownHorizon = 0;
+    var independent = [], overlapExcluded = [], unknownHorizon = [];
     ordered.forEach(function (r) {
       var exitAt = r.directionResult && Number(r.directionResult.exitAt);
       var step = interval(r.timeframe);
       if (!num(exitAt) || !step || exitAt < Number(r.signalAt)) {
-        unknownHorizon++;
+        unknownHorizon.push(r);
         return;
       }
       var assetKey = norm(r.symbol) + '|' + String(r.timeframe || '');
       var previousEnd = lastEndByAsset[assetKey];
       if (num(previousEnd) && Number(r.signalAt) < previousEnd) {
-        overlapExcluded++;
+        overlapExcluded.push(r);
         return;
       }
       independent.push(r);
       // exitAt son ileri mumun açılış zamanıdır; kapanışında pencere biter.
       lastEndByAsset[assetKey] = exitAt + step;
     });
-    var correct = 0, wrong = 0, flat = 0;
-    independent.forEach(function (r) {
-      if (Math.abs(r.forwardPct) <= (num(r.costPct) ? r.costPct : 0)) flat++;
-      else if ((r[key] === 'AL' && r.forwardPct > 0) || (r[key] === 'SAT' && r.forwardPct < 0)) correct++;
-      else wrong++;
+    return { independent: independent, overlapExcluded: overlapExcluded, unknownHorizon: unknownHorizon };
+  }
+
+  function summarizeAgentCalls(calls, key, selection) {
+    var independentSet = new Set(selection.independent);
+    var overlapSet = new Set(selection.overlapExcluded);
+    var unknownSet = new Set(selection.unknownHorizon);
+    var correct = 0, wrong = 0, flat = 0, overlapExcluded = 0, unknownHorizon = 0;
+    (calls || []).forEach(function (r) {
+      if (independentSet.has(r)) {
+        if (Math.abs(r.forwardPct) <= (num(r.costPct) ? r.costPct : 0)) flat++;
+        else if ((r[key] === 'AL' && r.forwardPct > 0) || (r[key] === 'SAT' && r.forwardPct < 0)) correct++;
+        else wrong++;
+      } else if (overlapSet.has(r)) overlapExcluded++;
+      else if (unknownSet.has(r)) unknownHorizon++;
     });
     var directional = correct + wrong;
     return {
-      rawCount: calls.length,
-      count: independent.length,
+      rawCount: (calls || []).length,
+      count: independentSet.size,
       overlapExcluded: overlapExcluded,
       unknownHorizon: unknownHorizon,
       correct: correct,
@@ -725,6 +726,15 @@
     };
   }
 
+  function agentStats(records, key) {
+    var calls = (records || []).filter(function (r) {
+      return r.directionStatus === 'completed' &&
+        (r[key] === 'AL' || r[key] === 'SAT') && num(r.forwardPct) &&
+        (key !== 'volumeDecision' || r.volumeAvailable !== false);
+    });
+    return summarizeAgentCalls(calls, key, selectIndependentCalls(calls));
+  }
+
   function agentBreakdown(records) {
     var definitions = [
       { label: 'Genel analiz', key: 'generalDecision', versionKey: 'generalAgentVersion' },
@@ -732,16 +742,18 @@
       { label: 'Hacim ajanı', key: 'volumeDecision', versionKey: 'volumeModelVersion' },
       { label: 'Nihai kurul', key: 'decision', versionKey: 'committeeVersion' }
     ];
-    var groups = Object.create(null);
-    (records || []).forEach(function (record) {
-      if (!record) return;
-      definitions.forEach(function (definition) {
+    var output = [];
+    definitions.forEach(function (definition) {
+      var groups = Object.create(null);
+      var allCalls = [];
+      (records || []).forEach(function (record) {
+        if (!record) return;
         var vote = record[definition.key];
         if (['AL', 'SAT', 'BEKLE'].indexOf(vote) < 0) return;
         var market = record.market || marketOf(record.symbol);
         var timeframe = record.timeframe || '—';
         var version = record[definition.versionKey] || record.agentVersion || 'Sürüm bilinmiyor';
-        var groupKey = [definition.key, market, timeframe, version].join('|');
+        var groupKey = [market, timeframe, version].join('|');
         if (!groups[groupKey]) {
           groups[groupKey] = {
             agent: definition.label,
@@ -749,53 +761,49 @@
             market: market,
             timeframe: timeframe,
             version: version,
-            records: [],
+            calls: [],
             votes: { AL: 0, SAT: 0, BEKLE: 0 }
           };
         }
-        groups[groupKey].records.push(record);
-        groups[groupKey].votes[vote]++;
+        var group = groups[groupKey];
+        group.votes[vote]++;
+        if (record.directionStatus === 'completed' &&
+            (vote === 'AL' || vote === 'SAT') && num(record.forwardPct) &&
+            (definition.key !== 'volumeDecision' || record.volumeAvailable !== false)) {
+          group.calls.push(record);
+          allCalls.push(record);
+        }
+      });
+      // Sinyal pencerelerini sürümler arasında da tekilleştir.
+      var selection = selectIndependentCalls(allCalls);
+      Object.keys(groups).forEach(function (key) {
+        var group = groups[key];
+        output.push({
+          agent: group.agent,
+          agentKey: group.agentKey,
+          market: group.market,
+          timeframe: group.timeframe,
+          version: group.version,
+          votes: group.votes,
+          stats: summarizeAgentCalls(group.calls, group.agentKey, selection)
+        });
       });
     });
-    return Object.keys(groups).map(function (key) {
-      var group = groups[key];
-      return {
-        agent: group.agent,
-        agentKey: group.agentKey,
-        market: group.market,
-        timeframe: group.timeframe,
-        version: group.version,
-        votes: group.votes,
-        stats: agentStats(group.records, group.agentKey)
-      };
-    }).sort(function (a, b) {
+    return output.sort(function (a, b) {
       return (a.market + '|' + a.timeframe + '|' + a.agent + '|' + a.version)
         .localeCompare(b.market + '|' + b.timeframe + '|' + b.agent + '|' + b.version, 'tr');
     });
   }
 
   function volumeBreakdown(records) {
-    var groups = Object.create(null);
-    (records || []).forEach(function (record) {
-      if (!record || record.directionStatus !== 'completed' ||
-          (record.volumeDecision !== 'AL' && record.volumeDecision !== 'SAT') ||
-          !num(record.forwardPct) || record.volumeAvailable === false) return;
-      var market = record.market || marketOf(record.symbol);
-      var timeframe = record.timeframe || '—';
-      var version = record.volumeModelVersion || 'Eski / sürümü bilinmiyor';
-      var key = version + '|' + market + '|' + timeframe;
-      if (!groups[key]) {
-        groups[key] = { version: version, market: market, timeframe: timeframe, records: [] };
-      }
-      groups[key].records.push(record);
-    });
-    return Object.keys(groups).sort().map(function (key) {
-      var group = groups[key];
+    return agentBreakdown(records).filter(function (row) {
+      return row.agentKey === 'volumeDecision' && row.stats.rawCount > 0;
+    }).map(function (row) {
       return {
-        version: group.version,
-        market: group.market,
-        timeframe: group.timeframe,
-        stats: agentStats(group.records, 'volumeDecision')
+        version: row.version,
+        market: row.market,
+        timeframe: row.timeframe,
+        stats: row.stats
       };
     });
   }
