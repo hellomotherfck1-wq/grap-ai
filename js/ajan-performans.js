@@ -450,7 +450,7 @@
     patch.waitResult = null;
     return patchRecord(id, patch).then(function (updated) {
       var shared = window.GrapAISharedResults;
-      var remote = Promise.resolve({ ok: true });
+      var remote = null;
       if (shared && updated && typeof shared.kaydet === 'function') {
         remote = shared.isAdmin().then(function (admin) {
           return admin && typeof shared.patchMany === 'function'
@@ -460,11 +460,17 @@
       } else if (shared && typeof shared.patchMany === 'function') {
         remote = shared.patchMany([{ id: id, patch: patch }]);
       }
-      return Promise.resolve(remote).then(function () {
-        return allRecords().then(function (records) {
-          render(records);
-          return updated;
+      if (remote) {
+        remote.then(function (result) {
+          if (result && !result.ok) console.warn('Karar ortak havuza gönderilemedi:', result.error);
+          return allRecords().then(function (records) { render(records); });
+        }).catch(function (error) {
+          console.warn('Karar ortak havuza gönderilemedi:', error && error.message ? error.message : error);
         });
+      }
+      return allRecords().then(function (records) {
+        render(records);
+        return updated;
       });
     }).catch(function (e) {
       setStatus('Ajan kararı güncellenemedi: ' + (e && e.message ? e.message : String(e)), true);
