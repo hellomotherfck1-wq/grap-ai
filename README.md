@@ -62,7 +62,7 @@ Ajan haberleri tarih ve kaynak bağlantısıyla gösterir; tekrar eden başlıkl
 - Ajan yön isabeti piyasa, zaman dilimi ve her ajanın kendi sürümüne göre ayrı gösterilir. AL/SAT oyları, 10 kapanmış mum sonrası fiyat yönüyle ölçülür; BEKLE oyları ayrı sayılır.
 - Aynı sembol/periyotta ileriye dönük 10 mum pencereleri çakışan sinyaller bağımsız örnek sayılmaz. İleri dönem bitiş zamanı eksik eski kayıtlar bağımsız örnek hesabına katılmaz; 30'dan az bağımsız örnek güvenilir başarı oranı sayılmaz.
 - Spot AL işlem kazanma oranında 30 işlemden önce örneklem yetersiz olarak işaretlenir; Wilson güven aralığı gösterilir.
-- Kayıtlar yalnızca bu cihaz/tarayıcıda bulunur. Tarayıcı verisi temizlenirse kaybolabilir; CSV dışa aktarımı vardır. 365 günden eski kayıtlar otomatik silinir.
+- Her cihaz kendi sinyallerini IndexedDB'de tutar ve ortak sonuç havuzuyla Supabase'e eşitler; ortak kayıtları yalnızca admin yetkili hesap okuyabilir. Tarayıcı verisi temizlenirse henüz eşitlenmemiş yerel kayıtlar kaybolabilir; CSV dışa aktarımı vardır. 365 günden eski kayıtlar otomatik silinir.
 - Ücretsiz Yahoo geçmiş sınırları yaklaşık 15 dakika için 30 gün, 1 saat için 3 ay, günlük için 2 yıldır; Binance geçmişi en fazla 1.000 mumdur. Kayıtlar 365 gün saklansa da sonuçları geciktirmeden güncellemek gerekir; kaynak geçmişi dışına çıkan sonuçlar "veri aralığı dışında" olarak işaretlenir.
 
 ## Supabase yönetici paneli
@@ -81,6 +81,8 @@ where email = 'YONETICI_EPOSTASI';
 Ardından uygulamadaki Admin ekranından bu hesapla giriş yap. Yetki, kullanıcı tarafından değiştirilebilen `user_metadata` yerine sunucu tarafındaki `app_metadata.role` alanından kontrol edilir.
 
 **Güvenlik:** Tarayıcıya yalnızca Supabase anon/publishable anahtarı konur. `service_role` anahtarını asla HTML veya JavaScript dosyalarına ekleme. İstatistikleri yalnızca admin rolü okuyabilir; olay ekleme politikası ziyaret ve analiz olaylarıyla sınırlıdır.
+
+Admin kontrol merkezinde günlük ziyaret/analiz özeti, son analizler ve elle yenileme düğmesi bulunur. Önceki teknik kararlar, güvenlik notları ve sonraki geliştirme adımları admin oturumu açıldıktan sonra erişilen kapalı **Eski geliştirme notları** bölümünde gruplandırılır.
 
 ## Kontrol listesi
 
