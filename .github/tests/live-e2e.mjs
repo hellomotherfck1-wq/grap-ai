@@ -368,6 +368,18 @@ try {
 
   await page.locator('nav button[data-git="yukle"]').click();
   await page.locator('#ara-ad').fill('THYAO.IS');
+  const bistChartTimeframes = await page.locator('#ara-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Hisse grafik aramasında yalnızca günlük zaman dilimi sunuluyor',
+    bistChartTimeframes.length === 1 && bistChartTimeframes[0] === '1d',
+    JSON.stringify(bistChartTimeframes));
+  await page.locator('#ara-zd').selectOption('1d');
+  await page.locator('#ara-ad').fill('BTCUSDT');
+  const cryptoChartTimeframes = await page.locator('#ara-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Kripto grafik aramasında 15m, 1h, 4h ve 1d seçenekleri var',
+    JSON.stringify(cryptoChartTimeframes) === JSON.stringify(['15m', '1h', '4h', '1d']),
+    JSON.stringify(cryptoChartTimeframes));
+  await page.locator('#ara-zd').selectOption('4h');
+  await page.locator('#ara-ad').fill('THYAO.IS');
   await page.locator('#ara-zd').selectOption('1d');
   await page.locator('#ara-btn').click();
 
@@ -495,7 +507,14 @@ try {
 
   // Exercise the full 100-symbol scan, not only the single-stock research path.
   await page.locator('nav button[data-git="strateji"]').click();
-  await page.locator('#tahmin-zd').selectOption('1d');
+  const bistScanConfig = await page.evaluate(() => ({
+    hasTimeframeSelector: Boolean(document.querySelector('#tahmin-zd')),
+    timeframe: window.TahminAI && window.TahminAI.zamanDilimi,
+    agentVersion: window.TahminAI && window.TahminAI.agentVersion
+  }));
+  check('BIST Tahmin ekranı yalnızca günlük periyoda sabit', !bistScanConfig.hasTimeframeSelector &&
+    bistScanConfig.timeframe === '1d' && bistScanConfig.agentVersion === 'tahmin-v1.4-daily',
+    JSON.stringify(bistScanConfig));
   await page.locator('#tahmin-btn').click();
   await page.waitForFunction(() => {
     const status = document.querySelector('#tahmin-durum')?.textContent || '';
@@ -503,6 +522,16 @@ try {
   }, null, { timeout: 600000 });
 
   const scanStatus = await page.locator('#tahmin-durum').innerText();
+  const bistScanTimeframes = await page.evaluate(() => {
+    const record = window.TahminAI && window.TahminAI.sonDurum;
+    return {
+      timeframe: record && record.zd,
+      candidatesDaily: Boolean(record && Array.isArray(record.adaylar) && record.adaylar.every(item => item.zd === '1d'))
+    };
+  });
+  check('BIST tarama kayıtları yalnızca günlük mumlardan oluşuyor',
+    bistScanTimeframes.timeframe === '1d' && bistScanTimeframes.candidatesDaily,
+    JSON.stringify(bistScanTimeframes));
   const scanSummary = await page.locator('#tahmin-alan details summary').first().innerText().catch(() => '');
   const scanRows = await page.locator('#tahmin-alan .bist-table tbody tr').count();
   const scanMatch = scanSummary.match(/BIST 100 tarama tablosu · (\d+) hisse(?: · (\d+) veri hatası)?/);
@@ -907,33 +936,37 @@ try {
     JSON.stringify(binanceVolume));
 
   const timeframeChecks = await page.evaluate(async () => {
-    const yahoo15 = await Veri.yahoo('THYAO.IS', '15m');
-    const yahoo1h = await Veri.yahoo('THYAO.IS', '1h');
+    const yahooDaily = await Veri.yahoo('THYAO.IS', '1d');
     const binance15 = await Veri.binance('BTCUSDT', '15m');
     const binance1h = await Veri.binance('BTCUSDT', '1h');
     const binance4h = await Veri.binance('BTCUSDT', '4h');
+    const binance1d = await Veri.binance('BTCUSDT', '1d');
     const now = Date.now();
     const closed = Veri.kapanmisMumlar([
       { t: now - 60 * 60 * 1000, closeTime: now - 1 },
       { t: now, closeTime: now + 60 * 60 * 1000 - 1 }
     ], '1h');
     return {
-      yahoo15: yahoo15.length, yahoo1h: yahoo1h.length,
+      yahooDaily: yahooDaily.length,
       binance15: binance15.length, binance1h: binance1h.length,
-      binance4h: binance4h.length, closedCount: closed.length
+      binance4h: binance4h.length, binance1d: binance1d.length,
+      closedCount: closed.length
     };
   });
-  check('15 dakika, 1 saat, 4 saat ve günlük veri aralıkları',
-    timeframeChecks.yahoo15 >= 20 && timeframeChecks.yahoo1h >= 20 &&
-    timeframeChecks.binance15 >= 20 && timeframeChecks.binance1h >= 20 &&
-    timeframeChecks.binance4h >= 20 && timeframeChecks.closedCount === 1,
+  check('Hisse günlük; kripto 15m, 1h, 4h ve 1d veri aralıkları',
+    timeframeChecks.yahooDaily >= 20 && timeframeChecks.binance15 >= 20 &&
+    timeframeChecks.binance1h >= 20 && timeframeChecks.binance4h >= 20 &&
+    timeframeChecks.binance1d >= 20 && timeframeChecks.closedCount === 1,
     JSON.stringify(timeframeChecks));
 
   const bistVolumeAgent = await page.evaluate(async () => {
-    const result = await TahminAI.taraBir({ q: 'THYAO', ad: 'Türk Hava Yolları' }, '1d');
-    return { symbol: result.sembol, lastVolume: result.sonHacim, averageVolume: result.ortHacim20, ratio: result.hacimOrani, volumeAvailable: result.hacimVar, volumeModelVersion: result.volumeModelVersion };
+    const result = await TahminAI.taraBir({ q: 'THYAO', ad: 'Türk Hava Yolları' }, '15m');
+    return { symbol: result.sembol, timeframe: result.zd, lastVolume: result.sonHacim, averageVolume: result.ortHacim20, ratio: result.hacimOrani, volumeAvailable: result.hacimVar, volumeModelVersion: result.volumeModelVersion };
   });
-  check('BIST hacim ajanına veri aktarımı', bistVolumeAgent.lastVolume > 0 && bistVolumeAgent.averageVolume > 0 && bistVolumeAgent.ratio > 0 && bistVolumeAgent.volumeAvailable === true && bistVolumeAgent.volumeModelVersion === 'volume-heuristic-v1', JSON.stringify(bistVolumeAgent));
+  check('BIST hacim ajanı istense bile günlük veri kullanıyor', bistVolumeAgent.timeframe === '1d' &&
+    bistVolumeAgent.lastVolume > 0 && bistVolumeAgent.averageVolume > 0 && bistVolumeAgent.ratio > 0 &&
+    bistVolumeAgent.volumeAvailable === true && bistVolumeAgent.volumeModelVersion === 'volume-heuristic-v1',
+    JSON.stringify(bistVolumeAgent));
 
   const coinVolumeAgent = await page.evaluate(async () => {
     const result = await CoinTahminAI.taraBir({ q: 'BTC', ad: 'Bitcoin' }, '1d');
@@ -963,9 +996,14 @@ try {
   const symbolMappings = await page.evaluate(() => ({
     bist: Veri.coz('PGSUS.IS')[0]?.sembol,
     coin: Veri.coz('BTC')[0]?.sembol,
-    timeframes: ['15m', '1h', '1d'].every(value => ['15m', '1h', '1d'].includes(value))
+    stockTimeframes: Veri.zamanDilimleri('THYAO.IS'),
+    cryptoTimeframes: Veri.zamanDilimleri('BTCUSDT')
   }));
   check('PGSUS.IS ve BTCUSDT sembol eşleştirmesi', symbolMappings.bist === 'PGSUS.IS' && symbolMappings.coin === 'BTCUSDT', JSON.stringify(symbolMappings));
+  check('Veri katmanı hisseyi günlük, kriptoyu dört zaman dilimine ayırıyor',
+    JSON.stringify(symbolMappings.stockTimeframes) === JSON.stringify(['1d']) &&
+    JSON.stringify(symbolMappings.cryptoTimeframes) === JSON.stringify(['15m', '1h', '4h', '1d']),
+    JSON.stringify(symbolMappings));
 
   await page.locator('nav button[data-git="gecmis"]').click();
   const coinUI = await page.locator('#coin-tahmin-btn').count();
@@ -978,11 +1016,19 @@ try {
   }, null, { timeout: 600000 });
   const coinScan = await page.evaluate(() => {
     const result = window.CoinTahminAI.sonDurum;
+    const deep = result && result.adaylar ? result.adaylar.filter(item => item.deepScan === 'tamamlandı') : [];
+    const deepTimeframeCoverage = deep.length > 0 && deep.every(item =>
+      item.mtf &&
+      ['daily', 'fourHour', 'hourly', 'fifteenMinute'].every(key => Object.prototype.hasOwnProperty.call(item.mtf, key)) &&
+      item.sourceTimestamps &&
+      ['1h', '1d', '4h', '15m'].every(key => Object.prototype.hasOwnProperty.call(item.sourceTimestamps, key))
+    );
     return {
       total: window.CoinTahminAI.LISTE.length,
       scanned: result && result.adaylar ? result.adaylar.length : 0,
       errors: result && result.hatalar ? result.hatalar.length : -1,
-      deepScanned: result && result.adaylar ? result.adaylar.filter(item => item.deepScan === 'tamamlandı').length : 0,
+      deepScanned: deep.length,
+      deepTimeframeCoverage,
       deepVersion: result && result.ajanSurum,
       errorDetails: result && result.hatalar ? result.hatalar.slice(0, 8) : [],
       status: document.querySelector('#coin-tahmin-durum')?.textContent || ''
@@ -995,6 +1041,8 @@ try {
       coinScan.status.startsWith('Tamamlandı'),
     JSON.stringify(coinScan)
   );
+  check('İlk 20 coin derin kontrolünde 15m, 1h, 4h ve 1d zaman damgaları var',
+    coinScan.deepTimeframeCoverage, JSON.stringify(coinScan));
   const coinResultText = await page.locator('#coin-tahmin-alan').innerText();
   const coinReasonUI = await page.evaluate(() => {
     const node = window.CoinTahminAI.renderCoinList([{
