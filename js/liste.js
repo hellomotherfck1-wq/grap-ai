@@ -64,14 +64,22 @@
     const n = this.norm(girdi);
     if (!n) throw new Error('Varlık adı anlaşılamadı.');
     const adaylar = [];
-    if (this.harita[n]) {
+    const ham = girdi.trim().toUpperCase().replace(/\s+/g, '');
+    const kod = n.replace(/[^a-z0-9]/g, '').toUpperCase();
+    const bistList = typeof window !== 'undefined' && window.TahminAI && Array.isArray(window.TahminAI.LISTE)
+      ? window.TahminAI.LISTE : [];
+    const bistItem = kod && bistList.find(item => String(item.q || '').toUpperCase() === kod);
+    if (ham.endsWith('.IS')) {
+      adaylar.push({ kaynak: 'y', sembol: ham, ad: ham.slice(0, -3), tur: 'BIST hissesi' });
+    } else if (this.harita[n]) {
       adaylar.push(this.harita[n]);
+    } else if (bistItem) {
+      adaylar.push({ kaynak: 'y', sembol: kod + '.IS', ad: bistItem.ad || kod, tur: 'BIST hissesi' });
     } else {
       bildir('Binance listesi kontrol ediliyor...');
       try { await this.listeYukle(); } catch (e) {}
       const b = this.binanceBul(girdi);
       if (b) adaylar.push({ kaynak: 'b', sembol: b, ad: b.replace(/USDT$/, ''), tur: 'Kripto (Binance)' });
-      const ham = girdi.trim().toUpperCase().replace(/\s+/g, '');
       if (/[.=^-]/.test(ham)) {
         adaylar.push({ kaynak: 'y', sembol: ham, ad: ham, tur: 'Diğer' });
       } else if (/^[A-Z0-9]{2,6}$/.test(ham)) {
@@ -81,9 +89,20 @@
     }
     let hata;
     const dene = async a => {
-      bildir(a.ad + ' aranıyor (' + (a.kaynak === 'b' ? 'Binance' : 'Yahoo Finance') + ')...');
-      const mumlar = a.kaynak === 'b' ? await this.binance(a.sembol, zd) : await this.yahoo(a.sembol, zd);
-      return Object.assign({}, a, { mumlar, zd, cekim: new Date() });
+      const sembol = String(a.sembol || '').toUpperCase();
+      const yalnizHisse = /BIST hissesi|ABD hissesi|Hisse \/ diğer/i.test(String(a.tur || '')) ||
+        sembol.endsWith('.IS') || (a.kaynak === 'y' && /^[A-Z0-9]{1,10}$/.test(sembol));
+      const istenenZd = ['15m', '1h', '4h', '1d'].includes(zd) ? zd : '1h';
+      const etkinZd = yalnizHisse ? '1d' : istenenZd;
+      if (a.kaynak !== 'b' && etkinZd === '4h') {
+        throw new Error('4 saatlik veri yalnızca kripto varlıklar için kullanılabilir.');
+      }
+      bildir(a.ad + ' aranıyor (' + (a.kaynak === 'b' ? 'Binance' : 'Yahoo Finance') + ')' +
+        (yalnizHisse && istenenZd !== '1d' ? ' · Hisse verisi günlük periyoda sabitlendi' : '') + '...');
+      const mumlar = a.kaynak === 'b'
+        ? await this.binance(a.sembol, etkinZd)
+        : await this.yahoo(a.sembol, etkinZd);
+      return Object.assign({}, a, { mumlar, zd: etkinZd, cekim: new Date() });
     };
     for (const a of adaylar) {
       try { return await dene(a); } catch (e) { hata = e; }

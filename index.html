@@ -22,18 +22,60 @@
         </div>
       </header>
 
-      <div class="kart">
-        <label for="ara-ad">Varlık adı veya sembolü</label>
-        <input id="ara-ad" class="form-alani" list="oneri" placeholder="Bitcoin, Pegasus, Altın, PGSUS.IS…" autocomplete="off">
-        <label for="ara-zd">Zaman dilimi</label>
-        <select id="ara-zd" class="form-alani">
+      <div class="kart ara-piyasa-kart" id="ara-kripto-panel">
+        <h3>🪙 Kripto Ara</h3>
+        <p class="alt">Yalnızca Binance Spot coinleri aranır. Kripto grafikleri 15 dakika, 1 saat, 4 saat veya günlük görüntülenir.</p>
+        <label for="ara-kripto-ad">Coin adı veya sembolü</label>
+        <input id="ara-kripto-ad" class="form-alani" list="kripto-oneri" placeholder="Bitcoin, BTC, ETH, SOL…" autocomplete="off">
+        <datalist id="kripto-oneri">
+          <option value="Bitcoin" label="BTCUSDT"></option>
+          <option value="Ethereum" label="ETHUSDT"></option>
+          <option value="Solana" label="SOLUSDT"></option>
+          <option value="XRP" label="XRPUSDT"></option>
+          <option value="BNB" label="BNBUSDT"></option>
+          <option value="Dogecoin" label="DOGEUSDT"></option>
+          <option value="Cardano" label="ADAUSDT"></option>
+          <option value="Avalanche" label="AVAXUSDT"></option>
+        </datalist>
+        <label for="ara-kripto-zd">Kripto grafik zaman dilimi</label>
+        <select id="ara-kripto-zd" class="form-alani">
+          <option value="15m">15 dakikalık</option>
+          <option value="1h" selected>1 saatlik</option>
+          <option value="4h">4 saatlik</option>
+          <option value="1d">Günlük</option>
+        </select>
+        <button type="button" id="ara-kripto-btn" class="buton">KRİPTO GRAFİĞİNİ BUL VE ANALİZ ET</button>
+        <p id="ara-kripto-durum" class="durum" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="kart ara-piyasa-kart" id="ara-bist-panel">
+        <h3>📈 BIST 100 Ara</h3>
+        <p class="alt">Bu alan yalnızca BIST 100 listesindeki hisseleri tarar. Hisse grafiği günlük (1D) periyoda sabittir.</p>
+        <label for="ara-bist-ad">BIST 100 hisse adı veya kodu</label>
+        <input id="ara-bist-ad" class="form-alani" list="bist100-oneri" placeholder="THYAO, ASELS veya Türk Hava Yolları…" autocomplete="off">
+        <datalist id="bist100-oneri"></datalist>
+        <label for="ara-bist-zd">BIST 100 grafik zaman dilimi</label>
+        <select id="ara-bist-zd" class="form-alani">
+          <option value="1d">Günlük (1D)</option>
+        </select>
+        <button type="button" id="ara-bist-btn" class="buton">BIST 100 GRAFİĞİNİ BUL VE ANALİZ ET</button>
+        <p id="ara-bist-durum" class="durum" role="status" aria-live="polite"></p>
+      </div>
+
+      <details class="kart" id="ara-diger-panel">
+        <summary>Diğer Piyasalar (ABD hisseleri, döviz, emtia, endeks)</summary>
+        <p class="alt">Kripto ve BIST 100 dışındaki varlıklar burada aranır. Tanımlı hisseler günlük, diğer piyasalar 15 dakika, 1 saat veya günlük periyotta açılır.</p>
+        <label for="ara-diger-ad">Varlık adı veya sembolü</label>
+        <input id="ara-diger-ad" class="form-alani" placeholder="AAPL, Altın, USDTRY, S&P 500…" autocomplete="off">
+        <label id="ara-diger-zd-label" for="ara-diger-zd">Diğer piyasa zaman dilimi</label>
+        <select id="ara-diger-zd" class="form-alani">
           <option value="15m">15 dakikalık</option>
           <option value="1h" selected>1 saatlik</option>
           <option value="1d">Günlük</option>
         </select>
-        <button type="button" id="ara-btn" class="buton">GRAFİĞİ BUL VE ANALİZ ET</button>
-        <p id="ara-durum" class="durum" role="status" aria-live="polite"></p>
-      </div>
+        <button type="button" id="ara-diger-btn" class="buton">DİĞER VARLIK GRAFİĞİNİ BUL VE ANALİZ ET</button>
+        <p id="ara-diger-durum" class="durum" role="status" aria-live="polite"></p>
+      </details>
 
       <details class="kart">
         <summary>Grafik görüntüsü yükleyerek analiz et</summary>
@@ -128,20 +170,20 @@
   <script src="js/tani.js"></script>
   <script src="js/cizim.js"></script>
   <script src="js/ocr.js?v=2"></script>
-  <script src="js/veri.js?v=3"></script>
-  <script src="js/liste.js"></script>
+  <script src="js/veri.js?v=4"></script>
+  <script src="js/liste.js?v=3"></script>
   <script src="js/bist100.js"></script>
   <script src="js/ajan.js?v=6"></script>
   <script src="js/ajan2.js?v=2"></script>
   <script src="js/ajan-fk.js?v=4"></script>
-  <script src="js/arayuz.js?v=12"></script>
-  <script src="js/tahmin.js?v=6"></script>
+  <script src="js/arayuz.js?v=16"></script>
+  <script src="js/tahmin.js?v=8"></script>
   <script src="js/bist-arastirma.js?v=3"></script>
   <script src="js/finansal-panel.js?v=7"></script>
   <script src="js/haber-ajani.js?v=1"></script>
   <script src="js/kripto-ajanlari.js?v=2"></script>
-  <script src="js/coin-tahmin.js?v=9"></script>
-  <script src="js/ajan-performans.js?v=12"></script>
+  <script src="js/coin-tahmin.js?v=11"></script>
+  <script src="js/ajan-performans.js?v=13"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/admin.js"></script>
 </body>

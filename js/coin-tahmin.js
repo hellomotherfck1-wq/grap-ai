@@ -427,6 +427,7 @@
       hacimVar: !!(panel.hacim && panel.hacim.var),
       hacimKarar: panel.hacim && panel.hacim.var
         ? (panel.hacim.skor > 0 ? 'AL' : panel.hacim.skor < 0 ? 'SAT' : 'BEKLE') : null,
+      volumeModelVersion: panel.hacim && panel.hacim.var ? 'volume-heuristic-v1' : null,
       denetciHata: panel.denetci ? panel.denetci.hata : null,
       denetciSorunSayisi: panel.denetci ? panel.denetci.sorunSayisi : null,
       denetciTeyit: panel.denetci ? (panel.denetci.teyit || panel.denetci.teknikTeyit || null) : null,
@@ -475,6 +476,7 @@
       teknikVar: !!r.teknikVar,
       hacimVar: !!r.hacimVar,
       hacimKarar: r.hacimVar ? r.hacimKarar : null,
+      volumeModelVersion: r.volumeModelVersion || null,
       denetciHata: r.denetciHata || null,
       denetciSorunSayisi: r.denetciSorunSayisi,
       denetciTeyit: r.denetciTeyit || null,
@@ -688,17 +690,13 @@
         (counts.missing ? ' · veri yok ' + counts.missing : '');
       summary.style.cssText = 'font-size:14px;font-weight:700;margin:10px 0;color:#e6edf3';
       box.appendChild(summary);
-      if (s.nihaiNeden) {
+      var reasonText = kararNedeniYazi(s);
+      if (reasonText) {
         var reason = document.createElement('p');
-        reason.textContent = 'Son kararın nedeni: ' + s.nihaiNeden;
-        reason.style.cssText = 'font-size:13px;line-height:1.5;color:#c8d1da';
+        reason.textContent = reasonText;
+        reason.style.cssText = 'font-size:13px;line-height:1.5;color:' +
+          (s.deepVeto ? '#f0b429' : '#c8d1da') + ';margin-top:8px';
         box.appendChild(reason);
-      }
-      if (s.deepVeto && s.deepReasons && s.deepReasons.length) {
-        var veto = document.createElement('p');
-        veto.textContent = 'Güvenlik kontrolü AL/SAT sinyalini BEKLE’ye çevirdi: ' + s.deepReasons.join(' ');
-        veto.style.cssText = 'font-size:13px;line-height:1.5;color:#f0b429;margin-top:8px';
-        box.appendChild(veto);
       }
     }
 
@@ -730,7 +728,7 @@
       'Toplam ' + (adaylar.length + hatalar.length) + ' coin listelendi: ' + adaylar.length +
         ' coin verisi incelendi, ' + hatalar.length + ' coin için veri alınamadı.',
       'Son karar dağılımı: ' + counts.AL + ' AL · ' + counts.SAT + ' SAT · ' + counts.BEKLE + ' BEKLE.',
-      deepCount + ' coin çoklu zaman dilimi ve Spot hacim verileriyle derin kontrolden geçti.',
+      deepCount + ' coin 15 dakika, 1 saat, 4 saat ve günlük verilerle Spot hacim kontrolünden geçti.',
       'Derin doğrulama almayan coinlerde AL/SAT sinyali gösterilmez; güvenlik için BEKLE yazılır.'
     ], '#2f81f7');
   }
@@ -739,6 +737,24 @@
     var counts = botOylariniSay(item);
     return 'Bot oyları: AL ' + counts.AL + ' · SAT ' + counts.SAT + ' · BEKLE ' + counts.BEKLE +
       (counts.missing ? ' · veri yok ' + counts.missing : '');
+  }
+
+  function kararNedeniYazi(item) {
+    if (!item) return '';
+    if (item.karar !== 'BEKLE') {
+      return item.nihaiNeden ? 'Karar nedeni: ' + item.nihaiNeden : '';
+    }
+    if (item.deepVeto && Array.isArray(item.deepReasons) && item.deepReasons.length) {
+      return 'BEKLE nedeni: ' + item.deepReasons.join(' ');
+    }
+    if (item.nihaiNeden) return 'BEKLE nedeni: ' + item.nihaiNeden;
+    if (item.deepScan === 'ilk 20 dışında') {
+      return 'BEKLE nedeni: Bu coin ilk 20 aday arasında olmadığı için derin doğrulama yapılmadı; doğrulanmamış AL/SAT sinyali gösterilmiyor.';
+    }
+    if (item.deepScan === 'veri yetersiz') {
+      return 'BEKLE nedeni: Derin doğrulama için yeterli veri alınamadı.';
+    }
+    return 'BEKLE nedeni: Genel analiz, teknik teyit ve hacim kontrolleri yeterince aynı yönde birleşmedi.';
   }
 
   function renderCoinList(adaylar) {
@@ -771,6 +787,13 @@
       meta.textContent = deepText + (item.skor != null ? ' · analiz puanı ' + item.skor + '/100' : '');
       meta.style.cssText = 'font-size:11px;color:#8b98a5;margin:0';
       row.appendChild(meta);
+      var reasonText = kararNedeniYazi(item);
+      if (reasonText) {
+        var reason = document.createElement('p');
+        reason.textContent = reasonText;
+        reason.style.cssText = 'font-size:12px;line-height:1.45;color:#f0b429;margin:6px 0 0';
+        row.appendChild(reason);
+      }
       wrap.appendChild(row);
     });
     details.appendChild(wrap);
@@ -848,8 +871,10 @@
     ana.appendChild(meta);
 
     var explanation = document.createElement('p');
-    explanation.textContent = s.netYok || s.karar === 'BEKLE'
-      ? 'BEKLE: Botlar yeterli teyitte birleşmedi. Şimdilik net bir işlem sinyali yok.'
+    explanation.textContent = s.netYok
+      ? 'BEKLE: Bugün yeterince güçlü ve doğrulanmış aday bulunamadı.'
+      : s.karar === 'BEKLE'
+        ? kararNedeniYazi(s)
       : s.karar === 'AL'
         ? 'AL: Botlar Spot piyasada alım yönünde yeterli teyit buldu. Bu bir garanti veya otomatik emir değildir.'
         : 'SAT: Spot piyasada elindeki coini satma veya azaltma yönünde sinyal. Açığa satış ya da kaldıraçlı işlem değildir.';
@@ -903,7 +928,7 @@
 
     sec.innerHTML =
       '<h2>Coin Tahmin AI</h2>' +
-      '<p class="alt">216 coin Spot verileriyle taranır. En güçlü 20 aday ayrıca farklı zaman dilimleri, alım/satım hacmi ve BTC/ETH piyasa durumuyla kontrol edilir. Sonuçta botların AL/SAT/BEKLE oyları ve sistemin son kararı açıkça gösterilir.</p>' +
+      '<p class="alt">216 coin Spot verileriyle 1 saatlik hızlı taramada incelenir. En güçlü 20 aday 15 dakika, 1 saat, 4 saat ve günlük verilerle; alım/satım hacmi ve BTC/ETH piyasa durumuyla derin kontrolden geçer. Sonuçta botların AL/SAT/BEKLE oyları ve sistemin son kararı açıkça gösterilir.</p>' +
       '<button type="button" id="coin-tahmin-btn" class="buton">BUGÜNÜN COİN TARAMASINI BAŞLAT</button>' +
       '<p id="coin-tahmin-durum" class="alt"></p>' +
       '<div id="coin-tahmin-alan"></div>' +
@@ -962,6 +987,8 @@
     LISTE: LISTE,
     bugunUret: bugunUret,
     taraBir: taraBir,
+    kararNedeniYazi: kararNedeniYazi,
+    renderCoinList: renderCoinList,
     okuHafiza: okuHafiza,
     okuBugunCache: okuBugunCache,
     sonDurum: null,

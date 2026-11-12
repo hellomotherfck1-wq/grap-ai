@@ -192,8 +192,10 @@ try {
       karar: 'BEKLE',
       genelKarar: i % 2 ? 'AL' : 'SAT',
       teknikKarar: i % 3 ? 'SAT' : 'AL',
-      hacimKarar: i % 2 ? 'AL' : 'BEKLE',
-      hacimSkor: i % 2 ? 2 : 0,
+      hacimVar: i !== 2,
+      hacimKarar: i === 2 ? null : i % 2 ? 'AL' : 'BEKLE',
+      hacimSkor: i === 2 ? 0 : i % 2 ? 2 : 0,
+      volumeModelVersion: i !== 2 ? 'volume-heuristic-v1' : null,
       flow: { available: true, decision: 'AL', score: 2 },
       mtf: { score: 1 },
       marketRegime: { regime: 'bull' },
@@ -216,6 +218,7 @@ try {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     const firstFullRecord = fullScanRecords.find(item => item.symbol === 'E2EALL0USDT');
+    const noVolumeRecord = fullScanRecords.find(item => item.symbol === 'E2EALL2USDT');
     return {
       storedOnce: stored.length === 1,
       rawCandlesNotStored: stored.length === 1 && !Array.isArray(stored[0].mumlar),
@@ -240,7 +243,10 @@ try {
       fullScanStored: fullScanRecords.length,
       allVotesSaved: !!firstFullRecord && firstFullRecord.generalDecision === 'SAT' &&
         firstFullRecord.technicalDecision === 'AL' && firstFullRecord.volumeDecision === 'BEKLE' &&
+        firstFullRecord.volumeAvailable === true && firstFullRecord.volumeModelVersion === 'volume-heuristic-v1' &&
         firstFullRecord.flowDecision === 'AL',
+      noVolumeSaved: !!noVolumeRecord && noVolumeRecord.volumeAvailable === false &&
+        noVolumeRecord.volumeDecision === null && noVolumeRecord.volumeScore === null,
       deepScanMetadataSaved: !!firstFullRecord && firstFullRecord.deepScan === 'tamamlandı' &&
         firstFullRecord.deepVeto === true && firstFullRecord.deepReasons[0] === 'Denetçi riski',
       deepScanBoundarySaved: fullScanRecords.filter(item => item.deepScan === 'tamamlandı').length === 20 &&
@@ -265,6 +271,34 @@ try {
     JSON.stringify(performanceChecks));
   check('216 coin kaydında genel, teknik, hacim ve Order Flow oyları saklanıyor',
     performanceChecks.allVotesSaved, JSON.stringify(performanceChecks));
+  check('Hacim verisi olmayan coine sahte BEKLE oyu yazılmıyor',
+    performanceChecks.noVolumeSaved, JSON.stringify(performanceChecks));
+  const volumeBreakdownChecks = await page.evaluate(() => {
+    const groups = window.AjanPerformans.hacimKirilimi([
+      { market: 'Kripto', timeframe: '1h', volumeDecision: 'AL', volumeAvailable: true,
+        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: 1, costPct: 0.2 },
+      { market: 'Kripto', timeframe: '1h', volumeDecision: 'SAT', volumeAvailable: true,
+        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: -1, costPct: 0.2 },
+      { market: 'BIST', timeframe: '1d', volumeDecision: 'AL', volumeAvailable: true,
+        volumeModelVersion: 'legacy-test', directionStatus: 'completed', forwardPct: -1, costPct: 0.2 },
+      { market: 'Kripto', timeframe: '1h', volumeDecision: 'AL', volumeAvailable: false,
+        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: 1, costPct: 0.2 },
+      { market: 'Kripto', timeframe: '1h', volumeDecision: 'BEKLE', volumeAvailable: true,
+        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: -1, costPct: 0.2 }
+    ]);
+    return groups.map(group => ({
+      market: group.market, timeframe: group.timeframe, version: group.version,
+      count: group.stats.count, correct: group.stats.correct,
+      wrong: group.stats.wrong, flat: group.stats.flat
+    }));
+  });
+  check('Hacim performansı piyasa, periyot ve model sürümüne göre ayrılıyor',
+    volumeBreakdownChecks.length === 2 &&
+      volumeBreakdownChecks.some(x => x.market === 'Kripto' && x.timeframe === '1h' &&
+        x.count === 2 && x.correct === 2 && x.wrong === 0) &&
+      volumeBreakdownChecks.some(x => x.market === 'BIST' && x.timeframe === '1d' &&
+        x.count === 1 && x.correct === 0 && x.wrong === 1),
+    JSON.stringify(volumeBreakdownChecks));
   check('İlk 20 derin tarama ve 196 hızlı tarama ayrımı kaydediliyor',
     performanceChecks.deepScanMetadataSaved && performanceChecks.deepScanBoundarySaved,
     JSON.stringify(performanceChecks));
@@ -333,18 +367,59 @@ try {
   check('Araştırma raporunda fiyat verisi var', /Son fiyat:.*\d/.test(researchText), researchText.split('\n').find(line => line.includes('Son fiyat')) || 'Fiyat satırı bulunamadı');
 
   await page.locator('nav button[data-git="yukle"]').click();
-  await page.locator('#ara-ad').fill('THYAO.IS');
-  await page.locator('#ara-zd').selectOption('1d');
-  await page.locator('#ara-btn').click();
+  const bistChartTimeframes = await page.locator('#ara-bist-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Ara ekranında BIST 100 için yalnızca günlük zaman dilimi var',
+    bistChartTimeframes.length === 1 && bistChartTimeframes[0] === '1d',
+    JSON.stringify(bistChartTimeframes));
+  const cryptoChartTimeframes = await page.locator('#ara-kripto-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Ara ekranında kripto için 15m, 1h, 4h ve 1d seçenekleri var',
+    JSON.stringify(cryptoChartTimeframes) === JSON.stringify(['15m', '1h', '4h', '1d']),
+    JSON.stringify(cryptoChartTimeframes));
+
+  await page.locator('#ara-diger-panel summary').click();
+  await page.locator('#ara-diger-ad').fill('AAPL');
+  const usStockTimeframes = await page.locator('#ara-diger-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Diğer piyasalarda tanımlı ABD hisseleri günlük kalıyor',
+    JSON.stringify(usStockTimeframes) === JSON.stringify(['1d']), JSON.stringify(usStockTimeframes));
+  await page.locator('#ara-diger-ad').fill('Altın');
+  const otherMarketTimeframes = await page.locator('#ara-diger-zd option').evaluateAll(options => options.map(option => option.value));
+  check('Diğer piyasalarda emtia için 15m, 1h ve 1d korunuyor',
+    JSON.stringify(otherMarketTimeframes) === JSON.stringify(['15m', '1h', '1d']), JSON.stringify(otherMarketTimeframes));
+  await page.locator('#ara-diger-ad').fill('BIST100');
+  const bistIndexTimeframes = await page.locator('#ara-diger-zd option').evaluateAll(options => options.map(option => option.value));
+  check('BIST 100 endeksi de yalnızca günlük periyotta kalıyor',
+    JSON.stringify(bistIndexTimeframes) === JSON.stringify(['1d']), JSON.stringify(bistIndexTimeframes));
+
+  await page.locator('#ara-kripto-ad').fill('THYAO.IS');
+  await page.locator('#ara-kripto-btn').click();
+  await page.waitForFunction(() =>
+    (document.querySelector('#ara-kripto-durum')?.textContent || '').includes('⚠️')
+  );
+  const cryptoIsolation = await page.locator('#ara-kripto-durum').innerText();
+  check('Kripto arama alanı BIST hisselerini reddediyor',
+    cryptoIsolation.includes('yalnızca kripto'), cryptoIsolation);
+
+  await page.locator('#ara-bist-ad').fill('BTCUSDT');
+  await page.locator('#ara-bist-btn').click();
+  await page.waitForFunction(() =>
+    (document.querySelector('#ara-bist-durum')?.textContent || '').includes('⚠️')
+  );
+  const bistIsolation = await page.locator('#ara-bist-durum').innerText();
+  check('BIST 100 arama alanı coin sembollerini reddediyor',
+    bistIsolation.includes('yalnızca BIST 100'), bistIsolation);
+
+  await page.locator('#ara-bist-ad').fill('THYAO.IS');
+  await page.locator('#ara-bist-zd').selectOption('1d');
+  await page.locator('#ara-bist-btn').click();
 
   await page.waitForFunction(() => {
-    const searchStatus = document.querySelector('#ara-durum')?.textContent || '';
+    const searchStatus = document.querySelector('#ara-bist-durum')?.textContent || '';
     const analysisStatus = document.querySelector('#analiz-durum')?.textContent || '';
     return searchStatus.includes('⚠️') || analysisStatus.includes('Analiz tamamlandı');
   }, null, { timeout: 120000 });
 
   const chartStatus = await page.locator('#analiz-durum').innerText();
-  const searchStatus = await page.locator('#ara-durum').innerText();
+  const searchStatus = await page.locator('#ara-bist-durum').innerText();
   const canvasCount = await page.locator('#tuval-alan canvas').count();
   check('THYAO.IS grafik araması', chartStatus.includes('Analiz tamamlandı'), chartStatus.includes('Analiz tamamlandı') ? chartStatus : searchStatus);
   check('Arama durum mesajı tamamlandı', searchStatus.includes('Analiz tamamlandı'), searchStatus);
@@ -461,7 +536,14 @@ try {
 
   // Exercise the full 100-symbol scan, not only the single-stock research path.
   await page.locator('nav button[data-git="strateji"]').click();
-  await page.locator('#tahmin-zd').selectOption('1d');
+  const bistScanConfig = await page.evaluate(() => ({
+    hasTimeframeSelector: Boolean(document.querySelector('#tahmin-zd')),
+    timeframe: window.TahminAI && window.TahminAI.zamanDilimi,
+    agentVersion: window.TahminAI && window.TahminAI.agentVersion
+  }));
+  check('BIST Tahmin ekranı yalnızca günlük periyoda sabit', !bistScanConfig.hasTimeframeSelector &&
+    bistScanConfig.timeframe === '1d' && bistScanConfig.agentVersion === 'tahmin-v1.4-daily',
+    JSON.stringify(bistScanConfig));
   await page.locator('#tahmin-btn').click();
   await page.waitForFunction(() => {
     const status = document.querySelector('#tahmin-durum')?.textContent || '';
@@ -469,6 +551,16 @@ try {
   }, null, { timeout: 600000 });
 
   const scanStatus = await page.locator('#tahmin-durum').innerText();
+  const bistScanTimeframes = await page.evaluate(() => {
+    const record = window.TahminAI && window.TahminAI.sonDurum;
+    return {
+      timeframe: record && record.zd,
+      candidatesDaily: Boolean(record && Array.isArray(record.adaylar) && record.adaylar.every(item => item.zd === '1d'))
+    };
+  });
+  check('BIST tarama kayıtları yalnızca günlük mumlardan oluşuyor',
+    bistScanTimeframes.timeframe === '1d' && bistScanTimeframes.candidatesDaily,
+    JSON.stringify(bistScanTimeframes));
   const scanSummary = await page.locator('#tahmin-alan details summary').first().innerText().catch(() => '');
   const scanRows = await page.locator('#tahmin-alan .bist-table tbody tr').count();
   const scanMatch = scanSummary.match(/BIST 100 tarama tablosu · (\d+) hisse(?: · (\d+) veri hatası)?/);
@@ -873,33 +965,37 @@ try {
     JSON.stringify(binanceVolume));
 
   const timeframeChecks = await page.evaluate(async () => {
-    const yahoo15 = await Veri.yahoo('THYAO.IS', '15m');
-    const yahoo1h = await Veri.yahoo('THYAO.IS', '1h');
+    const yahooDaily = await Veri.yahoo('THYAO.IS', '1d');
     const binance15 = await Veri.binance('BTCUSDT', '15m');
     const binance1h = await Veri.binance('BTCUSDT', '1h');
     const binance4h = await Veri.binance('BTCUSDT', '4h');
+    const binance1d = await Veri.binance('BTCUSDT', '1d');
     const now = Date.now();
     const closed = Veri.kapanmisMumlar([
       { t: now - 60 * 60 * 1000, closeTime: now - 1 },
       { t: now, closeTime: now + 60 * 60 * 1000 - 1 }
     ], '1h');
     return {
-      yahoo15: yahoo15.length, yahoo1h: yahoo1h.length,
+      yahooDaily: yahooDaily.length,
       binance15: binance15.length, binance1h: binance1h.length,
-      binance4h: binance4h.length, closedCount: closed.length
+      binance4h: binance4h.length, binance1d: binance1d.length,
+      closedCount: closed.length
     };
   });
-  check('15 dakika, 1 saat, 4 saat ve günlük veri aralıkları',
-    timeframeChecks.yahoo15 >= 20 && timeframeChecks.yahoo1h >= 20 &&
-    timeframeChecks.binance15 >= 20 && timeframeChecks.binance1h >= 20 &&
-    timeframeChecks.binance4h >= 20 && timeframeChecks.closedCount === 1,
+  check('Hisse günlük; kripto 15m, 1h, 4h ve 1d veri aralıkları',
+    timeframeChecks.yahooDaily >= 20 && timeframeChecks.binance15 >= 20 &&
+    timeframeChecks.binance1h >= 20 && timeframeChecks.binance4h >= 20 &&
+    timeframeChecks.binance1d >= 20 && timeframeChecks.closedCount === 1,
     JSON.stringify(timeframeChecks));
 
   const bistVolumeAgent = await page.evaluate(async () => {
-    const result = await TahminAI.taraBir({ q: 'THYAO', ad: 'Türk Hava Yolları' }, '1d');
-    return { symbol: result.sembol, lastVolume: result.sonHacim, averageVolume: result.ortHacim20, ratio: result.hacimOrani };
+    const result = await TahminAI.taraBir({ q: 'THYAO', ad: 'Türk Hava Yolları' }, '15m');
+    return { symbol: result.sembol, timeframe: result.zd, lastVolume: result.sonHacim, averageVolume: result.ortHacim20, ratio: result.hacimOrani, volumeAvailable: result.hacimVar, volumeModelVersion: result.volumeModelVersion };
   });
-  check('BIST hacim ajanına veri aktarımı', bistVolumeAgent.lastVolume > 0 && bistVolumeAgent.averageVolume > 0 && bistVolumeAgent.ratio > 0, JSON.stringify(bistVolumeAgent));
+  check('BIST hacim ajanı istense bile günlük veri kullanıyor', bistVolumeAgent.timeframe === '1d' &&
+    bistVolumeAgent.lastVolume > 0 && bistVolumeAgent.averageVolume > 0 && bistVolumeAgent.ratio > 0 &&
+    bistVolumeAgent.volumeAvailable === true && bistVolumeAgent.volumeModelVersion === 'volume-heuristic-v1',
+    JSON.stringify(bistVolumeAgent));
 
   const coinVolumeAgent = await page.evaluate(async () => {
     const result = await CoinTahminAI.taraBir({ q: 'BTC', ad: 'Bitcoin' }, '1d');
@@ -928,11 +1024,55 @@ try {
 
   const symbolMappings = await page.evaluate(() => ({
     bist: Veri.coz('PGSUS.IS')[0]?.sembol,
+    bist100: Veri.coz('AEFES')[0]?.sembol,
     coin: Veri.coz('BTC')[0]?.sembol,
-    timeframes: ['15m', '1h', '1d'].every(value => ['15m', '1h', '1d'].includes(value))
+    stockTimeframes: Veri.zamanDilimleri('THYAO.IS'),
+    usStockTimeframes: Veri.zamanDilimleri('AAPL'),
+    bist100Timeframes: Veri.zamanDilimleri('AEFES'),
+    cryptoTimeframes: Veri.zamanDilimleri('BTCUSDT')
   }));
-  check('PGSUS.IS ve BTCUSDT sembol eşleştirmesi', symbolMappings.bist === 'PGSUS.IS' && symbolMappings.coin === 'BTCUSDT', JSON.stringify(symbolMappings));
-
+  check('PGSUS.IS, BIST 100 hissesi ve BTCUSDT sembol eşleştirmesi',
+    symbolMappings.bist === 'PGSUS.IS' && symbolMappings.bist100 === 'AEFES.IS' && symbolMappings.coin === 'BTCUSDT',
+    JSON.stringify(symbolMappings));
+  check('Veri katmanı hisseyi günlük, kriptoyu dört zaman dilimine ayırıyor',
+    JSON.stringify(symbolMappings.stockTimeframes) === JSON.stringify(['1d']) &&
+    JSON.stringify(symbolMappings.usStockTimeframes) === JSON.stringify(['1d']) &&
+    JSON.stringify(symbolMappings.bist100Timeframes) === JSON.stringify(['1d']) &&
+    JSON.stringify(symbolMappings.cryptoTimeframes) === JSON.stringify(['15m', '1h', '4h', '1d']),
+    JSON.stringify(symbolMappings));
+  const marketRouting = await page.evaluate(async () => {
+    const originalBinance = Veri.binance, originalYahoo = Veri.yahoo;
+    const calls = [];
+    const candles = Array.from({ length: 30 }, (_, i) => ({
+      t: Date.now() - (30 - i) * 86400000, o: 10, h: 11, l: 9, c: 10.5, v: 100
+    }));
+    Veri.binance = async (symbol, timeframe) => {
+      calls.push({ source: 'Binance', symbol, timeframe });
+      return candles;
+    };
+    Veri.yahoo = async (symbol, timeframe) => {
+      calls.push({ source: 'Yahoo', symbol, timeframe });
+      return candles;
+    };
+    try {
+      const stock = await Veri.ara('THYAO.IS', '15m');
+      const usStock = await Veri.ara('AAPL', '15m');
+      const bist100 = await Veri.ara('AEFES', '15m');
+      const crypto = await Veri.ara('BTC', '4h');
+      return { stockTimeframe: stock.zd, usStockTimeframe: usStock.zd, bist100Timeframe: bist100.zd, bist100Symbol: bist100.sembol, cryptoTimeframe: crypto.zd, calls };
+    } finally {
+      Veri.binance = originalBinance;
+      Veri.yahoo = originalYahoo;
+    }
+  });
+  check('Veri yönlendiricisi hisseleri 1D’ye sabitliyor ve kriptoda 4H’yi koruyor',
+    marketRouting.stockTimeframe === '1d' && marketRouting.usStockTimeframe === '1d' &&
+    marketRouting.bist100Timeframe === '1d' && marketRouting.bist100Symbol === 'AEFES.IS' &&
+    marketRouting.cryptoTimeframe === '4h' &&
+    marketRouting.calls.some(call => call.source === 'Yahoo' && call.symbol === 'AAPL' && call.timeframe === '1d') &&
+    marketRouting.calls.some(call => call.source === 'Yahoo' && call.symbol === 'AEFES.IS' && call.timeframe === '1d') &&
+    marketRouting.calls.some(call => call.source === 'Binance' && call.timeframe === '4h'),
+    JSON.stringify(marketRouting));
   await page.locator('nav button[data-git="gecmis"]').click();
   const coinUI = await page.locator('#coin-tahmin-btn').count();
   const coinCount = await page.evaluate(() => window.CoinTahminAI.LISTE.length);
@@ -944,11 +1084,19 @@ try {
   }, null, { timeout: 600000 });
   const coinScan = await page.evaluate(() => {
     const result = window.CoinTahminAI.sonDurum;
+    const deep = result && result.adaylar ? result.adaylar.filter(item => item.deepScan === 'tamamlandı') : [];
+    const deepTimeframeCoverage = deep.length > 0 && deep.every(item =>
+      item.mtf &&
+      ['daily', 'fourHour', 'hourly', 'fifteenMinute'].every(key => Object.prototype.hasOwnProperty.call(item.mtf, key)) &&
+      item.sourceTimestamps &&
+      ['1h', '1d', '4h', '15m'].every(key => Object.prototype.hasOwnProperty.call(item.sourceTimestamps, key))
+    );
     return {
       total: window.CoinTahminAI.LISTE.length,
       scanned: result && result.adaylar ? result.adaylar.length : 0,
       errors: result && result.hatalar ? result.hatalar.length : -1,
-      deepScanned: result && result.adaylar ? result.adaylar.filter(item => item.deepScan === 'tamamlandı').length : 0,
+      deepScanned: deep.length,
+      deepTimeframeCoverage,
       deepVersion: result && result.ajanSurum,
       errorDetails: result && result.hatalar ? result.hatalar.slice(0, 8) : [],
       status: document.querySelector('#coin-tahmin-durum')?.textContent || ''
@@ -961,7 +1109,21 @@ try {
       coinScan.status.startsWith('Tamamlandı'),
     JSON.stringify(coinScan)
   );
+  check('İlk 20 coin derin kontrolünde 15m, 1h, 4h ve 1d zaman damgaları var',
+    coinScan.deepTimeframeCoverage, JSON.stringify(coinScan));
   const coinResultText = await page.locator('#coin-tahmin-alan').innerText();
+  const coinReasonUI = await page.evaluate(() => {
+    const node = window.CoinTahminAI.renderCoinList([{
+      ad: 'Curve DAO', sembol: 'CRVUSDT', karar: 'BEKLE', skor: 41,
+      deepScan: 'tamamlandı', deepVeto: true,
+      deepReasons: ['Order Flow güçlü biçimde ana sinyalin tersinde.'],
+      nihaiNeden: 'İlk kurul teyidi yetersiz.'
+    }]);
+    return node.textContent;
+  });
+  check('Coin listesindeki BEKLE kararı gerçek güvenlik nedenini gösteriyor',
+    coinReasonUI.includes('BEKLE nedeni:') && coinReasonUI.includes('Order Flow'),
+    coinReasonUI);
   check(
     'Coin veri hataları kullanıcıya gösteriliyor',
     coinScan.errors === 0 || coinResultText.includes('Veri alınamayanlar'),

@@ -69,8 +69,11 @@ const Veri = {
     if (!n) return [];
     if (this.harita[n]) return [this.harita[n]];
     const ham = girdi.trim().toUpperCase();
-    if (/[.=^-]/.test(ham)) return [{ kaynak: 'y', sembol: ham, ad: ham, tur: 'Diğer' }];
     const kod = n.replace(/[^a-z0-9]/g, '').toUpperCase();
+    const bistList = window.TahminAI && Array.isArray(window.TahminAI.LISTE) ? window.TahminAI.LISTE : [];
+    const bistItem = kod && bistList.find(item => String(item.q || '').toUpperCase() === kod);
+    if (bistItem) return [{ kaynak: 'y', sembol: kod + '.IS', ad: bistItem.ad || kod, tur: 'BIST hissesi' }];
+    if (/[.=^-]/.test(ham)) return [{ kaynak: 'y', sembol: ham, ad: ham, tur: 'Diğer' }];
     const l = [];
     if (kod.length >= 2 && kod.length <= 10) {
       l.push({ kaynak: 'b', sembol: kod.endsWith('USDT') ? kod : kod + 'USDT', ad: kod, tur: 'Kripto' });
@@ -78,6 +81,31 @@ const Veri = {
       l.push({ kaynak: 'y', sembol: kod, ad: kod, tur: 'Hisse / diğer' });
     }
     return l;
+  },
+
+  piyasaTahmini(girdi) {
+    const ham = String(girdi || '').trim().toUpperCase();
+    const n = this.norm(String(girdi || ''));
+    const mapped = this.harita[n];
+    if (mapped) {
+      if (mapped.kaynak === 'b') return 'Kripto';
+      if (String(mapped.sembol || '').toUpperCase().endsWith('.IS') ||
+          /BIST hissesi|ABD hissesi/i.test(mapped.tur || '')) return 'Hisse';
+      return mapped.tur || 'Diğer';
+    }
+    if (ham.endsWith('.IS')) return 'Hisse';
+    if (ham.endsWith('USDT')) return 'Kripto';
+    const code = ham.replace(/[^A-Z0-9]/g, '');
+    const bistList = window.TahminAI && Array.isArray(window.TahminAI.LISTE) ? window.TahminAI.LISTE : [];
+    if (code && bistList.some(item => String(item.q || '').toUpperCase() === code)) return 'Hisse';
+    return 'Diğer';
+  },
+
+  zamanDilimleri(girdi) {
+    const piyasa = this.piyasaTahmini(girdi);
+    if (piyasa === 'Hisse') return ['1d'];
+    if (piyasa === 'Kripto') return ['15m', '1h', '4h', '1d'];
+    return ['15m', '1h', '1d'];
   },
 
   async getir(url, ms) {
@@ -147,7 +175,14 @@ const Veri = {
   },
 
   async yahoo(sembol, zd) {
+    const symbol = String(sembol || '').toUpperCase();
+    const isMappedEquity = Object.keys(this.harita).some(key => {
+      const item = this.harita[key];
+      return item && item.sembol === symbol && /BIST hissesi|ABD hissesi/i.test(String(item.tur || ''));
+    });
+    if (symbol.endsWith('.IS') || isMappedEquity) zd = '1d';
     const p = { '15m': ['15m', '5d'], '1h': ['60m', '1mo'], '1d': ['1d', '6mo'] }[zd];
+    if (!p) throw new Error('Yahoo Finance bu zaman dilimini desteklemiyor: ' + zd);
     const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sembol) + '?interval=' + p[0] + '&range=' + p[1];
     const yollar = [
       u => u,
@@ -176,12 +211,24 @@ const Veri = {
   async ara(girdi, zd, durum) {
     const l = this.coz(girdi);
     if (!l.length) throw new Error('Varlık adı anlaşılamadı.');
+    const desteklenen = ['15m', '1h', '4h', '1d'];
+    const istenenZd = desteklenen.includes(zd) ? zd : '1h';
     let hata;
     for (const a of l) {
       try {
-        if (durum) durum(a.ad + ' aranıyor (' + (a.kaynak === 'b' ? 'Binance' : 'Yahoo Finance') + ')...');
-        const mumlar = a.kaynak === 'b' ? await this.binance(a.sembol, zd) : await this.yahoo(a.sembol, zd);
-        return Object.assign({}, a, { mumlar, zd, cekim: new Date() });
+        const sembol = String(a.sembol || '').toUpperCase();
+        const hisse = /BIST hissesi|ABD hissesi|Hisse \/ diğer/i.test(String(a.tur || '')) ||
+          sembol.endsWith('.IS') || (a.kaynak === 'y' && /^[A-Z0-9]{1,10}$/.test(sembol));
+        const etkinZd = hisse ? '1d' : istenenZd;
+        if (a.kaynak !== 'b' && etkinZd === '4h') {
+          throw new Error('4 saatlik veri yalnızca kripto varlıklar için kullanılabilir.');
+        }
+        if (durum) durum(a.ad + ' aranıyor (' + (a.kaynak === 'b' ? 'Binance' : 'Yahoo Finance') + ')' +
+          (hisse && istenenZd !== '1d' ? ' · Hisse verisi günlük periyoda sabitlendi' : '') + '...');
+        const mumlar = a.kaynak === 'b'
+          ? await this.binance(a.sembol, etkinZd)
+          : await this.yahoo(a.sembol, etkinZd);
+        return Object.assign({}, a, { mumlar, zd: etkinZd, cekim: new Date() });
       } catch (e) { hata = e; }
     }
     throw new Error('Veri bulunamadı' + (hata ? ' (' + hata.message + ').' : '.'));
@@ -212,7 +259,7 @@ const Veri = {
 
   bilgi(v, d) {
     const gun = v.zd === '1d';
-    const zdAd = { '15m': '15 dakika', '1h': '1 saat', '1d': '1 gün' }[v.zd];
+    const zdAd = { '15m': '15 dakika', '1h': '1 saat', '4h': '4 saat', '1d': '1 gün' }[v.zd];
     const L = [
       'Varlık: ' + v.ad + ' (' + v.sembol + ') – ' + v.tur,
       'Veri kaynağı: ' + (v.kaynak === 'b' ? 'Binance herkese açık piyasa verisi' : 'Yahoo Finance (gecikmeli olabilir)'),
