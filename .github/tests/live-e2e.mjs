@@ -192,8 +192,10 @@ try {
       karar: 'BEKLE',
       genelKarar: i % 2 ? 'AL' : 'SAT',
       teknikKarar: i % 3 ? 'SAT' : 'AL',
-      hacimKarar: i % 2 ? 'AL' : 'BEKLE',
-      hacimSkor: i % 2 ? 2 : 0,
+      hacimVar: i !== 2,
+      hacimKarar: i === 2 ? null : i % 2 ? 'AL' : 'BEKLE',
+      hacimSkor: i === 2 ? 0 : i % 2 ? 2 : 0,
+      volumeModelVersion: i !== 2 ? 'volume-heuristic-v1' : null,
       flow: { available: true, decision: 'AL', score: 2 },
       mtf: { score: 1 },
       marketRegime: { regime: 'bull' },
@@ -216,6 +218,7 @@ try {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     const firstFullRecord = fullScanRecords.find(item => item.symbol === 'E2EALL0USDT');
+    const noVolumeRecord = fullScanRecords.find(item => item.symbol === 'E2EALL2USDT');
     return {
       storedOnce: stored.length === 1,
       rawCandlesNotStored: stored.length === 1 && !Array.isArray(stored[0].mumlar),
@@ -240,7 +243,10 @@ try {
       fullScanStored: fullScanRecords.length,
       allVotesSaved: !!firstFullRecord && firstFullRecord.generalDecision === 'SAT' &&
         firstFullRecord.technicalDecision === 'AL' && firstFullRecord.volumeDecision === 'BEKLE' &&
+        firstFullRecord.volumeAvailable === true && firstFullRecord.volumeModelVersion === 'volume-heuristic-v1' &&
         firstFullRecord.flowDecision === 'AL',
+      noVolumeSaved: !!noVolumeRecord && noVolumeRecord.volumeAvailable === false &&
+        noVolumeRecord.volumeDecision === null && noVolumeRecord.volumeScore === null,
       deepScanMetadataSaved: !!firstFullRecord && firstFullRecord.deepScan === 'tamamlandı' &&
         firstFullRecord.deepVeto === true && firstFullRecord.deepReasons[0] === 'Denetçi riski',
       deepScanBoundarySaved: fullScanRecords.filter(item => item.deepScan === 'tamamlandı').length === 20 &&
@@ -265,6 +271,34 @@ try {
     JSON.stringify(performanceChecks));
   check('216 coin kaydında genel, teknik, hacim ve Order Flow oyları saklanıyor',
     performanceChecks.allVotesSaved, JSON.stringify(performanceChecks));
+  check('Hacim verisi olmayan coine sahte BEKLE oyu yazılmıyor',
+    performanceChecks.noVolumeSaved, JSON.stringify(performanceChecks));
+  const volumeBreakdownChecks = await page.evaluate(() => {
+    const groups = window.AjanPerformans.hacimKirilimi([
+      { market: 'Kripto', timeframe: '1h', volumeDecision: 'AL', volumeAvailable: true,
+        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: 1, costPct: 0.2 },
+      { market: 'Kripto', timeframe: '1h', volumeDecision: 'SAT', volumeAvailable: true,
+        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: -1, costPct: 0.2 },
+      { market: 'BIST', timeframe: '1d', volumeDecision: 'AL', volumeAvailable: true,
+        volumeModelVersion: 'legacy-test', directionStatus: 'completed', forwardPct: -1, costPct: 0.2 },
+      { market: 'Kripto', timeframe: '1h', volumeDecision: 'AL', volumeAvailable: false,
+        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: 1, costPct: 0.2 },
+      { market: 'Kripto', timeframe: '1h', volumeDecision: 'BEKLE', volumeAvailable: true,
+        volumeModelVersion: 'volume-heuristic-v1', directionStatus: 'completed', forwardPct: -1, costPct: 0.2 }
+    ]);
+    return groups.map(group => ({
+      market: group.market, timeframe: group.timeframe, version: group.version,
+      count: group.stats.count, correct: group.stats.correct,
+      wrong: group.stats.wrong, flat: group.stats.flat
+    }));
+  });
+  check('Hacim performansı piyasa, periyot ve model sürümüne göre ayrılıyor',
+    volumeBreakdownChecks.length === 2 &&
+      volumeBreakdownChecks.some(x => x.market === 'Kripto' && x.timeframe === '1h' &&
+        x.count === 2 && x.correct === 2 && x.wrong === 0) &&
+      volumeBreakdownChecks.some(x => x.market === 'BIST' && x.timeframe === '1d' &&
+        x.count === 1 && x.correct === 0 && x.wrong === 1),
+    JSON.stringify(volumeBreakdownChecks));
   check('İlk 20 derin tarama ve 196 hızlı tarama ayrımı kaydediliyor',
     performanceChecks.deepScanMetadataSaved && performanceChecks.deepScanBoundarySaved,
     JSON.stringify(performanceChecks));
@@ -962,6 +996,18 @@ try {
     JSON.stringify(coinScan)
   );
   const coinResultText = await page.locator('#coin-tahmin-alan').innerText();
+  const coinReasonUI = await page.evaluate(() => {
+    const node = window.CoinTahminAI.renderCoinList([{
+      ad: 'Curve DAO', sembol: 'CRVUSDT', karar: 'BEKLE', skor: 41,
+      deepScan: 'tamamlandı', deepVeto: true,
+      deepReasons: ['Order Flow güçlü biçimde ana sinyalin tersinde.'],
+      nihaiNeden: 'İlk kurul teyidi yetersiz.'
+    }]);
+    return node.innerText;
+  });
+  check('Coin listesindeki BEKLE kararı gerçek güvenlik nedenini gösteriyor',
+    coinReasonUI.includes('BEKLE nedeni:') && coinReasonUI.includes('Order Flow'),
+    coinReasonUI);
   check(
     'Coin veri hataları kullanıcıya gösteriliyor',
     coinScan.errors === 0 || coinResultText.includes('Veri alınamayanlar'),
