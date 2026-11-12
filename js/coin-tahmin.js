@@ -740,7 +740,10 @@
   }
 
   function kararNedeniYazi(item) {
-    if (!item || item.karar !== 'BEKLE') return '';
+    if (!item) return '';
+    if (item.karar !== 'BEKLE') {
+      return item.nihaiNeden ? 'Karar nedeni: ' + item.nihaiNeden : '';
+    }
     if (item.deepVeto && Array.isArray(item.deepReasons) && item.deepReasons.length) {
       return 'BEKLE nedeni: ' + item.deepReasons.join(' ');
     }
