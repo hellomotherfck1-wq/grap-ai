@@ -1003,7 +1003,7 @@ try {
       deepReasons: ['Order Flow güçlü biçimde ana sinyalin tersinde.'],
       nihaiNeden: 'İlk kurul teyidi yetersiz.'
     }]);
-    return node.innerText;
+    return node.textContent;
   });
   check('Coin listesindeki BEKLE kararı gerçek güvenlik nedenini gösteriyor',
     coinReasonUI.includes('BEKLE nedeni:') && coinReasonUI.includes('Order Flow'),
