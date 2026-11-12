@@ -26,6 +26,7 @@ create index if not exists agent_signals_shared_market_timeframe_idx
 
 alter table public.agent_signals_shared enable row level security;
 
+revoke all on table public.agent_signals_shared from public;
 revoke all on table public.agent_signals_shared from anon, authenticated;
 grant select on table public.agent_signals_shared to authenticated;
 
@@ -223,7 +224,9 @@ begin
     end loop;
 
     update public.agent_signals_shared
-    set payload = payload || v_patch,
+    set payload = payload || v_patch || jsonb_build_object(
+          'updatedAt', floor(extract(epoch from now()) * 1000)::bigint
+        ),
         decision = coalesce(v_patch ->> 'decision', decision),
         updated_at = now()
     where signal_id = v_signal_id;
