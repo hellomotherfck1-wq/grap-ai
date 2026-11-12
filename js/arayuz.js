@@ -251,6 +251,50 @@ function bist100OnerileriDoldur() {
   });
 }
 
+function digerZamanDilimleriGuncelle(girdi, tercih) {
+  const select = el('ara-diger-zd');
+  if (!select || typeof Veri === 'undefined' || typeof Veri.zamanDilimleri !== 'function') return;
+  const piyasa = Veri.piyasaTahmini(girdi || '');
+  const secenekler = piyasa === 'Hisse' ? ['1d'] : ['15m', '1h', '1d'];
+  const mevcut = String(tercih || select.value || '');
+  const etiketler = { '15m': '15 dakikalık', '1h': '1 saatlik', '1d': 'Günlük' };
+  select.replaceChildren();
+  secenekler.forEach(function (value) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = etiketler[value];
+    select.appendChild(option);
+  });
+  select.value = secenekler.indexOf(mevcut) >= 0 ? mevcut : (piyasa === 'Hisse' ? '1d' : '1h');
+  const label = el('ara-diger-zd-label');
+  if (label) label.textContent = piyasa === 'Hisse'
+    ? 'Hisse zaman dilimi (sabit günlük)'
+    : 'Diğer piyasa zaman dilimi';
+}
+
+async function digerVeriAra(girdi, zd, durum) {
+  const mapped = Veri.harita[Veri.norm(girdi)];
+  const piyasa = Veri.piyasaTahmini(girdi);
+  if ((mapped && mapped.kaynak === 'b') || piyasa === 'Kripto') {
+    throw new Error('Bu sembol kripto. Kripto için üstteki ayrı arama alanını kullan.');
+  }
+  if (bist100Eslesme(girdi)) {
+    throw new Error('Bu hisse BIST 100 listesinde. BIST 100 için üstteki ayrı arama alanını kullan.');
+  }
+  if (!mapped && piyasa !== 'Hisse') {
+    if (durum) durum('Varlık türü kontrol ediliyor…');
+    try {
+      await Veri.listeYukle();
+      if (Veri.binanceBul(String(girdi || '').trim())) {
+        throw new Error('Bu sembol Binance Spot kripto varlığı. Kripto için üstteki ayrı arama alanını kullan.');
+      }
+    } catch (e) {
+      if (e && /Binance Spot kripto varlığı/.test(e.message || '')) throw e;
+    }
+  }
+  return Veri.ara(girdi, zd, durum);
+}
+
 function grafikAra(ayar) {
   const input = el(ayar.inputId);
   const zaman = el(ayar.timeframeId);
@@ -283,7 +327,9 @@ function grafikAra(ayar) {
       const zd = ayar.market === 'BIST' ? '1d' : zaman.value;
       const v = ayar.market === 'BIST'
         ? await bist100VeriAra(ad, x => { dur.textContent = x; })
-        : await kriptoVeriAra(ad, zd, x => { dur.textContent = x; });
+        : ayar.market === 'Kripto'
+          ? await kriptoVeriAra(ad, zd, x => { dur.textContent = x; })
+          : await digerVeriAra(ad, zd, x => { dur.textContent = x; });
       const dn = Veri.donustur(v, 80);
       if (!dn || !Array.isArray(dn.m) || dn.m.length < 15) {
         throw new Error('Analiz için yeterli piyasa verisi alınamadı.');
@@ -307,7 +353,9 @@ function grafikAra(ayar) {
         sinyalMumuZamani: sinyalMumu ? sinyalMumu.t : null,
         sinyalFiyati: sinyalMumu ? sinyalMumu.c : null,
         sinyalAralikMs: aralikMs,
-        market: ayar.market,
+        market: ayar.market === 'BIST' ? 'BIST'
+          : ayar.market === 'Kripto' ? 'Kripto'
+            : (String(v.sembol || '').toUpperCase().endsWith('.IS') ? 'BIST' : 'Diğer'),
         fundamentalStatus: (v.kaynak !== 'b' &&
           !/(kripto|coin|crypto|forex|emtia|endeks)/i.test(String(v.tur || '')) &&
           !/(?:-USD|-USDT|-EUR|=X|=F)$/i.test(v.sembol || '') &&
@@ -384,14 +432,28 @@ const BIST_ARAMA = {
   buttonId: 'ara-bist-btn',
   statusId: 'ara-bist-durum'
 };
+const DIGER_ARAMA = {
+  market: 'Diger',
+  inputId: 'ara-diger-ad',
+  timeframeId: 'ara-diger-zd',
+  buttonId: 'ara-diger-btn',
+  statusId: 'ara-diger-durum'
+};
 
 el('ara-kripto-btn').addEventListener('click', function () { grafikAra(KRIPTO_ARAMA); });
 el('ara-bist-btn').addEventListener('click', function () { grafikAra(BIST_ARAMA); });
+el('ara-diger-btn').addEventListener('click', function () { grafikAra(DIGER_ARAMA); });
 el('ara-kripto-ad').addEventListener('keydown', e => {
   if (e.key === 'Enter') el('ara-kripto-btn').click();
 });
 el('ara-bist-ad').addEventListener('keydown', e => {
   if (e.key === 'Enter') el('ara-bist-btn').click();
+});
+el('ara-diger-ad').addEventListener('input', function () {
+  digerZamanDilimleriGuncelle(this.value);
+});
+el('ara-diger-ad').addEventListener('keydown', e => {
+  if (e.key === 'Enter') el('ara-diger-btn').click();
 });
 
 if (document.readyState === 'loading') {
@@ -531,8 +593,7 @@ if ('serviceWorker' in navigator) {
 }
 GrafikAI.araVarlik = function (sembol, zd) {
   const deger = String(sembol || '').trim();
-  const bistMi = /\.IS$/i.test(deger) || Boolean(bist100Eslesme(deger));
-  if (bistMi) {
+  if (bist100Eslesme(deger)) {
     const alan = el('ara-bist-ad');
     const zaman = el('ara-bist-zd');
     const arama = el('ara-bist-btn');
@@ -544,12 +605,26 @@ GrafikAI.araVarlik = function (sembol, zd) {
     return;
   }
 
-  const alan = el('ara-kripto-ad');
-  const zaman = el('ara-kripto-zd');
-  const arama = el('ara-kripto-btn');
+  const piyasa = Veri.piyasaTahmini(deger);
+  const coinMi = piyasa === 'Kripto' || Boolean(Veri.binanceBul(deger));
+  if (coinMi) {
+    const alan = el('ara-kripto-ad');
+    const zaman = el('ara-kripto-zd');
+    const arama = el('ara-kripto-btn');
+    if (!alan || !zaman || !arama) return;
+    alan.value = deger;
+    zaman.value = ['15m', '1h', '4h', '1d'].includes(zd) ? zd : '1h';
+    ekranGoster('yukle');
+    arama.click();
+    return;
+  }
+
+  const alan = el('ara-diger-ad');
+  const zaman = el('ara-diger-zd');
+  const arama = el('ara-diger-btn');
   if (!alan || !zaman || !arama) return;
   alan.value = deger;
-  zaman.value = ['15m', '1h', '4h', '1d'].includes(zd) ? zd : '1h';
+  digerZamanDilimleriGuncelle(deger, zd);
   ekranGoster('yukle');
   arama.click();
 };
