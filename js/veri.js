@@ -217,7 +217,8 @@ const Veri = {
     for (const a of l) {
       try {
         const sembol = String(a.sembol || '').toUpperCase();
-        const hisse = /BIST hissesi|ABD hissesi|Hisse \/ diğer/i.test(String(a.tur || '')) || sembol.endsWith('.IS');
+        const hisse = /BIST hissesi|ABD hissesi|Hisse \/ diğer/i.test(String(a.tur || '')) ||
+          sembol.endsWith('.IS') || (a.kaynak === 'y' && /^[A-Z0-9]{1,10}$/.test(sembol));
         const etkinZd = hisse ? '1d' : istenenZd;
         if (a.kaynak !== 'b' && etkinZd === '4h') {
           throw new Error('4 saatlik veri yalnızca kripto varlıklar için kullanılabilir.');
