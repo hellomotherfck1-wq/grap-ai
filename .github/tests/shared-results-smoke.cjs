@@ -51,6 +51,7 @@ assert.ok(/grap_ai_shared_signals_patch[\s\S]*admin_required/i.test(sql), 'Resul
 assert.ok(sql.includes("'updatedAt', floor(extract(epoch from now()) * 1000)::bigint"), 'Remote result updates must refresh the payload timestamp');
 assert.ok(sql.includes("v_market = 'BIST' and v_timeframe <> '1d'"), 'BIST shared records must remain daily only');
 assert.ok(sql.includes("v_price is null or v_price <= 0"), 'Shared records must reject missing or invalid prices');
+assert.ok(sql.includes("v_created_at < now() - interval '365 days'"), 'Shared backfill must preserve the 365-day retention window');
 assert.ok(/grap_ai_shared_signals_prune[\s\S]*admin_required/i.test(sql), 'Retention cleanup must require admin');
 assert.ok(/grant execute on function public\.grap_ai_shared_signals_upsert\(jsonb\) to anon, authenticated/i.test(sql), 'Anonymous devices must be able to submit records');
 assert.ok(!/service_role\s*[:=]\s*['"][^'"]+/i.test(helper + admin + sql), 'No service_role secret may be shipped to browsers');
