@@ -949,10 +949,15 @@
       ['Denetçi bulgusu', String(all.reduce(function (sum, r) { return sum + (r.auditorWarningCount || 0); }, 0))],
       ['Veri aralığı dışında', String(expired)]
     ].forEach(function (x) { grid.appendChild(kpi(x[0], x[1])); });
-    var cihazlar = Object.create(null);
+    var cihazlar = Object.create(null), cihazSira = 0;
     all.forEach(function (record) {
       (Array.isArray(record.deviceIds) ? record.deviceIds : (record.deviceId ? [record.deviceId] : []))
-        .forEach(function (id) { if (id) cihazlar[id] = true; });
+        .forEach(function (id) {
+          if (id && !cihazlar[id]) {
+            cihazSira++;
+            cihazlar[id] = 'Cihaz ' + cihazSira;
+          }
+        });
     });
     var cihazSayisi = Object.keys(cihazlar).length;
     if (cihazSayisi) grid.appendChild(kpi('Ortak havuz cihazı', String(cihazSayisi)));
@@ -989,7 +994,10 @@
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), row = el('tr');
-    ['Tarih', 'Varlık', 'Periyot', 'Karar', 'Denetçi', 'F/K', 'Durum', 'Net sonuç'].forEach(function (x) { row.appendChild(el('th', '', x)); });
+    var resultHeaders = ortakGorunum
+      ? ['Cihaz', 'Tarih', 'Varlık', 'Periyot', 'Karar', 'Denetçi', 'F/K', 'Durum', 'Net sonuç']
+      : ['Tarih', 'Varlık', 'Periyot', 'Karar', 'Denetçi', 'F/K', 'Durum', 'Net sonuç'];
+    resultHeaders.forEach(function (x) { row.appendChild(el('th', '', x)); });
     head.appendChild(row); table.appendChild(head);
     var body = el('tbody');
     all.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 15).forEach(function (r) {
@@ -1003,8 +1011,16 @@
         : r.fundamentalStatus === 'pending' ? 'Bekliyor'
         : r.fundamentalStatus === 'unavailable' ? 'Veri yok'
         : r.fundamentalStatus === 'not-included' ? 'Tarama dışı' : 'Uygulanmaz';
-      [new Date(r.signalAt).toLocaleDateString('tr-TR'), r.name || r.symbol, r.timeframe,
-        r.decision, r.auditorError || '—', fkLabel, statusText(r), net].forEach(function (x) { tr.appendChild(el('td', '', x)); });
+      var values = [new Date(r.signalAt).toLocaleDateString('tr-TR'), r.name || r.symbol, r.timeframe,
+        r.decision, r.auditorError || '—', fkLabel, statusText(r), net];
+      if (ortakGorunum) {
+        var ids = Array.isArray(r.deviceIds) ? r.deviceIds : (r.deviceId ? [r.deviceId] : []);
+        var deviceLabel = ids.length
+          ? ids.map(function (id) { return cihazlar[id] || 'Diğer cihaz'; }).join(', ')
+          : 'Bu cihaz';
+        values.unshift(deviceLabel);
+      }
+      values.forEach(function (x) { tr.appendChild(el('td', '', x)); });
       body.appendChild(tr);
     });
     table.appendChild(body); wrap.appendChild(table); card.appendChild(wrap);
