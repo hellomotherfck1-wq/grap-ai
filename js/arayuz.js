@@ -203,7 +203,7 @@ function aramaPiyasaTuru(girdi) {
   if (girdi && typeof girdi === 'object') {
     if (girdi.kaynak === 'b' || girdi.tur === 'Kripto') return 'Kripto';
     if (String(girdi.sembol || '').toUpperCase().endsWith('.IS') ||
-        /BIST hissesi|ABD hissesi/i.test(girdi.tur || '')) return 'Hisse';
+        /BIST hissesi|ABD hissesi|Hisse \/ diğer/i.test(girdi.tur || '')) return 'Hisse';
     return Veri.piyasaTahmini(girdi.sembol || girdi.ad || '');
   }
   return Veri.piyasaTahmini(girdi || '');
@@ -214,7 +214,7 @@ function zamanDilimleriGuncelle(girdi, tercih) {
   if (!select || typeof Veri === 'undefined' || typeof Veri.zamanDilimleri !== 'function') return;
   const piyasa = aramaPiyasaTuru(girdi);
   const kaynak = girdi && typeof girdi === 'object' ? (girdi.sembol || girdi.ad || '') : girdi;
-  const secenekler = Veri.zamanDilimleri(kaynak);
+  const secenekler = piyasa === 'Hisse' ? ['1d'] : Veri.zamanDilimleri(kaynak);
   const mevcut = String(tercih || select.value || '');
   const etiketler = { '15m': '15 dakikalık', '1h': '1 saatlik', '4h': '4 saatlik', '1d': 'Günlük' };
   select.replaceChildren();
