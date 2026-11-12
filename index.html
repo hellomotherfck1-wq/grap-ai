@@ -62,6 +62,21 @@
         <p id="ara-bist-durum" class="durum" role="status" aria-live="polite"></p>
       </div>
 
+      <details class="kart" id="ara-diger-panel">
+        <summary>Diğer Piyasalar (ABD hisseleri, döviz, emtia, endeks)</summary>
+        <p class="alt">Kripto ve BIST 100 dışındaki varlıklar burada aranır. Tanımlı hisseler günlük, diğer piyasalar 15 dakika, 1 saat veya günlük periyotta açılır.</p>
+        <label for="ara-diger-ad">Varlık adı veya sembolü</label>
+        <input id="ara-diger-ad" class="form-alani" placeholder="AAPL, Altın, USDTRY, S&P 500…" autocomplete="off">
+        <label id="ara-diger-zd-label" for="ara-diger-zd">Diğer piyasa zaman dilimi</label>
+        <select id="ara-diger-zd" class="form-alani">
+          <option value="15m">15 dakikalık</option>
+          <option value="1h" selected>1 saatlik</option>
+          <option value="1d">Günlük</option>
+        </select>
+        <button type="button" id="ara-diger-btn" class="buton">DİĞER VARLIK GRAFİĞİNİ BUL VE ANALİZ ET</button>
+        <p id="ara-diger-durum" class="durum" role="status" aria-live="polite"></p>
+      </details>
+
       <details class="kart">
         <summary>Grafik görüntüsü yükleyerek analiz et</summary>
         <p class="alt">Bir ekran görüntüsü seç. Mumlar cihazında okunur; fiyat ekseni OCR ile okunamazsa en yüksek ve en düşük fiyatı elle girebilirsin.</p>
@@ -161,7 +176,7 @@
   <script src="js/ajan.js?v=6"></script>
   <script src="js/ajan2.js?v=2"></script>
   <script src="js/ajan-fk.js?v=4"></script>
-  <script src="js/arayuz.js?v=14"></script>
+  <script src="js/arayuz.js?v=15"></script>
   <script src="js/tahmin.js?v=8"></script>
   <script src="js/bist-arastirma.js?v=3"></script>
   <script src="js/finansal-panel.js?v=7"></script>
