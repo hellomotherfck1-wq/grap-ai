@@ -32,6 +32,7 @@ assert.ok(performance.includes('shared.syncLocal(local)'), 'Existing local recor
 assert.ok(performance.includes('shared.patchMany(remotePatches)'), 'Evaluation outcomes must sync in batches');
 assert.ok(performance.includes('Object.assign({}, record, shared'), 'The central shared record must remain the admin view source of truth');
 assert.ok(performance.includes('shared.kaydet([updated])'), 'A device must sync its own revised pending analysis');
+assert.ok(performance.includes('remote.then(function (result)'), 'Shared sync must not block local decision updates');
 assert.ok(performance.includes('Ortak sonuç havuzu'), 'Admin shared-pool state must be visible in results');
 const renderStart = performance.indexOf('function render(records)');
 const allDeclaration = performance.indexOf('var all = Array.isArray(records) ? records : [];', renderStart);
