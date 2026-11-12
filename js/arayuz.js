@@ -203,8 +203,8 @@ function bist100Eslesme(girdi) {
   const liste = window.TahminAI && Array.isArray(window.TahminAI.LISTE)
     ? window.TahminAI.LISTE : [];
   if (!liste.length) return null;
-  const ham = String(girdi || '').trim().toUpperCase().replace(/\\.IS$/i, '').replace(/\\s+/g, '');
-  const norm = Veri.norm(String(girdi || '').replace(/\\.IS$/i, ''));
+  const ham = String(girdi || '').trim().toUpperCase().replace(/\.IS$/i, '').replace(/\s+/g, '');
+  const norm = Veri.norm(String(girdi || '').replace(/\.IS$/i, ''));
   return liste.find(item =>
     String(item.q || '').toUpperCase() === ham ||
     (item.ad && Veri.norm(item.ad) === norm)
@@ -531,7 +531,7 @@ if ('serviceWorker' in navigator) {
 }
 GrafikAI.araVarlik = function (sembol, zd) {
   const deger = String(sembol || '').trim();
-  const bistMi = /\\.IS$/i.test(deger) || Boolean(bist100Eslesme(deger));
+  const bistMi = /\.IS$/i.test(deger) || Boolean(bist100Eslesme(deger));
   if (bistMi) {
     const alan = el('ara-bist-ad');
     const zaman = el('ara-bist-zd');
