@@ -27,7 +27,9 @@ assert.ok(helper.includes("if (!adminAuthorized)"), 'Non-admin clients must not 
 assert.ok(helper.includes("setAdminAccess: function (allowed)"), 'Admin module must explicitly grant shared-pool UI access only after role verification');
 assert.ok(admin.includes("ortakHavuzYetkisi(true)") && admin.includes("ortakHavuzYetkisi(false)"), 'Admin login/logout must toggle shared-pool visibility');
 assert.ok(admin.includes("admin-yenile-btn") && admin.includes("istatistikYukle()"), 'Admin panel must support manual statistics refresh');
-assert.ok(/<div id="admin-panel" hidden>[\\s\\S]*id="admin-gelistirme-notlari"/.test(html), 'Development notes must stay inside the authenticated admin panel');
+const adminPanelStart = html.indexOf('<div id="admin-panel" hidden>');
+const adminNotesIndex = html.indexOf('id="admin-gelistirme-notlari"');
+assert.ok(adminPanelStart >= 0 && adminNotesIndex > adminPanelStart, 'Development notes must stay inside the authenticated admin panel');
 assert.ok(html.includes("Eski geliştirme notları") && html.includes("Ajan performans karnesi") && html.includes("Giriş ve veri güvenliği"), 'Admin notes must retain historical project decisions');
 assert.ok(helper.includes(".from(TABLE)"), 'Admin must read the shared table');
 assert.ok(admin.includes('window.GrapAISharedResults.client'), 'Admin login must reuse the shared Supabase session');
