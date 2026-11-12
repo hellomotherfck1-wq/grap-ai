@@ -931,9 +931,9 @@ try {
 
   const bistVolumeAgent = await page.evaluate(async () => {
     const result = await TahminAI.taraBir({ q: 'THYAO', ad: 'Türk Hava Yolları' }, '1d');
-    return { symbol: result.sembol, lastVolume: result.sonHacim, averageVolume: result.ortHacim20, ratio: result.hacimOrani };
+    return { symbol: result.sembol, lastVolume: result.sonHacim, averageVolume: result.ortHacim20, ratio: result.hacimOrani, volumeAvailable: result.hacimVar, volumeModelVersion: result.volumeModelVersion };
   });
-  check('BIST hacim ajanına veri aktarımı', bistVolumeAgent.lastVolume > 0 && bistVolumeAgent.averageVolume > 0 && bistVolumeAgent.ratio > 0, JSON.stringify(bistVolumeAgent));
+  check('BIST hacim ajanına veri aktarımı', bistVolumeAgent.lastVolume > 0 && bistVolumeAgent.averageVolume > 0 && bistVolumeAgent.ratio > 0 && bistVolumeAgent.volumeAvailable === true && bistVolumeAgent.volumeModelVersion === 'volume-heuristic-v1', JSON.stringify(bistVolumeAgent));
 
   const coinVolumeAgent = await page.evaluate(async () => {
     const result = await CoinTahminAI.taraBir({ q: 'BTC', ad: 'Bitcoin' }, '1d');
