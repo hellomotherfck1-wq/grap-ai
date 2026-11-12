@@ -200,6 +200,7 @@
   }
 
   function safeRecord(input) {
+    var versions = window.Ajan && window.Ajan.surumler ? window.Ajan.surumler : {};
     var symbol = norm(input.symbol);
     var tf = input.timeframe || input.zd;
     var at = input.signalAt === null || input.signalAt === undefined || input.signalAt === ''
@@ -233,7 +234,11 @@
       volumeDecision: input.volumeDecision || null,
       volumeScore: num(input.volumeScore) ? input.volumeScore : null,
       volumeAvailable: typeof input.volumeAvailable === 'boolean' ? input.volumeAvailable : null,
-      volumeModelVersion: input.volumeModelVersion || null,
+      generalAgentVersion: String(input.generalAgentVersion || versions.general || input.agentVersion || 'sürüm-bilinmiyor'),
+      technicalAgentVersion: String(input.technicalAgentVersion || versions.technical || input.agentVersion || 'sürüm-bilinmiyor'),
+      volumeModelVersion: input.volumeModelVersion || (input.volumeAvailable === true ? versions.volume : null) || null,
+      auditorVersion: String(input.auditorVersion || versions.auditor || input.agentVersion || 'sürüm-bilinmiyor'),
+      committeeVersion: String(input.committeeVersion || versions.committee || input.agentVersion || 'sürüm-bilinmiyor'),
       flowDecision: input.flowDecision || null,
       flowScore: num(input.flowScore) ? input.flowScore : null,
       flowAvailable: typeof input.flowAvailable === 'boolean' ? input.flowAvailable : null,
@@ -670,19 +675,103 @@
   }
 
   function agentStats(records, key) {
-    var calls = records.filter(function (r) {
+    var calls = (records || []).filter(function (r) {
       return r.directionStatus === 'completed' &&
         (r[key] === 'AL' || r[key] === 'SAT') && num(r.forwardPct) &&
         (key !== 'volumeDecision' || r.volumeAvailable !== false);
     });
+    // Aynı sembol/periyotta bir önceki 10 mumluk ölçüm bitmeden gelen
+    // yeni sinyali ikinci bağımsız örnek sayma.
+    var ordered = calls.slice().sort(function (a, b) {
+      return (Number(a.signalAt) || 0) - (Number(b.signalAt) || 0);
+    });
+    var lastEndByAsset = Object.create(null);
+    var independent = [];
+    var overlapExcluded = 0;
+    var unknownHorizon = 0;
+    ordered.forEach(function (r) {
+      var exitAt = r.directionResult && Number(r.directionResult.exitAt);
+      var step = interval(r.timeframe);
+      if (!num(exitAt) || !step || exitAt < Number(r.signalAt)) {
+        unknownHorizon++;
+        return;
+      }
+      var assetKey = norm(r.symbol) + '|' + String(r.timeframe || '');
+      var previousEnd = lastEndByAsset[assetKey];
+      if (num(previousEnd) && Number(r.signalAt) < previousEnd) {
+        overlapExcluded++;
+        return;
+      }
+      independent.push(r);
+      // exitAt son ileri mumun açılış zamanıdır; kapanışında pencere biter.
+      lastEndByAsset[assetKey] = exitAt + step;
+    });
     var correct = 0, wrong = 0, flat = 0;
-    calls.forEach(function (r) {
-      if (Math.abs(r.forwardPct) <= r.costPct) flat++;
+    independent.forEach(function (r) {
+      if (Math.abs(r.forwardPct) <= (num(r.costPct) ? r.costPct : 0)) flat++;
       else if ((r[key] === 'AL' && r.forwardPct > 0) || (r[key] === 'SAT' && r.forwardPct < 0)) correct++;
       else wrong++;
     });
     var directional = correct + wrong;
-    return { count: calls.length, correct: correct, wrong: wrong, flat: flat, rate: directional ? correct / directional * 100 : null };
+    return {
+      rawCount: calls.length,
+      count: independent.length,
+      overlapExcluded: overlapExcluded,
+      unknownHorizon: unknownHorizon,
+      correct: correct,
+      wrong: wrong,
+      flat: flat,
+      rate: directional ? correct / directional * 100 : null
+    };
+  }
+
+  function agentBreakdown(records) {
+    var definitions = [
+      { label: 'Genel analiz', key: 'generalDecision', versionKey: 'generalAgentVersion' },
+      { label: 'Teknik ajan', key: 'technicalDecision', versionKey: 'technicalAgentVersion' },
+      { label: 'Hacim ajanı', key: 'volumeDecision', versionKey: 'volumeModelVersion' },
+      { label: 'Nihai kurul', key: 'decision', versionKey: 'committeeVersion' }
+    ];
+    var groups = Object.create(null);
+    (records || []).forEach(function (record) {
+      if (!record) return;
+      definitions.forEach(function (definition) {
+        var vote = record[definition.key];
+        if (['AL', 'SAT', 'BEKLE'].indexOf(vote) < 0) return;
+        var market = record.market || marketOf(record.symbol);
+        var timeframe = record.timeframe || '—';
+        var version = record[definition.versionKey] || record.agentVersion || 'Sürüm bilinmiyor';
+        var groupKey = [definition.key, market, timeframe, version].join('|');
+        if (!groups[groupKey]) {
+          groups[groupKey] = {
+            agent: definition.label,
+            agentKey: definition.key,
+            market: market,
+            timeframe: timeframe,
+            version: version,
+            records: [],
+            votes: { AL: 0, SAT: 0, BEKLE: 0 }
+          };
+        }
+        groups[groupKey].records.push(record);
+        groups[groupKey].votes[vote]++;
+      });
+    });
+    return Object.keys(groups).map(function (key) {
+      var group = groups[key];
+      return {
+        agent: group.agent,
+        agentKey: group.agentKey,
+        market: group.market,
+        timeframe: group.timeframe,
+        version: group.version,
+        votes: group.votes,
+        stats: agentStats(group.records, group.agentKey)
+      };
+    }).sort(function (a, b) {
+      return (a.market + '|' + a.timeframe + '|' + a.agent + '|' + a.version)
+        .localeCompare(b.market + '|' + b.timeframe + '|' + b.agent + '|' + b.version, 'tr');
+    });
   }
 
   function volumeBreakdown(records) {
@@ -712,27 +801,36 @@
   }
 
   function renderAgentTable(records) {
+    var rows = agentBreakdown(records);
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead');
     var hr = el('tr');
-    ['Ajan', 'Yön sinyali', 'Doğru', 'Yanlış', 'Yatay', 'İsabet'].forEach(function (label) { hr.appendChild(el('th', '', label)); });
+    ['Piyasa', 'Periyot', 'Ajan', 'Ajan sürümü', 'AL', 'SAT', 'BEKLE',
+      'Tamamlanan', 'Bağımsız', 'Dışlanan', 'Doğru', 'Yanlış', 'Yatay', 'İsabet']
+      .forEach(function (label) { hr.appendChild(el('th', '', label)); });
     head.appendChild(hr);
     table.appendChild(head);
     var body = el('tbody');
-    [
-      ['Genel analiz', 'generalDecision'],
-      ['Teknik ajan', 'technicalDecision'],
-      ['Hacim ajanı', 'volumeDecision'],
-      ['Nihai kurul', 'decision']
-    ].forEach(function (item) {
-      var s = agentStats(records, item[1]);
+    rows.forEach(function (item) {
+      var s = item.stats;
+      var accuracy = s.rate === null ? '—' : '%' + s.rate.toFixed(1).replace('.', ',');
+      var excluded = s.overlapExcluded + s.unknownHorizon;
+      var values = [
+        item.market, item.timeframe, item.agent, item.version,
+        String(item.votes.AL), String(item.votes.SAT), String(item.votes.BEKLE),
+        String(s.rawCount), String(s.count), String(excluded),
+        String(s.correct), String(s.wrong), String(s.flat), accuracy
+      ];
       var row = el('tr');
-      [item[0], String(s.count), String(s.correct), String(s.wrong), String(s.flat), s.rate === null ? '—' : '%' + s.rate.toFixed(1).replace('.', ',')].forEach(function (v) { row.appendChild(el('td', '', v)); });
+      values.forEach(function (value) { row.appendChild(el('td', '', value)); });
       body.appendChild(row);
     });
     table.appendChild(body);
     wrap.appendChild(table);
+    if (!rows.length) {
+      wrap.appendChild(el('p', 'backtest-not', 'Ajanların tamamlanmış yön sonuçları geldikçe bu tabloda ayrı ayrı görünecek.'));
+    }
     return wrap;
   }
 
@@ -741,7 +839,7 @@
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), hr = el('tr');
-    ['Model sürümü', 'Piyasa', 'Periyot', 'Sinyal', 'Doğru', 'Yanlış', 'Yatay', 'İsabet'].forEach(function (label) {
+    ['Model sürümü', 'Piyasa', 'Periyot', 'Ham', 'Bağımsız', 'Doğru', 'Yanlış', 'Yatay', 'İsabet'].forEach(function (label) {
       hr.appendChild(el('th', '', label));
     });
     head.appendChild(hr);
@@ -753,7 +851,7 @@
         ? 'Mevcut model v1' : item.version;
       var tr = el('tr');
       [
-        version, item.market, item.timeframe, String(stats.count),
+        version, item.market, item.timeframe, String(stats.rawCount), String(stats.count),
         String(stats.correct), String(stats.wrong), String(stats.flat),
         stats.rate === null ? '—' : '%' + stats.rate.toFixed(1).replace('.', ',')
       ].forEach(function (value) { tr.appendChild(el('td', '', value)); });
@@ -978,10 +1076,10 @@
         ? 'Spot AL ön sonucu: 30–99 işlem var. %95 Wilson aralığı yaklaşık %' + wr.low.toFixed(1) + '–%' + wr.high.toFixed(1) + '.'
         : 'Spot AL örneklemi genişliyor: %95 Wilson aralığı yaklaşık %' + wr.low.toFixed(1) + '–%' + wr.high.toFixed(1) + '. Bu yine de gelecekteki başarıyı garanti etmez.';
     card.appendChild(el('p', 'backtest-not', quality));
-    card.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · sinyalden 10 mum sonra'));
+    card.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · piyasa, periyot ve sürüm ayrımı'));
     card.appendChild(renderAgentTable(all));
     card.appendChild(el('p', 'backtest-not',
-      'Hacim ajanının doğru/yanlış hesabı yalnızca AL/SAT oylarını sayar; BEKLE ve veri yok oyları isabet hesabına girmez. Maliyet eşiği içindeki yatay sonuçlar da doğru/yanlış oranının paydasına katılmaz, ayrı gösterilir. Ölçüm, sinyalden sonraki 10 kapanmış mumun fiyat yönüne göredir; işlem kâr oranı değildir. Genel toplam farklı piyasa ve periyotları birleştirebilir. Aynı coin için yakın zamanlı 10 mumluk pencereler örtüşebileceğinden örnekler tamamen bağımsız değildir.'));
+      'İsabet, sinyalden sonraki 10 kapanmış mumun fiyat yönüne göre hesaplanır; gerçek işlem kârı değildir. BEKLE oyları AL/SAT isabetine katılmaz, yatay sonuçlar ayrı gösterilir. Aynı sembol ve periyotta ölçüm penceresi bitmeden gelen tekrar sinyalleri bağımsız örnek sayılmaz. Eski kayıtlarda ileri dönem bitiş zamanı bulunmuyorsa bu kayıtlar bağımsız örnek hesabına alınmaz. 30’dan az bağımsız örnek kesin başarı göstergesi değildir.'));
     card.appendChild(el('h4', 'backtest-trades-title', 'Hacim ajanı · model, piyasa ve periyot kırılımı'));
     card.appendChild(renderVolumeBreakdown(all));
     card.appendChild(el('h4', 'backtest-trades-title', 'Spot AL: piyasa ve zaman dilimi ayrımı'));
@@ -1055,8 +1153,9 @@
 
   function exportCSV(records) {
     var columns = ['signalAt', 'scanAt', 'symbol', 'name', 'market', 'timeframe', 'decision',
-      'generalDecision', 'technicalDecision', 'volumeDecision', 'volumeScore', 'volumeAvailable',
-      'volumeModelVersion', 'flowDecision', 'flowScore', 'flowAvailable', 'marketRegime',
+      'generalDecision', 'generalAgentVersion', 'technicalDecision', 'technicalAgentVersion',
+      'volumeDecision', 'volumeScore', 'volumeAvailable', 'volumeModelVersion',
+      'auditorVersion', 'committeeVersion', 'flowDecision', 'flowScore', 'flowAvailable', 'marketRegime',
       'mtfAlignment', 'deepScan', 'deepVeto', 'deepReasons', 'finalReason', 'auditorError',
       'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target', 'costPct',
       'tradeStatus', 'tradeOutcome', 'netPct', 'spotStatus', 'spotOutcome',
@@ -1068,9 +1167,9 @@
       var values = [
         new Date(r.signalAt).toISOString(), r.scanAt ? new Date(r.scanAt).toISOString() : '',
         r.symbol, r.name, r.market, r.timeframe, r.decision,
-        r.generalDecision, r.technicalDecision, r.volumeDecision,
-        r.volumeScore, r.volumeAvailable, r.volumeModelVersion,
-        r.flowDecision, r.flowScore, r.flowAvailable,
+        r.generalDecision, r.generalAgentVersion, r.technicalDecision, r.technicalAgentVersion,
+        r.volumeDecision, r.volumeScore, r.volumeAvailable, r.volumeModelVersion,
+        r.auditorVersion, r.committeeVersion, r.flowDecision, r.flowScore, r.flowAvailable,
         r.marketRegime, r.mtfAlignment, r.deepScan || '', r.deepVeto,
         (r.deepReasons || []).join('|'), r.finalReason || '',
         r.auditorError, r.auditorWarningCount, r.fundamentalStatus,
@@ -1291,6 +1390,7 @@
     listele: allRecords,
     sonucHesapla: evaluateSignal,
     ajanIstatistik: agentStats,
+    ajanKirilimi: agentBreakdown,
     hacimKirilimi: volumeBreakdown,
     guncelleSonuclar: updateResults,
     yenile: refreshView,
