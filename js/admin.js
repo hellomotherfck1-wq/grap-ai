@@ -50,6 +50,15 @@
     return roller.some(x => String(x).toLowerCase() === hedef);
   }
 
+  async function ortakHavuzYetkisi(izinli) {
+    if (window.GrapAISharedResults && typeof window.GrapAISharedResults.setAdminAccess === 'function') {
+      window.GrapAISharedResults.setAdminAccess(Boolean(izinli));
+    }
+    if (window.AjanPerformans && typeof window.AjanPerformans.yenile === 'function') {
+      try { await window.AjanPerformans.yenile(); } catch (e) {}
+    }
+  }
+
   async function eventKaydet(tip, asset) {
     if (!supabase || !hazir) return;
     try {
@@ -137,6 +146,7 @@
       }
 
       if (!session) {
+        await ortakHavuzYetkisi(false);
         giris.hidden = false;
         panel.hidden = true;
         return;
@@ -147,17 +157,20 @@
 
       if (!yetkiliMi(data.user)) {
         await supabase.auth.signOut();
+        await ortakHavuzYetkisi(false);
         giris.hidden = false;
         panel.hidden = true;
         mesaj('Bu hesapta yönetici yetkisi bulunmuyor. Supabase app_metadata.role alanı admin olmalı.', true);
         return;
       }
 
+      await ortakHavuzYetkisi(true);
       giris.hidden = true;
       panel.hidden = false;
       mesaj('Yönetici oturumu açık.');
       await istatistikYukle();
     } catch (e) {
+      await ortakHavuzYetkisi(false);
       giris.hidden = false;
       panel.hidden = true;
       mesaj('Oturum kontrolü yapılamadı: ' + (e.message || String(e)), true);
@@ -171,9 +184,11 @@
     }
 
     try {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-      });
+      supabase = window.GrapAISharedResults && window.GrapAISharedResults.client
+        ? window.GrapAISharedResults.client
+        : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+          });
       hazir = true;
 
       const girisBtn = $('admin-giris-btn');
@@ -206,6 +221,7 @@
         try {
           const { error } = await supabase.auth.signOut();
           if (error) throw error;
+          await ortakHavuzYetkisi(false);
           giris.hidden = false;
           panel.hidden = true;
           mesaj('Güvenli çıkış yapıldı.');

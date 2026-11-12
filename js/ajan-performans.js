@@ -58,13 +58,56 @@
     return dbPromise;
   }
 
-  function allRecords() {
+  function localRecords() {
     return openDB().then(function (db) {
       return new Promise(function (resolve, reject) {
         var tx = db.transaction(STORE, 'readonly');
         var req = tx.objectStore(STORE).getAll();
         req.onsuccess = function () { resolve(Array.isArray(req.result) ? req.result : []); };
         req.onerror = function () { reject(req.error || new Error('Sinyaller okunamadı.')); };
+      });
+    });
+  }
+
+  function mergeRecords(local, remote) {
+    var byId = Object.create(null);
+    (remote || []).forEach(function (record) {
+      if (record && record.id) byId[record.id] = record;
+    });
+    (local || []).forEach(function (record) {
+      if (!record || !record.id) return;
+      var shared = byId[record.id];
+      if (!shared) {
+        byId[record.id] = record;
+        return;
+      }
+      byId[record.id] = Object.assign({}, record, shared, {
+        deviceId: shared.deviceId || null,
+        deviceIds: shared.deviceIds || [],
+        sharedPool: true
+      });
+    });
+    return Object.keys(byId).map(function (key) { return byId[key]; })
+      .sort(function (a, b) { return (Number(b.signalAt) || 0) - (Number(a.signalAt) || 0); });
+  }
+
+  function allRecords() {
+    return localRecords().then(function (local) {
+      var shared = window.GrapAISharedResults;
+      if (!shared || typeof shared.adminRecords !== 'function') return local;
+      return shared.adminRecords().then(function (result) {
+        if (result && result.error) {
+          setStatus('Yerel kayıtlar gösteriliyor. Ortak havuz okunamadı: ' + result.error, true);
+        }
+        var merged = mergeRecords(local, result && Array.isArray(result.records) ? result.records : []);
+        if (result && result.isAdmin) {
+          merged.forEach(function (record) { record.sharedPool = true; });
+        }
+        return merged;
+      }).catch(function (error) {
+        setStatus('Yerel kayıtlar gösteriliyor. Ortak havuz bağlantısı kurulamadı: ' +
+          (error && error.message ? error.message : String(error)), true);
+        return local;
       });
     });
   }
@@ -141,7 +184,7 @@
 
   function prune() {
     var cutoff = Date.now() - RETENTION_MS;
-    return allRecords().then(function (records) {
+    return localRecords().then(function (records) {
       var old = records.filter(function (r) { return !num(r.createdAt) || r.createdAt < cutoff; });
       if (!old.length) return 0;
       return openDB().then(function (db) {
@@ -229,7 +272,15 @@
     var record = safeRecord(input || {});
     if (!record) return null;
     putRecord(record).then(function () {
-      return allRecords().then(render);
+      var shared = window.GrapAISharedResults;
+      return shared && typeof shared.kaydet === 'function' ? shared.kaydet([record]) : null;
+    }).then(function (sync) {
+      return allRecords().then(function (records) {
+        render(records);
+        if (sync && !sync.ok) {
+          setStatus('Sinyal bu cihaza kaydedildi; ortak havuza gönderilemedi: ' + sync.error, true);
+        }
+      });
     }).catch(function (e) {
       setStatus('Sinyal kaydedilemedi: ' + (e && e.message ? e.message : String(e)), true);
     });
@@ -318,6 +369,7 @@
     var scanAt = num(meta.scanAt) ? meta.scanAt : Date.now();
     var count = 0;
     var writes = [];
+    var remoteRecords = [];
     candidates.forEach(function (c) {
       if (!c || !c.sembol || c.sembol === '—') return;
       var volumeAvailable = typeof c.hacimVar === 'boolean'
@@ -367,9 +419,20 @@
       if (record) {
         count++;
         writes.push(putRecord(record));
+        remoteRecords.push(record);
       }
     });
-    Promise.all(writes).then(allRecords).then(render).catch(function (e) {
+    Promise.all(writes).then(function () {
+      var shared = window.GrapAISharedResults;
+      return shared && typeof shared.kaydet === 'function' ? shared.kaydet(remoteRecords) : null;
+    }).then(function (sync) {
+      return allRecords().then(function (records) {
+        render(records);
+        if (sync && !sync.ok) {
+          setStatus('Tarama bu cihaza kaydedildi; ortak havuza gönderilemedi: ' + sync.error, true);
+        }
+      });
+    }).catch(function (e) {
       setStatus('Tarama sinyalleri kaydedilemedi: ' + (e && e.message ? e.message : String(e)), true);
     });
     return count;
@@ -386,6 +449,25 @@
     patch.forwardPct = null;
     patch.waitResult = null;
     return patchRecord(id, patch).then(function (updated) {
+      var shared = window.GrapAISharedResults;
+      var remote = null;
+      if (shared && updated && typeof shared.kaydet === 'function') {
+        remote = shared.isAdmin().then(function (admin) {
+          return admin && typeof shared.patchMany === 'function'
+            ? shared.patchMany([{ id: id, patch: patch }])
+            : shared.kaydet([updated]);
+        });
+      } else if (shared && typeof shared.patchMany === 'function') {
+        remote = shared.patchMany([{ id: id, patch: patch }]);
+      }
+      if (remote) {
+        remote.then(function (result) {
+          if (result && !result.ok) console.warn('Karar ortak havuza gönderilemedi:', result.error);
+          return allRecords().then(function (records) { render(records); });
+        }).catch(function (error) {
+          console.warn('Karar ortak havuza gönderilemedi:', error && error.message ? error.message : error);
+        });
+      }
       return allRecords().then(function (records) {
         render(records);
         return updated;
@@ -781,12 +863,16 @@
   function render(records) {
     var root = document.getElementById('ajan-performans-panel');
     if (!root) return;
+    var all = Array.isArray(records) ? records : [];
     root.replaceChildren();
     var card = el('div', 'kart ajan-performans');
     var header = el('div', 'performans-baslik');
     var heading = el('div');
     heading.appendChild(el('h3', '', '🏆 Ajanların ölçülen performansı'));
-    heading.appendChild(el('p', 'backtest-not', 'Sinyaller 365 gün saklanır · 216 coin taramasındaki geçerli adayların oyları tutulur · ham mumlar saklanmaz · bu cihazda.'));
+    var ortakGorunum = all.some(function (record) { return record && record.sharedPool; });
+    heading.appendChild(el('p', 'backtest-not', ortakGorunum
+      ? 'Ortak sonuç havuzu · Ortak kayıtları yalnızca yönetici hesabı görebilir · cihaz etiketleri anonim tarayıcı profili kimliğidir · sinyaller 365 gün saklanır · ham mumlar saklanmaz.'
+      : 'Sinyaller 365 gün saklanır · 216 coin taramasındaki geçerli adayların oyları tutulur · ham mumlar saklanmaz · bu cihazda.'));
     header.appendChild(heading);
 
     var actions = el('div', 'performans-eylemler');
@@ -824,7 +910,6 @@
     status.setAttribute('aria-live', 'polite');
     card.appendChild(status);
 
-    var all = records;
     var completedTrades = all.filter(function (r) {
       return r.decision === 'AL' && r.tradeStatus === 'completed' && r.tradeResult;
     });
@@ -874,6 +959,17 @@
       ['Denetçi bulgusu', String(all.reduce(function (sum, r) { return sum + (r.auditorWarningCount || 0); }, 0))],
       ['Veri aralığı dışında', String(expired)]
     ].forEach(function (x) { grid.appendChild(kpi(x[0], x[1])); });
+    var cihazlar = Object.create(null);
+    all.forEach(function (record) {
+      (Array.isArray(record.deviceIds) ? record.deviceIds : (record.deviceId ? [record.deviceId] : []))
+        .forEach(function (id) { if (id) cihazlar[id] = true; });
+    });
+    var cihazKimlikleri = Object.keys(cihazlar).sort();
+    cihazKimlikleri.forEach(function (id, index) {
+      cihazlar[id] = 'Cihaz ' + (index + 1) + ' · ' + id.slice(0, 6);
+    });
+    var cihazSayisi = cihazKimlikleri.length;
+    if (cihazSayisi) grid.appendChild(kpi('Ortak havuz cihazı', String(cihazSayisi)));
     card.appendChild(grid);
 
     var quality = completedTrades.length < 30
@@ -903,14 +999,17 @@
         ' · sonrasında düşüş: ' + fkAvoid + ' · yükseliş: ' + fkMiss + '.'));
     }
 
-    card.appendChild(el('h4', 'backtest-trades-title', 'Son sinyaller'));
+    card.appendChild(el('h4', 'backtest-trades-title', ortakGorunum ? 'Son sinyaller · cihazlar arası' : 'Son sinyaller'));
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), row = el('tr');
-    ['Tarih', 'Varlık', 'Periyot', 'Karar', 'Denetçi', 'F/K', 'Durum', 'Net sonuç'].forEach(function (x) { row.appendChild(el('th', '', x)); });
+    var resultHeaders = ortakGorunum
+      ? ['Cihaz', 'Tarih', 'Varlık', 'Periyot', 'Karar', 'Denetçi', 'F/K', 'Durum', 'Net sonuç']
+      : ['Tarih', 'Varlık', 'Periyot', 'Karar', 'Denetçi', 'F/K', 'Durum', 'Net sonuç'];
+    resultHeaders.forEach(function (x) { row.appendChild(el('th', '', x)); });
     head.appendChild(row); table.appendChild(head);
     var body = el('tbody');
-    all.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 15).forEach(function (r) {
+    all.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 50).forEach(function (r) {
       var tr = el('tr');
       var net = r.decision === 'SAT' && r.spotResult && num(r.spotResult.saleAdvantagePct)
         ? pct(r.spotResult.saleAdvantagePct) + ' (satış/tutma)'
@@ -921,8 +1020,16 @@
         : r.fundamentalStatus === 'pending' ? 'Bekliyor'
         : r.fundamentalStatus === 'unavailable' ? 'Veri yok'
         : r.fundamentalStatus === 'not-included' ? 'Tarama dışı' : 'Uygulanmaz';
-      [new Date(r.signalAt).toLocaleDateString('tr-TR'), r.name || r.symbol, r.timeframe,
-        r.decision, r.auditorError || '—', fkLabel, statusText(r), net].forEach(function (x) { tr.appendChild(el('td', '', x)); });
+      var values = [new Date(r.signalAt).toLocaleDateString('tr-TR'), r.name || r.symbol, r.timeframe,
+        r.decision, r.auditorError || '—', fkLabel, statusText(r), net];
+      if (ortakGorunum) {
+        var ids = Array.isArray(r.deviceIds) ? r.deviceIds : (r.deviceId ? [r.deviceId] : []);
+        var deviceLabel = ids.length
+          ? ids.map(function (id) { return cihazlar[id] || 'Diğer cihaz'; }).join(', ')
+          : 'Bu cihaz';
+        values.unshift(deviceLabel);
+      }
+      values.forEach(function (x) { tr.appendChild(el('td', '', x)); });
       body.appendChild(tr);
     });
     table.appendChild(body); wrap.appendChild(table); card.appendChild(wrap);
@@ -947,22 +1054,27 @@
   }
 
   function exportCSV(records) {
-    var columns = ['signalAt', 'scanAt', 'symbol', 'name', 'market', 'timeframe', 'decision', 'generalDecision',
-      'technicalDecision', 'volumeDecision', 'volumeScore', 'volumeAvailable', 'volumeModelVersion',
-      'flowDecision', 'flowScore', 'flowAvailable',
-      'marketRegime', 'mtfAlignment', 'deepScan', 'deepVeto', 'deepReasons', 'finalReason',
-      'auditorError', 'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target',
-      'costPct', 'tradeStatus', 'tradeOutcome', 'netPct', 'spotStatus', 'spotOutcome',
+    var columns = ['signalAt', 'scanAt', 'symbol', 'name', 'market', 'timeframe', 'decision',
+      'generalDecision', 'technicalDecision', 'volumeDecision', 'volumeScore', 'volumeAvailable',
+      'volumeModelVersion', 'flowDecision', 'flowScore', 'flowAvailable', 'marketRegime',
+      'mtfAlignment', 'deepScan', 'deepVeto', 'deepReasons', 'finalReason', 'auditorError',
+      'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target', 'costPct',
+      'tradeStatus', 'tradeOutcome', 'netPct', 'spotStatus', 'spotOutcome',
       'spotSaleAdvantagePct', 'spotHoldReturnPct', 'spotSellPrice', 'spotHoldPrice',
-      'directionStatus', 'forwardPct', 'waitResult', 'source'];
+      'directionStatus', 'forwardPct', 'waitResult', 'source', 'deviceIds'];
     var rows = [columns.join(';')];
     records.slice().sort(function (a, b) { return a.signalAt - b.signalAt; }).forEach(function (r) {
+      var deviceIds = Array.isArray(r.deviceIds) ? r.deviceIds : (r.deviceId ? [r.deviceId] : []);
       var values = [
         new Date(r.signalAt).toISOString(), r.scanAt ? new Date(r.scanAt).toISOString() : '',
         r.symbol, r.name, r.market, r.timeframe, r.decision,
-        r.generalDecision, r.technicalDecision, r.volumeDecision, r.flowDecision, r.flowScore, r.flowAvailable,
-        r.marketRegime, r.mtfAlignment, r.deepScan || '', r.deepVeto, (r.deepReasons || []).join('|'), r.finalReason || '',
-        r.auditorError, r.auditorWarningCount, r.fundamentalStatus, r.price, r.stop, r.target, r.costPct,
+        r.generalDecision, r.technicalDecision, r.volumeDecision,
+        r.volumeScore, r.volumeAvailable, r.volumeModelVersion,
+        r.flowDecision, r.flowScore, r.flowAvailable,
+        r.marketRegime, r.mtfAlignment, r.deepScan || '', r.deepVeto,
+        (r.deepReasons || []).join('|'), r.finalReason || '',
+        r.auditorError, r.auditorWarningCount, r.fundamentalStatus,
+        r.price, r.stop, r.target, r.costPct,
         r.decision === 'SAT' ? 'not-applicable' : r.tradeStatus,
         r.decision === 'AL' && r.tradeResult ? r.tradeResult.outcome : '',
         r.decision === 'AL' && r.tradeResult ? r.tradeResult.netPct : '',
@@ -973,11 +1085,12 @@
         r.spotResult ? r.spotResult.sellPrice : '',
         r.spotResult ? r.spotResult.holdPrice : '',
         r.directionStatus, r.forwardPct == null ? '' : r.forwardPct,
-        r.waitResult || '', (r.sources || [r.source]).join('+')
+        r.waitResult || '', (r.sources || [r.source]).join('+'),
+        deviceIds.join('|')
       ];
       rows.push(values.map(function (v) {
-        var s = v == null ? '' : String(v);
-        return '"' + s.replace(/"/g, '""') + '"';
+        var value = v == null ? '' : String(v);
+        return '"' + value.replace(/"/g, '""') + '"';
       }).join(';'));
     });
     var blob = new Blob(['\uFEFF' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
@@ -1036,16 +1149,19 @@
           });
           var first = bars.length ? bars[0].t : null;
           var tasks = [];
+          var remotePatches = [];
           group.records.forEach(function (record) {
             if (first && record.signalAt < first - step * 2) {
-              tasks.push(saveEvaluation(record.id, {
+              var expiredPatch = {
                 tradeStatus: record.decision === 'SAT' ? 'not-applicable'
                   : record.decision === 'AL' && record.tradeStatus === 'pending' ? 'expired' : record.tradeStatus,
                 tradeResult: record.decision === 'SAT' ? null : record.tradeResult,
                 spotStatus: record.decision === 'SAT' && record.spotStatus !== 'completed' ? 'expired' : record.spotStatus,
                 directionStatus: record.directionStatus === 'pending' ? 'expired' : record.directionStatus,
                 lastError: 'Ücretsiz kaynağın geçmiş aralığı bu sinyali kapsamıyor.'
-              }));
+              };
+              tasks.push(saveEvaluation(record.id, expiredPatch));
+              remotePatches.push({ id: record.id, patch: expiredPatch });
               return;
             }
             var evaluated = evaluateSignal(record, bars);
@@ -1077,21 +1193,33 @@
                   : evaluated.direction.classification === 'up' ? 'missed-up' : 'flat';
               }
             }
-            if (Object.keys(patch).length > 2) tasks.push(saveEvaluation(record.id, patch));
-            else tasks.push(saveEvaluation(record.id, patch));
+            tasks.push(saveEvaluation(record.id, patch));
+            remotePatches.push({ id: record.id, patch: patch });
           });
           return Promise.all(tasks).then(function () {
+            var shared = window.GrapAISharedResults;
+            return shared && typeof shared.patchMany === 'function'
+              ? shared.patchMany(remotePatches) : null;
+          }).then(function () {
             completed++;
           });
         }).catch(function (e) {
           failures++;
-          return Promise.all(group.records.map(function (r) {
-            return saveEvaluation(r.id, {
+          var errorPatches = group.records.map(function (r) {
+            var patch = {
               lastCheckedAt: Date.now(),
               nextCheckAt: Date.now() + 6 * 60 * 60 * 1000,
               lastError: e && e.message ? e.message : String(e)
-            });
-          }));
+            };
+            return { id: r.id, patch: patch };
+          });
+          return Promise.all(errorPatches.map(function (item) {
+            return saveEvaluation(item.id, item.patch);
+          })).then(function () {
+            var shared = window.GrapAISharedResults;
+            return shared && typeof shared.patchMany === 'function'
+              ? shared.patchMany(errorPatches) : null;
+          });
         }).then(function () {
           setStatus('Kontrol ediliyor: ' + completed + '/' + list.length + ' varlık · ' + failures + ' veri hatası…');
           return new Promise(function (resolve) { setTimeout(resolve, 160); });
@@ -1121,14 +1249,37 @@
   function init() {
     var root = document.getElementById('ajan-performans-panel');
     if (!root) return;
-    openDB().then(prune).then(allRecords).then(render).then(function () {
-      setStatus('Yerel performans hafızası hazır · son 365 gün.');
+    render([]);
+    openDB().then(prune).then(localRecords).then(function (local) {
+      var shared = window.GrapAISharedResults;
+      if (!shared || typeof shared.syncLocal !== 'function') {
+        return { records: local, sync: null };
+      }
+      return shared.syncLocal(local).then(function (sync) {
+        return allRecords().then(function (records) {
+          return { records: records, sync: sync };
+        });
+      });
+    }).then(function (result) {
+      render(result.records);
+      if (result.sync && !result.sync.ok) {
+        setStatus('Bu cihazın kayıtları yerel hafızada. Ortak havuza gönderim bekliyor: ' + result.sync.error, true);
+      } else {
+        setStatus('Performans hafızası hazır · son 365 gün · ortak havuz admin hesabına açık.');
+      }
     }).catch(function (e) {
       setStatus('Performans hafızası açılamadı: ' + (e && e.message ? e.message : String(e)), true);
     });
     var resultNav = document.querySelector('nav button[data-git="sonuc"]');
     if (resultNav) resultNav.addEventListener('click', function () {
       updateResults();
+    });
+  }
+
+  function refreshView() {
+    return allRecords().then(function (records) {
+      render(records);
+      return records;
     });
   }
 
@@ -1142,6 +1293,7 @@
     ajanIstatistik: agentStats,
     hacimKirilimi: volumeBreakdown,
     guncelleSonuclar: updateResults,
+    yenile: refreshView,
     maliyetOku: function () { return currentCostPct; },
     ayarlar: { saklamaGun: 365, ufukMumu: HORIZON, varsayilanMaliyetYuzde: DEFAULT_COST }
   };
