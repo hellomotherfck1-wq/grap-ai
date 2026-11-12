@@ -997,13 +997,43 @@ try {
     bist: Veri.coz('PGSUS.IS')[0]?.sembol,
     coin: Veri.coz('BTC')[0]?.sembol,
     stockTimeframes: Veri.zamanDilimleri('THYAO.IS'),
+    bist100Timeframes: Veri.zamanDilimleri('AEFES'),
     cryptoTimeframes: Veri.zamanDilimleri('BTCUSDT')
   }));
   check('PGSUS.IS ve BTCUSDT sembol eşleştirmesi', symbolMappings.bist === 'PGSUS.IS' && symbolMappings.coin === 'BTCUSDT', JSON.stringify(symbolMappings));
   check('Veri katmanı hisseyi günlük, kriptoyu dört zaman dilimine ayırıyor',
     JSON.stringify(symbolMappings.stockTimeframes) === JSON.stringify(['1d']) &&
+    JSON.stringify(symbolMappings.bist100Timeframes) === JSON.stringify(['1d']) &&
     JSON.stringify(symbolMappings.cryptoTimeframes) === JSON.stringify(['15m', '1h', '4h', '1d']),
     JSON.stringify(symbolMappings));
+  const marketRouting = await page.evaluate(async () => {
+    const originalBinance = Veri.binance, originalYahoo = Veri.yahoo;
+    const calls = [];
+    const candles = Array.from({ length: 30 }, (_, i) => ({
+      t: Date.now() - (30 - i) * 86400000, o: 10, h: 11, l: 9, c: 10.5, v: 100
+    }));
+    Veri.binance = async (symbol, timeframe) => {
+      calls.push({ source: 'Binance', symbol, timeframe });
+      return candles;
+    };
+    Veri.yahoo = async (symbol, timeframe) => {
+      calls.push({ source: 'Yahoo', symbol, timeframe });
+      return candles;
+    };
+    try {
+      const stock = await Veri.ara('THYAO.IS', '15m');
+      const crypto = await Veri.ara('BTCUSDT', '4h');
+      return { stockTimeframe: stock.zd, cryptoTimeframe: crypto.zd, calls };
+    } finally {
+      Veri.binance = originalBinance;
+      Veri.yahoo = originalYahoo;
+    }
+  });
+  check('Veri yönlendiricisi hisseyi 1D’ye sabitliyor ve kriptoda 4H’yi koruyor',
+    marketRouting.stockTimeframe === '1d' && marketRouting.cryptoTimeframe === '4h' &&
+    marketRouting.calls.some(call => call.source === 'Yahoo' && call.timeframe === '1d') &&
+    marketRouting.calls.some(call => call.source === 'Binance' && call.timeframe === '4h'),
+    JSON.stringify(marketRouting));
 
   await page.locator('nav button[data-git="gecmis"]').click();
   const coinUI = await page.locator('#coin-tahmin-btn').count();
