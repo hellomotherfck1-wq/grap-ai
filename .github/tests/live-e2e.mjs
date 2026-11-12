@@ -998,6 +998,7 @@ try {
     bist100: Veri.coz('AEFES')[0]?.sembol,
     coin: Veri.coz('BTC')[0]?.sembol,
     stockTimeframes: Veri.zamanDilimleri('THYAO.IS'),
+    usStockTimeframes: Veri.zamanDilimleri('AAPL'),
     bist100Timeframes: Veri.zamanDilimleri('AEFES'),
     cryptoTimeframes: Veri.zamanDilimleri('BTCUSDT')
   }));
@@ -1006,6 +1007,7 @@ try {
     JSON.stringify(symbolMappings));
   check('Veri katmanı hisseyi günlük, kriptoyu dört zaman dilimine ayırıyor',
     JSON.stringify(symbolMappings.stockTimeframes) === JSON.stringify(['1d']) &&
+    JSON.stringify(symbolMappings.usStockTimeframes) === JSON.stringify(['1d']) &&
     JSON.stringify(symbolMappings.bist100Timeframes) === JSON.stringify(['1d']) &&
     JSON.stringify(symbolMappings.cryptoTimeframes) === JSON.stringify(['15m', '1h', '4h', '1d']),
     JSON.stringify(symbolMappings));
@@ -1025,17 +1027,20 @@ try {
     };
     try {
       const stock = await Veri.ara('THYAO.IS', '15m');
+      const usStock = await Veri.ara('AAPL', '15m');
       const bist100 = await Veri.ara('AEFES', '15m');
       const crypto = await Veri.ara('BTC', '4h');
-      return { stockTimeframe: stock.zd, bist100Timeframe: bist100.zd, bist100Symbol: bist100.sembol, cryptoTimeframe: crypto.zd, calls };
+      return { stockTimeframe: stock.zd, usStockTimeframe: usStock.zd, bist100Timeframe: bist100.zd, bist100Symbol: bist100.sembol, cryptoTimeframe: crypto.zd, calls };
     } finally {
       Veri.binance = originalBinance;
       Veri.yahoo = originalYahoo;
     }
   });
   check('Veri yönlendiricisi hisseleri 1D’ye sabitliyor ve kriptoda 4H’yi koruyor',
-    marketRouting.stockTimeframe === '1d' && marketRouting.bist100Timeframe === '1d' &&
-    marketRouting.bist100Symbol === 'AEFES.IS' && marketRouting.cryptoTimeframe === '4h' &&
+    marketRouting.stockTimeframe === '1d' && marketRouting.usStockTimeframe === '1d' &&
+    marketRouting.bist100Timeframe === '1d' && marketRouting.bist100Symbol === 'AEFES.IS' &&
+    marketRouting.cryptoTimeframe === '4h' &&
+    marketRouting.calls.some(call => call.source === 'Yahoo' && call.symbol === 'AAPL' && call.timeframe === '1d') &&
     marketRouting.calls.some(call => call.source === 'Yahoo' && call.symbol === 'AEFES.IS' && call.timeframe === '1d') &&
     marketRouting.calls.some(call => call.source === 'Binance' && call.timeframe === '4h'),
     JSON.stringify(marketRouting));
