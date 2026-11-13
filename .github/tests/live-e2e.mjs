@@ -37,12 +37,18 @@ try {
 
   await page.waitForFunction(() =>
     Boolean(window.TahminAI && window.BistArastirma && window.GrafikAI && window.AjanPerformans &&
-      window.HaberAjani && window.KriptoAjanlari) &&
+      window.HaberAjani && window.KriptoAjanlari && window.GrapAIDataTransport) &&
+    typeof window.GrapAIDataTransport.json === 'function' &&
+    typeof window.GrapAIDataTransport.text === 'function' &&
     typeof Veri !== 'undefined' && typeof Analiz !== 'undefined' && typeof Cizim !== 'undefined',
     null,
     { timeout: 45000 }
   );
   check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma / Haber / Kripto ajanları');
+  check('Ortak veri aktarım katmanı yüklendi',
+    typeof window.GrapAIDataTransport.json === 'function' &&
+    typeof window.GrapAIDataTransport.text === 'function',
+    'Yedek kaynak, önbellek ve tekilleştirilmiş istek desteği');
   const sharedPoolModule = await page.evaluate(() => ({
     loaded: !!window.GrapAISharedResults,
     save: typeof window.GrapAISharedResults?.kaydet,
