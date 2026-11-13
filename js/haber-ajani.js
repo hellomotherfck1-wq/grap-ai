@@ -50,7 +50,7 @@
       staleMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
       timeoutMs: 6500,
       validate: function (value) {
-        return typeof value === 'string' && /<rss\\b|<feed\\b/i.test(value);
+        return typeof value === 'string' && /<rss\b|<feed\b/i.test(value);
       }
     });
   }
