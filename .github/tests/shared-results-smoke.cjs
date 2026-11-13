@@ -32,6 +32,10 @@ const adminNotesIndex = html.indexOf('id="admin-gelistirme-notlari"');
 assert.ok(adminPanelStart >= 0 && adminNotesIndex > adminPanelStart, 'Development notes must stay inside the authenticated admin panel');
 assert.ok(html.includes("Eski geliştirme notları") && html.includes("Ajan performans karnesi") && html.includes("Giriş ve veri güvenliği"), 'Admin notes must retain historical project decisions');
 assert.ok(helper.includes(".from(TABLE)"), 'Admin must read the shared table');
+assert.ok(helper.includes('function isTestSignal(record)') &&
+  helper.includes('return !isTestSignal(record)') &&
+  helper.includes('window.__GRAP_AI_E2E_TEST__'),
+  'Synthetic E2E rows must be hidden from shared reads and test writes isolated');
 assert.ok(helper.includes('offset < 50000'), 'Admin browser history keeps a 50,000-row safety ceiling for mobile memory use');
 assert.ok(admin.includes('window.GrapAISharedResults.client'), 'Admin login must reuse the shared Supabase session');
 assert.ok(performance.includes('shared.syncLocal(local)'), 'Existing local records must be backfilled');
