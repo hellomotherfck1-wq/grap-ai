@@ -578,7 +578,13 @@
           sonHata = e;
         }
       }
-      throw new Error('Ücretsiz geçmiş veri alınamadı' + (sonHata ? ': ' + (sonHata.message || sonHata) : '.'));
+      var finalError = new Error('Ücretsiz geçmiş veri alınamadı' + (sonHata ? ': ' + (sonHata.message || sonHata) : '.'));
+      if (typeof window !== 'undefined' && window.GrapAISystemMonitor &&
+          typeof window.GrapAISystemMonitor.apiFailure === 'function') {
+        window.GrapAISystemMonitor.apiFailure('Veri.gecmis/' + String(girdi || 'bilinmeyen'),
+          finalError, { symbol: String(girdi || '').slice(0, 80), timeframe: zd || '1d' });
+      }
+      throw finalError;
     };
 
     if (typeof Veri.donustur === 'function') {
