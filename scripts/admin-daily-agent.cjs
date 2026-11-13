@@ -375,28 +375,6 @@ async function checkGithubActions(checks) {
   }
 }
 
-function writeStepSummary(report) {
-  const target = process.env.GITHUB_STEP_SUMMARY;
-  if (!target) return;
-  const lines = [
-    '# Grap-AI günlük sistem raporu',
-    '',
-    '- Tarih: ' + report.report_date,
-    '- Durum: ' + report.status,
-    '- Özet: ' + report.summary,
-    '',
-    '## Kontroller'
-  ];
-  report.details.checks.forEach(function (check) {
-    lines.push('- [' + check.status.toUpperCase() + '] ' + check.name + ': ' + check.detail);
-  });
-  lines.push('', '## Sonuç özeti');
-  lines.push('- Sinyal: ' + report.details.results.totalSignals);
-  lines.push('- Tamamlanan yön değerlendirmesi: ' + report.details.results.completedDirection);
-  lines.push('- Bekleyen: ' + report.details.results.pending);
-  lines.push('- Hata kaydı: ' + report.details.errors.total);
-  fs.appendFileSync(target, lines.join('\n') + '\n');
-}
 
 async function main() {
   if (!SERVICE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY GitHub secret olarak tanımlanmamış.');
@@ -534,15 +512,7 @@ async function main() {
       response.status + ': ' + responseText.slice(0, 500));
   }
 
-  writeStepSummary(report);
-  console.log(JSON.stringify({
-    report_date: report.report_date,
-    status: report.status,
-    summary: report.summary,
-    checks: checks.length,
-    errors: errorTotal,
-    signals: results.totalSignals
-  }, null, 2));
+  console.log('Grap-AI günlük raporu özel yönetici tablosuna kaydedildi.');
 }
 
 main().catch(function (error) {
