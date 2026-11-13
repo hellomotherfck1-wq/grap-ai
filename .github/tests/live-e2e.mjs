@@ -24,6 +24,9 @@ try {
     locale: 'tr-TR',
     timezoneId: 'Europe/Istanbul'
   });
+  await context.addInitScript(() => {
+    window.__GRAP_AI_E2E_TEST__ = true;
+  });
   page = await context.newPage();
   page.setDefaultTimeout(25000);
 
@@ -61,6 +64,15 @@ try {
   check('Ortak sonuç modülü yüklendi', sharedPoolModule.loaded &&
     sharedPoolModule.save === 'function' && sharedPoolModule.adminRead === 'function' &&
     sharedPoolModule.patch === 'function', JSON.stringify(sharedPoolModule));
+  const sharedPoolIsolation = await page.evaluate(async () => {
+    const result = await window.GrapAISharedResults.kaydet([{
+      id: 'E2E_ISOLATION_TEST|1h|1', symbol: 'E2EISOLATIONUSDT',
+      timeframe: '1h', decision: 'BEKLE'
+    }]);
+    return window.__GRAP_AI_E2E_TEST__ === true && result && result.skipped === true;
+  });
+  check('E2E testleri üretim ortak havuzuna yazmıyor', sharedPoolIsolation,
+    'Test kayıtları yalnızca geçici tarayıcı hafızasında tutuluyor');
   const spotOnlyAgents = await page.evaluate(() => ({
     orderFlow: typeof window.KriptoAjanlari.orderFlow,
     futuresAgent: typeof window.KriptoAjanlari.futuresOku
