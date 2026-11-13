@@ -33,6 +33,15 @@ assert.ok(admin.includes('ajanRaporuYukle()'), 'Admin must refresh the report af
 assert.ok(monitor.includes("rpc('grap_ai_log_system_event'"), 'Browser errors must be sent through the constrained RPC');
 assert.ok(monitor.includes('unhandledrejection') && monitor.includes('resource_error'),
   'Monitor must capture runtime and resource errors');
+assert.ok(!monitor.includes('var originalFetch = window.fetch') &&
+  monitor.includes('info.final = true') && monitor.includes('apiFailure: logApiFailure'),
+  'Monitor must not count recoverable fetch fallback attempts; only explicit final API failures are logged');
+assert.ok(agent.includes('event.details.final === true') &&
+  agent.includes('findings.softwareFindings.length') && agent.includes('softwareErrorOccurrences'),
+  'Daily report must ignore legacy per-attempt API noise and separate distinct errors from repeated records');
+assert.ok(admin.includes('Farklı yazılım/API hatası') &&
+  admin.includes('Tekrarlanan hata kaydı'),
+  'Admin metrics must distinguish unique software errors from repeated event records');
 assert.ok(!/SUPABASE_SERVICE_ROLE_KEY|service_role\s*[:=]\s*['\"][^'\"]+/i.test(admin + monitor + html),
   'No privileged Supabase key may be shipped to browser files');
 
@@ -75,7 +84,7 @@ assert.ok(agent.includes("url.searchParams.set('limit', String(count))") &&
   'Supabase pagination must use non-negative PostgREST offset/limit query parameters');
 assert.ok(!agent.includes('GITHUB_STEP_SUMMARY') && !agent.includes('writeStepSummary'),
   'Private report details must not be exposed in public workflow summaries');
-assert.ok(worker.includes('graph-ai-v53') && worker.includes('./js/system-monitor.js'),
+assert.ok(worker.includes('graph-ai-v54') && worker.includes('./js/system-monitor.js'),
   'Service worker must cache the monitor and use the new cache version');
 
 console.log('PASS daily admin agent, error logging, report privacy, and service-worker checks');
