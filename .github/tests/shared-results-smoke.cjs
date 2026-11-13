@@ -53,10 +53,11 @@ assert.equal(exportColumns.length, exportValues.length, 'CSV header and row fiel
 assert.ok(exportColumns.includes('deviceIds'), 'Full CSV export must include source device IDs');
 assert.ok(performance.includes('Ortak sonuç havuzu'), 'Admin shared-pool state must be visible in results');
 const renderStart = performance.indexOf('function render(records)');
-const allDeclaration = performance.indexOf('var all = Array.isArray(records) ? records : [];', renderStart);
+const allDeclaration = performance.indexOf('var all = (Array.isArray(records) ? records : []).filter(function (record) {', renderStart);
 const sharedSummary = performance.indexOf('var ortakGorunum = all.some', renderStart);
-assert.ok(renderStart >= 0 && allDeclaration >= renderStart && sharedSummary > allDeclaration,
-  'Result rows must be initialized before shared-pool summary reads them');
+assert.ok(renderStart >= 0 && allDeclaration >= renderStart && sharedSummary > allDeclaration &&
+  performance.includes('function isTestRecord') && performance.includes('return !isTestRecord(record)'),
+  'Result rows must be filtered and initialized before shared-pool summary reads them');
 assert.ok(performance.includes("'Cihaz ' + (index + 1)"), 'Admin result rows must identify the source device');
 assert.ok(performance.includes(".slice(0, 50)"), 'Admin result list must show a wider cross-device recent history');
 
