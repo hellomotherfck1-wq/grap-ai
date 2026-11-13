@@ -501,6 +501,7 @@ async function main() {
   try {
     const fetchedSignals = await supabaseRows('agent_signals_shared', {
       select: 'signal_id,symbol,market,timeframe,decision,signal_at,payload,created_at,updated_at',
+      symbol: 'not.like.E2E*',
       created_at: 'gte.' + isoAgo(24 * 30),
       order: 'signal_at.desc'
     });
