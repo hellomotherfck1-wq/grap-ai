@@ -100,7 +100,12 @@
       }
     }
 
-    throw sonHata || new Error('Ücretsiz finansal veri kaynağına erişilemedi');
+    var finalError = sonHata || new Error('Ücretsiz finansal veri kaynağına erişilemedi');
+    if (window.GrapAISystemMonitor &&
+        typeof window.GrapAISystemMonitor.apiFailure === 'function') {
+      window.GrapAISystemMonitor.apiFailure('Yahoo Finance F/K verisi', finalError, { service: 'valuation' });
+    }
+    throw finalError;
   }
 
   function quoteAyris(sembol, json, grafikFiyati) {
