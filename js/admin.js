@@ -145,35 +145,75 @@
     raporMetrik(metrikler, 'Son 30 gün sinyal', results.totalSignals || 0);
     raporMetrik(metrikler, 'Tamamlanan ölçüm', results.completedDirection || 0);
     raporMetrik(metrikler, 'Bekleyen sonuç', results.pending || 0);
-    raporMetrik(metrikler, 'Hata kaydı', errors.total || 0);
+    const softwareErrorCount = errors.softwareTotal !== undefined
+      ? Number(errors.softwareTotal) || 0
+      : (Number(errors.browser) || 0) + (Number(errors.signal) || 0);
+    const analysisWarningCount = errors.analysisWarningTotal !== undefined
+      ? Number(errors.analysisWarningTotal) || 0
+      : (Number(errors.auditor) || 0) + (Number(errors.auditorWarnings) || 0);
+    raporMetrik(metrikler, 'Yazılım/API hatası', softwareErrorCount);
+    raporMetrik(metrikler, 'Denetçi uyarısı', analysisWarningCount);
     raporMetrik(metrikler, '7 gün ziyaret', activity.visits || 0);
     raporMetrik(metrikler, '7 gün analiz', activity.analyses || 0);
 
-    const findings = Array.isArray(errors.findings) ? errors.findings : [];
-    if (!findings.length) {
-      const empty = document.createElement('p');
-      empty.className = 'admin-rapor-bos';
-      empty.textContent = 'Rapor içinde hata bulgusu bulunmuyor.';
-      hatalar.appendChild(empty);
-    } else {
+    const legacyFindings = Array.isArray(errors.findings) ? errors.findings : [];
+    const hasSplitFindings = Array.isArray(errors.softwareFindings) ||
+      Array.isArray(errors.analysisFindings);
+    const softwareFindings = hasSplitFindings
+      ? (Array.isArray(errors.softwareFindings) ? errors.softwareFindings : [])
+      : legacyFindings.filter(function (finding) {
+          return finding.category !== 'analysis' &&
+            !/^Denetçi (?:uyarısı|değerlendirmesi)/i.test(String(finding.title || ''));
+        });
+    const analysisFindings = hasSplitFindings
+      ? (Array.isArray(errors.analysisFindings) ? errors.analysisFindings : [])
+      : legacyFindings.filter(function (finding) {
+          return finding.category === 'analysis' ||
+            /^Denetçi (?:uyarısı|değerlendirmesi)/i.test(String(finding.title || ''));
+        });
+
+    function raporBulguBolumu(baslik, findings, category) {
+      const heading = document.createElement('h4');
+      heading.textContent = baslik;
+      hatalar.appendChild(heading);
+
+      if (!findings.length) {
+        const empty = document.createElement('p');
+        empty.className = 'admin-rapor-bos';
+        empty.textContent = category === 'analysis'
+          ? 'Coin bazlı denetçi uyarısı bulunmuyor.'
+          : 'Yazılım veya API hatası bulunmuyor.';
+        hatalar.appendChild(empty);
+        return;
+      }
+
       findings.forEach(function (finding) {
         const card = document.createElement('div');
-        card.className = 'admin-rapor-bulgu admin-rapor-bulgu-' + (finding.severity || 'info');
+        const severity = category === 'analysis' ? 'warning' : (finding.severity || 'info');
+        card.className = 'admin-rapor-bulgu admin-rapor-bulgu-' + severity;
         const title = document.createElement('strong');
-        title.textContent = finding.title || 'Hata bulgusu';
+        title.textContent = finding.title || (category === 'analysis' ? 'Denetçi uyarısı' : 'Hata bulgusu');
         const meta = document.createElement('small');
-        meta.textContent = (finding.source || 'Kaynak bilinmiyor') +
-          ' · Tekrar: ' + (finding.count || 0) +
-          (finding.lastSeen ? ' · Son: ' + raporTarihi(finding.lastSeen) : '');
+        meta.textContent = category === 'analysis'
+          ? (finding.source || 'Varlık bilinmiyor') +
+            ' · Sinyal: ' + (finding.count || 0) +
+            ' · Uyarı maddesi: ' + (finding.warningCount || 0) +
+            (finding.lastSeen ? ' · Son: ' + raporTarihi(finding.lastSeen) : '')
+          : (finding.source || 'Kaynak bilinmiyor') +
+            ' · Tekrar: ' + (finding.count || 0) +
+            (finding.lastSeen ? ' · Son: ' + raporTarihi(finding.lastSeen) : '');
         const explanation = document.createElement('p');
-        explanation.textContent = finding.explanation || 'Ajan bu hata için ek açıklama bulamadı.';
+        explanation.textContent = finding.explanation || 'Ajan bu kayıt için ek açıklama bulamadı.';
         const action = document.createElement('p');
         action.className = 'admin-rapor-oneri';
-        action.textContent = 'Öneri: ' + (finding.action || 'Tekrar edip etmediğini izle.');
+        action.textContent = 'Öneri: ' + (finding.action || 'İlgili kaydı incele.');
         card.append(title, meta, explanation, action);
         hatalar.appendChild(card);
       });
     }
+
+    raporBulguBolumu('Yazılım ve API hataları', softwareFindings, 'software');
+    raporBulguBolumu('Coin bazlı analiz / denetçi uyarıları', analysisFindings, 'analysis');
 
     const checks = Array.isArray(details.checks) ? details.checks : [];
     if (!checks.length) {
