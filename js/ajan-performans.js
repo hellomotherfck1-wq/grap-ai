@@ -32,6 +32,15 @@
   function marketOf(symbol) {
     return /USDT$/i.test(symbol) ? 'Kripto' : /\.IS$/i.test(symbol) ? 'BIST' : 'Diğer';
   }
+
+  function isTestRecord(record) {
+    if (!record) return false;
+    var sources = Array.isArray(record.sources) ? record.sources : [record.source];
+    var testSource = sources.some(function (source) {
+      return /^E2E(?:\b|[\s_-])/i.test(String(source || '').trim());
+    });
+    return testSource || /^E2E[A-Z0-9]*USDT$/i.test(String(record.symbol || ''));
+  }
   function idFor(symbol, tf, signalAt) {
     return norm(symbol) + '|' + String(tf || '') + '|' + String(Math.round(Number(signalAt) || 0));
   }
@@ -971,7 +980,9 @@
   function render(records) {
     var root = document.getElementById('ajan-performans-panel');
     if (!root) return;
-    var all = Array.isArray(records) ? records : [];
+    var all = (Array.isArray(records) ? records : []).filter(function (record) {
+      return !isTestRecord(record);
+    });
     root.replaceChildren();
     var card = el('div', 'kart ajan-performans');
     var header = el('div', 'performans-baslik');
