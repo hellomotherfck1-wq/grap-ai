@@ -123,14 +123,20 @@ function safeText(value) {
 }
 
 function groupErrors(events, signals) {
-  const groups = new Map();
-  function add(type, source, message, date, severity) {
+  const softwareGroups = new Map();
+  const analysisGroups = new Map();
+
+  function addSoftware(type, source, message, date, severity) {
     const clean = safeText(message);
-    const key = type + '|' + clean;
-    const current = groups.get(key) || {
+    const sourceLabel = safeText(source || 'Uygulama');
+    // Include the source (especially the asset symbol) in the key so that
+    // identical messages from different coins are never merged together.
+    const key = type + '|' + sourceLabel + '|' + clean;
+    const current = softwareGroups.get(key) || {
+      category: 'software',
       severity: severity || 'warning',
       title: clean,
-      source: source || 'Uygulama',
+      source: sourceLabel,
       count: 0,
       lastSeen: date || null,
       explanation: '',
@@ -138,7 +144,15 @@ function groupErrors(events, signals) {
     };
     current.count += 1;
     if (date && (!current.lastSeen || date > current.lastSeen)) current.lastSeen = date;
-    groups.set(key, current);
+    softwareGroups.set(key, current);
+  }
+
+  function levelRank(level) {
+    const value = String(level || '').toLocaleLowerCase('tr-TR');
+    if (value.indexOf('yüksek') >= 0 || value.indexOf('high') >= 0) return 3;
+    if (value.indexOf('orta') >= 0 || value.indexOf('medium') >= 0) return 2;
+    if (value.indexOf('düşük') >= 0 || value.indexOf('low') >= 0) return 1;
+    return 0;
   }
 
   (events || []).forEach(function (event) {
@@ -146,32 +160,52 @@ function groupErrors(events, signals) {
     const message = event.message || 'Tarayıcı hatası';
     const source = event.source || 'Bilinmeyen kaynak';
     const severity = type === 'js_error' ? 'warning' : 'info';
-    add(type, source, message, event.created_at, severity);
+    addSoftware(type, source, message, event.created_at, severity);
   });
 
   (signals || []).forEach(function (row) {
     const payload = row.payload || {};
+    const symbol = row.symbol || payload.symbol || 'Bilinmeyen varlık';
+    const market = row.market || payload.market || '';
+    const source = market ? String(symbol) + ' · ' + String(market) : symbol;
+    const date = row.updated_at || row.created_at;
+
     if (payload.lastError) {
-      add('signal_error', row.symbol || 'Sinyal', payload.lastError, row.updated_at || row.created_at, 'warning');
+      addSoftware('signal_error', source, payload.lastError, date, 'warning');
     }
-    if (payload.auditorError && payload.auditorError !== 'Düşük') {
-      add('agent_audit', row.symbol || 'Sinyal',
-        'Denetçi hata seviyesi: ' + payload.auditorError, row.updated_at || row.created_at, 'warning');
-    }
-    if (Number(payload.auditorWarningCount) > 0) {
-      add('agent_audit_warning', row.symbol || 'Sinyal',
-        'Denetçi ' + Number(payload.auditorWarningCount) + ' uyarı kaydetti',
-        row.updated_at || row.created_at, 'warning');
+
+    const auditorLevel = String(payload.auditorError || '').trim();
+    const warningCount = Math.max(0, Math.floor(Number(payload.auditorWarningCount) || 0));
+    if ((auditorLevel && levelRank(auditorLevel) > 1) || warningCount > 0) {
+      const key = String(source);
+      const current = analysisGroups.get(key) || {
+        category: 'analysis',
+        severity: 'warning',
+        source: safeText(source),
+        symbol: safeText(symbol),
+        count: 0,
+        warningCount: 0,
+        level: '',
+        levelRank: 0,
+        lastSeen: date || null
+      };
+      current.count += 1;
+      current.warningCount += warningCount;
+      if (levelRank(auditorLevel) > current.levelRank) {
+        current.level = auditorLevel;
+        current.levelRank = levelRank(auditorLevel);
+      }
+      if (date && (!current.lastSeen || date > current.lastSeen)) current.lastSeen = date;
+      analysisGroups.set(key, current);
     }
   });
 
-  const findings = Array.from(groups.values()).sort(function (a, b) {
+  const softwareFindings = Array.from(softwareGroups.values()).sort(function (a, b) {
     return b.count - a.count;
-  }).slice(0, 6);
+  }).slice(0, 8);
 
-  findings.forEach(function (item) {
-    if (item.count >= 5 || (item.severity === 'warning' && item.count >= 3)) item.severity = 'critical';
-    if (item.source === 'Bilinmeyen kaynak') item.source = 'Uygulama';
+  softwareFindings.forEach(function (item) {
+    if (item.count >= 5) item.severity = 'critical';
     if (item.title.toLowerCase().indexOf('http 429') >= 0) {
       item.explanation = 'Veri sağlayıcı istek sınırına takılmış olabilir.';
       item.action = 'İstek sıklığını azalt ve kısa süre sonra yeniden kontrol et.';
@@ -187,27 +221,32 @@ function groupErrors(events, signals) {
       item.action = 'İlgili veri kaynağının güncel API yanıtını incele.';
     } else {
       item.explanation = item.count > 1
-        ? 'Aynı hata birden fazla kez kaydedilmiş; tekrarlayan bir sorun olabilir.'
+        ? 'Aynı yazılım/veri kaynağı hatası bu kaynakta ' + item.count + ' kez kaydedilmiş.'
         : 'Tek seferlik bir uygulama veya veri kaynağı hatası kaydedilmiş.';
-      item.action = 'Tekrar edip etmediğini izle; sürerse ilgili modülün kayıtlarını incele.';
+      item.action = 'Önce belirtilen kaynağı incele; tekrarlıyorsa ilgili modülün kayıtlarını kontrol et.';
     }
   });
 
-  if (!findings.length) {
-    findings.push({
-      severity: 'info',
-      title: 'Son 24 saatte kayıtlı hata bulunmadı',
-      source: 'Sistem izleme',
-      count: 0,
-      lastSeen: null,
-      explanation: 'Tarayıcılardan hata kaydı gelmedi ve son sinyal kayıtlarında hata görünmedi.',
-      action: 'Otomatik izleme devam ediyor.'
-    });
-  }
+  const analysisFindings = Array.from(analysisGroups.values()).map(function (item) {
+    item.title = item.level
+      ? 'Denetçi değerlendirmesi: ' + item.level
+      : 'Denetçi uyarısı';
+    item.explanation = 'Bu varlıkta ' + item.count + ' sinyal denetçi uyarısı taşıyor' +
+      (item.warningCount ? ' (' + item.warningCount + ' uyarı maddesi)' : '') +
+      '. Bu bir analiz kalite/risk uyarısıdır; yazılım arızası değildir.';
+    item.action = 'Sinyal ayrıntısındaki denetçi maddelerini incele; yalnızca bu uyarıya bakarak AL/SAT kararı verme.';
+    delete item.levelRank;
+    return item;
+  }).sort(function (a, b) {
+    return (b.warningCount + b.count) - (a.warningCount + a.count);
+  }).slice(0, 8);
 
-  return findings;
+  return {
+    softwareFindings: softwareFindings,
+    analysisFindings: analysisFindings,
+    findings: softwareFindings.concat(analysisFindings)
+  };
 }
-
 function summarizeResults(rows) {
   const decisions = { AL: 0, SAT: 0, BEKLE: 0 };
   const completed = [];
