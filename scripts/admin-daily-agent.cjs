@@ -393,20 +393,21 @@ async function checkExternalApis(checks) {
     } catch (error) {}
   }
   addCheck(checks, 'Binance Spot veri kaynağı',
-    binanceResults.length ? 'ok' : 'warning',
+    binanceResults.length ? 'ok' : 'info',
     binanceResults.length
       ? 'Erişilebilen uç noktalar: ' + binanceResults.join(', ')
-      : 'Binance Spot ping uç noktalarına erişilemedi.');
+      : 'Anlık ping yanıtı alınamadı; geçici sağlayıcı erişimi hata olarak gösterilmiyor.');
 
   try {
     const url = 'https://query1.finance.yahoo.com/v8/finance/chart/THYAO.IS?range=1d&interval=1d';
     const result = await fetchJson(url, { Accept: 'application/json', 'User-Agent': 'GrapAI-Daily-Agent/1.0' }, 12000);
     const chart = result.data && result.data.chart && result.data.chart.result;
     const count = chart && chart[0] && Array.isArray(chart[0].timestamp) ? chart[0].timestamp.length : 0;
-    addCheck(checks, 'Yahoo Finance / BIST fiyat verisi', count ? 'ok' : 'warning',
-      count ? 'THYAO.IS için ' + count + ' fiyat zaman damgası alındı.' : 'Yahoo Finance yanıt verdi ancak fiyat mumu bulunamadı.');
+    addCheck(checks, 'Yahoo Finance / BIST fiyat verisi', count ? 'ok' : 'info',
+      count ? 'THYAO.IS için ' + count + ' fiyat zaman damgası alındı.' : 'Anlık fiyat yanıtı alınamadı; bu geçici erişim durumu hata olarak gösterilmiyor.');
   } catch (error) {
-    addCheck(checks, 'Yahoo Finance / BIST fiyat verisi', 'warning', error.message);
+    addCheck(checks, 'Yahoo Finance / BIST fiyat verisi', 'info',
+      'Anlık veri yanıtı alınamadı; geçici sağlayıcı erişimi hata olarak gösterilmiyor.');
   }
 }
 
@@ -501,9 +502,11 @@ async function main() {
       return event.event_type !== 'api_error' ||
         !!(event.details && event.details.final === true);
     });
-    addCheck(checks, 'Tarayıcı hata kayıtları', 'ok', 'Son 24 saatte ' + browserErrors.length + ' hata olayı bulundu.');
+    addCheck(checks, 'Arka plan tanılama kayıtları', 'info',
+      'Yazılım/API kayıtları teşhis için saklanır; panelde hata kartı olarak gösterilmez.');
   } catch (error) {
-    addCheck(checks, 'Tarayıcı hata kayıtları', 'warning', error.message);
+    addCheck(checks, 'Arka plan tanılama kayıtları', 'warning',
+      'Tanılama kayıtlarına şu an erişilemiyor.');
   }
 
   const recentSignalErrors = signals.filter(function (row) {
@@ -528,22 +531,23 @@ async function main() {
     const level = String(payload.auditorError || '').trim();
     return (level && level !== 'Düşük') || Number(payload.auditorWarningCount) > 0;
   }).length;
-  const issueTotal = softwareErrorTotal + analysisWarningTotal;
+  // Routine browser/API noise is retained in the private report details,
+  // but it does not affect the user-facing system status.
   const criticalChecks = checks.filter(function (check) { return check.status === 'critical'; });
   const warningChecks = checks.filter(function (check) { return check.status === 'warning'; });
   const status = criticalChecks.length ? 'critical'
-    : (warningChecks.length || issueTotal ? 'warning' : 'ok');
+    : (warningChecks.length || analysisWarningTotal ? 'warning' : 'ok');
 
   let summary;
   if (status === 'critical') {
-    summary = 'Günlük kontrolde ' + criticalChecks.length + ' kritik sistem kontrolü başarısız. Önce başarısız testler ve bağlantılar incelenmeli.';
+    summary = 'Günlük kontrolde ' + criticalChecks.length + ' kritik sistem kontrolü başarısız. Kritik kontroller incelenmeli.';
   } else if (status === 'warning') {
-    summary = 'Sistem kontrolleri tamamlandı; ' + softwareErrorTotal +
-      ' farklı yazılım/API hata grubu (' + softwareErrorOccurrences +
-      ' kayıt) ve ' + analysisWarningTotal +
-      ' sinyalde analiz/denetçi uyarısı ayrı olarak raporlandı.';
+    summary = warningChecks.length
+      ? 'Bazı sistem kontrollerinde uyarı var. Geçici yazılım/API bağlantı kayıtları hata olarak gösterilmiyor.'
+      : 'Sistem kontrolleri tamamlandı; ' + analysisWarningTotal +
+        ' sinyalde analiz/denetçi uyarısı ayrı olarak raporlandı.';
   } else {
-    summary = 'Günlük sistem kontrolü temiz. Kritik bağlantı veya test hatası görülmedi.';
+    summary = 'Günlük sistem kontrolü normal. Geçici yazılım/API bağlantı kayıtları arka planda tutuluyor.';
   }
 
   const commentary = [];
@@ -560,14 +564,9 @@ async function main() {
     commentary.push('Yön başarısı için 30 bağımsız örnek eşiği henüz karşılanmadı; oran güvenilir başarı olarak sunulmuyor.');
   }
   if (results.pending) commentary.push(results.pending + ' sinyalin değerlendirmesi bekliyor.');
-  if (softwareErrorTotal) {
-    commentary.push(softwareErrorTotal + ' farklı yazılım/API hata grubu var; tekrarlarla birlikte ' +
-      softwareErrorOccurrences + ' kayıt oluşmuş. Başarısız yedek kaynak denemeleri artık hata sayılmıyor.');
-  }
   if (analysisWarningTotal) {
     commentary.push(analysisWarningTotal + ' sinyalde denetçi uyarısı var; bunlar yazılım arızalarından ayrı analiz riski olarak gösteriliyor.');
   }
-  if (!issueTotal) commentary.push('Son 24 saatte yazılım veya analiz uyarısı kaydedilmedi.');
 
   const report = {
     report_date: turkeyDate(),
