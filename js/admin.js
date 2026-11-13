@@ -163,13 +163,13 @@
       ? (Array.isArray(errors.softwareFindings) ? errors.softwareFindings : [])
       : legacyFindings.filter(function (finding) {
           return finding.category !== 'analysis' &&
-            !/^Denetçi (?:uyarısı|değerlendirmesi)/i.test(String(finding.title || ''));
+            !/^Denetçi\b/i.test(String(finding.title || ''));
         });
     const analysisFindings = hasSplitFindings
       ? (Array.isArray(errors.analysisFindings) ? errors.analysisFindings : [])
       : legacyFindings.filter(function (finding) {
           return finding.category === 'analysis' ||
-            /^Denetçi (?:uyarısı|değerlendirmesi)/i.test(String(finding.title || ''));
+            /^Denetçi\b/i.test(String(finding.title || ''));
         });
 
     function raporBulguBolumu(baslik, findings, category) {
