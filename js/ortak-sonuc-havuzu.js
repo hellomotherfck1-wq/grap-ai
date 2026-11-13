@@ -178,7 +178,7 @@
             var page = Array.isArray(result.data) ? result.data : [];
             rows = rows.concat(page);
             offset += page.length;
-            if (page.length === 1000 && offset < 50000) return readPage();
+            if (page.length === 1000) return readPage();
             return rows;
           });
       }
