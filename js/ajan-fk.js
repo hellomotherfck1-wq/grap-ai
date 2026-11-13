@@ -7,7 +7,6 @@
   var A = (typeof window !== 'undefined') ? window.Ajan : null;
   if (!A) return;
 
-  var VEKIL = 'https://grafik-vekil.hellomotherfck1.workers.dev/?u=';
   var YAHOO = 'https://query1.finance.yahoo.com';
   var KART_BASLIK = '📊 F/K Değerleme ve Ajanlar Arası Tartışma';
 
@@ -78,34 +77,16 @@
   }
 
   async function jsonGet(url) {
-    var yollar = [
-      VEKIL + encodeURIComponent(url),
-      'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
-    ];
-    var sonHata = null;
-
-    for (var i = 0; i < yollar.length; i++) {
-      var denetleyici = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var zamanlayici = denetleyici ? setTimeout(function () { denetleyici.abort(); }, 12000) : null;
-      try {
-        var secenek = { method: 'GET', cache: 'no-store' };
-        if (denetleyici) secenek.signal = denetleyici.signal;
-        var yanit = await fetch(yollar[i], secenek);
-        if (!yanit.ok) throw new Error('HTTP ' + yanit.status);
-        return await yanit.json();
-      } catch (e) {
-        sonHata = e && e.name === 'AbortError' ? new Error('Yahoo Finance isteği zaman aşımına uğradı') : e;
-      } finally {
-        if (zamanlayici) clearTimeout(zamanlayici);
+    if (!window.GrapAIDataTransport) throw new Error('Ortak veri aktarım katmanı yüklenmedi.');
+    return window.GrapAIDataTransport.json(url, {
+      cacheTtlMs: 15 * 60 * 1000,
+      staleMaxAgeMs: 24 * 60 * 60 * 1000,
+      timeoutMs: 6500,
+      validate: function (value) {
+        return !!(value && value.quoteSummary &&
+          Array.isArray(value.quoteSummary.result) && value.quoteSummary.result.length > 0);
       }
-    }
-
-    var finalError = sonHata || new Error('Ücretsiz finansal veri kaynağına erişilemedi');
-    if (window.GrapAISystemMonitor &&
-        typeof window.GrapAISystemMonitor.apiFailure === 'function') {
-      window.GrapAISystemMonitor.apiFailure('Yahoo Finance F/K verisi', finalError, { service: 'valuation' });
-    }
-    throw finalError;
+    });
   }
 
   function quoteAyris(sembol, json, grafikFiyati) {
