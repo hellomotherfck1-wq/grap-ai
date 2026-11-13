@@ -32,6 +32,9 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
+      - name: Smoke test pending-result worker
+        run: node .github/tests/pending-results-worker-smoke.cjs
+
       - name: Evaluate pending shared signals
         env:
           SUPABASE_URL: https://qkkhguyngmsddnkunyws.supabase.co
