@@ -7,6 +7,7 @@ on:
       - ".github/tests/**"
       - ".github/workflows/live-e2e.yml"
       - ".github/workflows/admin-daily-agent.yml"
+      - ".github/workflows/pending-results-worker.yml"
       - "scripts/**"
       - "supabase/**"
       - "index.html"
@@ -20,6 +21,7 @@ on:
       - ".github/tests/**"
       - ".github/workflows/live-e2e.yml"
       - ".github/workflows/admin-daily-agent.yml"
+      - ".github/workflows/pending-results-worker.yml"
       - "scripts/**"
       - "supabase/**"
       - "index.html"
@@ -54,6 +56,9 @@ jobs:
 
       - name: Smoke test private daily admin agent
         run: node .github/tests/admin-agent-smoke.cjs
+
+      - name: Smoke test background pending result evaluator
+        run: node .github/tests/pending-results-worker-smoke.cjs
 
       - name: Smoke test shared external data transport
         run: node .github/tests/data-transport-smoke.cjs
