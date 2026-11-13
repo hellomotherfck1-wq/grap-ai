@@ -498,7 +498,13 @@ async function main() {
   const visits = events.filter(function (event) { return event.event_type === 'visit'; }).length;
   const analyses = events.filter(function (event) { return event.event_type === 'analiz'; }).length;
   const softwareErrorTotal = browserErrors.length + results.signalErrors;
-  const analysisWarningTotal = results.auditorErrorSignals + results.auditorWarningCount;
+  // Count each affected signal once even when it has both a medium/high level
+  // and multiple auditor warning items.
+  const analysisWarningTotal = signals.filter(function (row) {
+    const payload = row.payload || {};
+    const level = String(payload.auditorError || '').trim();
+    return (level && level !== 'Düşük') || Number(payload.auditorWarningCount) > 0;
+  }).length;
   const issueTotal = softwareErrorTotal + analysisWarningTotal;
   const criticalChecks = checks.filter(function (check) { return check.status === 'critical'; });
   const warningChecks = checks.filter(function (check) { return check.status === 'warning'; });
@@ -511,7 +517,7 @@ async function main() {
   } else if (status === 'warning') {
     summary = 'Sistem kontrolleri tamamlandı; ' + softwareErrorTotal +
       ' yazılım/API hata kaydı ve ' + analysisWarningTotal +
-      ' analiz/denetçi uyarısı ayrı olarak raporlandı.';
+      ' sinyalde analiz/denetçi uyarısı ayrı olarak raporlandı.';
   } else {
     summary = 'Günlük sistem kontrolü temiz. Kritik bağlantı veya test hatası görülmedi.';
   }
@@ -534,7 +540,7 @@ async function main() {
     commentary.push(softwareErrorTotal + ' yazılım/API hata kaydı var; bunlar coin bazında ayrı gruplandı.');
   }
   if (analysisWarningTotal) {
-    commentary.push(analysisWarningTotal + ' denetçi uyarısı var; bunlar yazılım arızalarından ayrı analiz riski olarak gösteriliyor.');
+    commentary.push(analysisWarningTotal + ' sinyalde denetçi uyarısı var; bunlar yazılım arızalarından ayrı analiz riski olarak gösteriliyor.');
   }
   if (!issueTotal) commentary.push('Son 24 saatte yazılım veya analiz uyarısı kaydedilmedi.');
 
