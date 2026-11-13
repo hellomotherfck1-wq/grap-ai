@@ -152,7 +152,7 @@
       ? Number(errors.analysisWarningTotal) || 0
       : (Number(errors.auditor) || 0) + (Number(errors.auditorWarnings) || 0);
     raporMetrik(metrikler, 'Yazılım/API hatası', softwareErrorCount);
-    raporMetrik(metrikler, 'Denetçi uyarısı', analysisWarningCount);
+    raporMetrik(metrikler, 'Denetçi uyarılı sinyal', analysisWarningCount);
     raporMetrik(metrikler, '7 gün ziyaret', activity.visits || 0);
     raporMetrik(metrikler, '7 gün analiz', activity.analyses || 0);
 
