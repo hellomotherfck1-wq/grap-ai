@@ -848,6 +848,7 @@ try {
   });
   const fallbackNews = await page.evaluate(async () => window.BistArastirma.haberGetir('FALLBACK'));
   check('Yahoo haberlerinde ikinci ücretsiz proxy yedeği', fallbackNews.length === 1 && fallbackNews[0].title.includes('AllOrigins'), fallbackNews.map(x => x.title).join(', ') || 'Haber alınamadı');
+  await page.evaluate(() => window.GrapAIDataTransport.clear());
 
   const makeBinanceRows = requestedUrl => {
     const parsed = new URL(requestedUrl);
@@ -1047,6 +1048,33 @@ try {
       transport.clear();
     }
   });
+
+  check('Cloudflare zaman aşımında AllOrigins yedeği kullanılıyor',
+    yahooFallbackTests.timeoutFallback.count === 30 &&
+    yahooFallbackTests.timeoutFallback.proxyCalls === 1 &&
+    yahooFallbackTests.timeoutFallback.allOriginsCalls === 1 &&
+    yahooFallbackTests.timeoutFallback.volume > 0,
+    JSON.stringify(yahooFallbackTests.timeoutFallback));
+  check('Başarısız vekil devre kesiciyle sonraki istekte atlanıyor',
+    yahooFallbackTests.serverRetry.count === 30 &&
+    yahooFallbackTests.serverRetry.proxyCalls === 1 &&
+    yahooFallbackTests.serverRetry.allOriginsCalls === 2,
+    JSON.stringify(yahooFallbackTests.serverRetry));
+  check('AllOrigins yedeği çalışıyor',
+    yahooFallbackTests.allOriginsFallback.count === 30 &&
+    yahooFallbackTests.allOriginsFallback.proxyCalls === 1 &&
+    yahooFallbackTests.allOriginsFallback.allOriginsCalls === 1,
+    JSON.stringify(yahooFallbackTests.allOriginsFallback));
+  check('AllOrigins da başarısızsa CORS proxy yedeği çalışıyor',
+    yahooFallbackTests.corsProxyFallback.count === 30 &&
+    yahooFallbackTests.corsProxyFallback.proxyCalls === 1 &&
+    yahooFallbackTests.corsProxyFallback.allOriginsCalls === 1 &&
+    yahooFallbackTests.corsProxyFallback.corsProxyCalls === 1,
+    JSON.stringify(yahooFallbackTests.corsProxyFallback));
+  check('Bütün aktarım servisleri kapalıysa kaynaklar açıkça bildiriliyor',
+    ['Cloudflare Worker', 'AllOrigins', 'CORS proxy'].every(name =>
+      yahooFallbackTests.allSourcesFail.error.includes(name)),
+    yahooFallbackTests.allSourcesFail.error);
 
   const binanceVolume = await page.evaluate(async () => {
     const rows = await Veri.binance('BTCUSDT', '1d');
