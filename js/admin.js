@@ -110,7 +110,6 @@
 
   function raporGorunumu(report) {
     const details = report && report.details || {};
-    const errors = details.errors || {};
     const rawChecks = Array.isArray(details.checks) ? details.checks : [];
     const softProvider = /^(?:Binance Spot veri kaynağı|Yahoo Finance \/ BIST fiyat verisi|Tarayıcı hata kayıtları|Arka plan tanılama kayıtları)$/i;
     const checks = rawChecks.map(function (check) {
@@ -130,21 +129,16 @@
     });
     const critical = checks.some(function (check) { return check.status === 'critical'; });
     const warning = checks.some(function (check) { return check.status === 'warning'; });
-    const analysisWarningCount = errors.analysisWarningTotal !== undefined
-      ? Number(errors.analysisWarningTotal) || 0
-      : (Number(errors.auditor) || 0) + (Number(errors.auditorWarnings) || 0);
-    const status = critical ? 'critical' : (warning || analysisWarningCount ? 'warning' : 'ok');
+    const status = critical ? 'critical' : (warning ? 'warning' : 'ok');
     let summary;
     if (critical) {
       summary = 'Kritik sistem kontrolü başarısız. Ayrıntıyı sistem kontrolleri bölümünde görebilirsin.';
     } else if (warning) {
       summary = 'Bazı temel sistem kontrollerinde uyarı var. Geçici yazılım/API bağlantı kayıtları gösterilmiyor.';
-    } else if (analysisWarningCount) {
-      summary = 'Sistem kontrolleri normal; ' + analysisWarningCount + ' sinyalde analiz kalite uyarısı bulunuyor.';
     } else {
       summary = 'Sistem kontrolleri normal. Geçici yazılım/API bağlantı kayıtları arka planda tutuluyor.';
     }
-    return { status: status, summary: summary, checks: checks, analysisWarningCount: analysisWarningCount };
+    return { status: status, summary: summary, checks: checks };
   }
 
   function ajanRaporuCiz(reports) {
@@ -157,6 +151,13 @@
     const zaman = $('admin-ajan-zaman');
     const gecmis = $('admin-ajan-gecmis');
     if (!durum || !ozet || !metrikler || !hatalar || !kontroller || !sonuclar) return;
+    hatalar.hidden = true;
+    const hataAciklama = hatalar.previousElementSibling;
+    if (hataAciklama && hataAciklama.tagName === 'P') {
+      hataAciklama.hidden = true;
+      const hataBaslik = hataAciklama.previousElementSibling;
+      if (hataBaslik && hataBaslik.tagName === 'H4') hataBaslik.hidden = true;
+    }
 
     [metrikler, hatalar, kontroller, sonuclar, gecmis].forEach(function (node) {
       if (node) node.replaceChildren();
@@ -174,7 +175,6 @@
     const latest = reports[0];
     const details = latest.details || {};
     const results = details.results || {};
-    const errors = details.errors || {};
     const activity = details.activity || {};
     const view = raporGorunumu(latest);
     const status = view.status;
@@ -185,46 +185,8 @@
     raporMetrik(metrikler, 'Son 30 gün sinyal', results.totalSignals || 0);
     raporMetrik(metrikler, 'Tamamlanan ölçüm', results.completedDirection || 0);
     raporMetrik(metrikler, 'Bekleyen sonuç', results.pending || 0);
-    raporMetrik(metrikler, 'Denetçi uyarılı sinyal', view.analysisWarningCount);
     raporMetrik(metrikler, '7 gün ziyaret', activity.visits || 0);
     raporMetrik(metrikler, '7 gün analiz', activity.analyses || 0);
-
-    const legacyFindings = Array.isArray(errors.findings) ? errors.findings : [];
-    const analysisFindings = Array.isArray(errors.analysisFindings)
-      ? errors.analysisFindings
-      : legacyFindings.filter(function (finding) {
-          return finding.category === 'analysis' ||
-            /^Denetçi\b/i.test(String(finding.title || ''));
-        });
-
-    const heading = document.createElement('h4');
-    heading.textContent = 'Coin bazlı analiz / denetçi uyarıları';
-    hatalar.appendChild(heading);
-    if (!analysisFindings.length) {
-      const empty = document.createElement('p');
-      empty.className = 'admin-rapor-bos';
-      empty.textContent = 'Coin bazlı denetçi uyarısı bulunmuyor.';
-      hatalar.appendChild(empty);
-    } else {
-      analysisFindings.forEach(function (finding) {
-        const card = document.createElement('div');
-        card.className = 'admin-rapor-bulgu admin-rapor-bulgu-warning';
-        const title = document.createElement('strong');
-        title.textContent = finding.title || 'Denetçi uyarısı';
-        const meta = document.createElement('small');
-        meta.textContent = (finding.source || 'Varlık bilinmiyor') +
-          ' · Sinyal: ' + (finding.count || 0) +
-          ' · Uyarı maddesi: ' + (finding.warningCount || 0) +
-          (finding.lastSeen ? ' · Son: ' + raporTarihi(finding.lastSeen) : '');
-        const explanation = document.createElement('p');
-        explanation.textContent = finding.explanation || 'Ajan bu kayıt için ek açıklama bulamadı.';
-        const action = document.createElement('p');
-        action.className = 'admin-rapor-oneri';
-        action.textContent = 'Öneri: ' + (finding.action || 'İlgili sinyalin denetçi maddelerini incele.');
-        card.append(title, meta, explanation, action);
-        hatalar.appendChild(card);
-      });
-    }
 
     if (!view.checks.length) {
       raporSatir(kontroller, 'Kontroller', 'Rapor ayrıntısı bulunamadı', 'warning');
@@ -317,7 +279,6 @@
     const ist = $('istatistikler');
     const sonlar = $('son-analizler');
     if (!ist || !sonlar || !supabase || istatistikYukleniyor) return;
-
     istatistikYukleniyor = true;
     const yenileBtn = $('admin-yenile-btn');
     const guncelleme = $('admin-son-guncelleme');
