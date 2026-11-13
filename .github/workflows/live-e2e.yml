@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/tests/**"
       - ".github/workflows/live-e2e.yml"
+      - ".github/workflows/admin-daily-agent.yml"
+      - "scripts/**"
       - "supabase/**"
       - "index.html"
       - "binance-api-check.html"
@@ -47,6 +49,9 @@ jobs:
 
       - name: Smoke test shared admin-only results pool
         run: node .github/tests/shared-results-smoke.cjs
+
+      - name: Smoke test private daily admin agent
+        run: node .github/tests/admin-agent-smoke.cjs
 
       - name: Validate browser Binance diagnostic page
         run: |
