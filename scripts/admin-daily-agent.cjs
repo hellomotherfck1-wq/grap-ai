@@ -202,7 +202,7 @@ function groupErrors(events, signals) {
 
   const softwareFindings = Array.from(softwareGroups.values()).sort(function (a, b) {
     return b.count - a.count;
-  }).slice(0, 8);
+  });
 
   softwareFindings.forEach(function (item) {
     if (item.count >= 5) item.severity = 'critical';
@@ -239,7 +239,7 @@ function groupErrors(events, signals) {
     return item;
   }).sort(function (a, b) {
     return (b.warningCount + b.count) - (a.warningCount + a.count);
-  }).slice(0, 8);
+  });
 
   return {
     softwareFindings: softwareFindings,
