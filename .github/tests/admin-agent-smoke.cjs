@@ -60,6 +60,9 @@ assert.ok(agent.includes("const key = type + '|' + sourceLabel + '|' + clean") &
   'Findings must be grouped by source/asset and separated into software versus analysis warnings');
 assert.ok(agent.includes('analysisWarningTotal') && agent.includes('softwareErrorTotal'),
   'Report totals must keep software errors separate from auditor warnings');
+assert.ok(agent.includes('const analysisWarningTotal = signals.filter') &&
+  agent.includes('Number(payload.auditorWarningCount) > 0'),
+  'Each signal with auditor findings must be counted once even if it has multiple warning items');
 assert.ok(admin.includes('Yazılım ve API hataları') &&
   admin.includes('Coin bazlı analiz / denetçi uyarıları') &&
   admin.includes('Yazılım/API hatası') && admin.includes('Denetçi uyarısı'),
