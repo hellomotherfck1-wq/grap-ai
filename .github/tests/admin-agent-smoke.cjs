@@ -47,6 +47,7 @@ assert.ok(/grap_ai_log_system_event[\s\S]*security definer/i.test(sql),
 assert.ok(/v_recent_count >= 30/i.test(sql), 'Error logging RPC must rate-limit devices');
 
 assert.ok(workflow.includes('0 5 * * *'), 'Daily agent must run every day at 08:00 Europe/Istanbul');
+assert.ok(!workflow.includes('\\${{'), 'GitHub Actions expressions must not be escaped as plain text');
 assert.ok(workflow.includes('SUPABASE_SERVICE_ROLE_KEY') && workflow.includes('secrets.SUPABASE_SERVICE_ROLE_KEY'),
   'Service key must be supplied only from GitHub Actions secrets');
 assert.ok(agent.includes('admin_daily_reports?on_conflict=report_date'), 'Agent must upsert one report per local day');
