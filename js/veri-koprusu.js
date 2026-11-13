@@ -259,6 +259,7 @@
     },
     clear: function () {
       memory.clear();
+      routeHealth = Object.create(null);
       lastInfo = Object.create(null);
       try {
         var keys = [];
