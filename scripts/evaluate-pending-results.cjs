@@ -35,7 +35,17 @@ function recordFromRow(row) {
   });
 }
 
+function isTestSignal(record) {
+  if (!record) return false;
+  const sources = Array.isArray(record.sources) ? record.sources : [record.source];
+  const testSource = sources.some(function (source) {
+    return /^E2E(?:\\b|[\\s_-])/i.test(String(source || '').trim());
+  });
+  return testSource || /^E2E[A-Z0-9]*USDT$/i.test(String(record.symbol || ''));
+}
+
 function isPending(record) {
+  if (isTestSignal(record)) return false;
   return record.directionStatus === 'pending' ||
     (record.decision === 'AL' && record.tradeStatus === 'pending') ||
     (record.decision === 'SAT' && record.spotStatus !== 'completed' && record.spotStatus !== 'expired');
@@ -261,6 +271,13 @@ function safeError(error) {
     .slice(0, 350);
 }
 
+function normalizeFailureReason(message) {
+  return String(message || '')
+    .replace(/Invalid currency pair [A-Z0-9_]+/gi, 'Invalid currency pair [pair]')
+    .replace(/symbol(?:=|\s+)[A-Z0-9_]+/gi, 'symbol [symbol]')
+    .slice(0, 350);
+}
+
 async function fetchText(url, headers, timeoutMs, method, body) {
   const controller = new AbortController();
   const timer = setTimeout(function () { controller.abort(); }, timeoutMs || 15000);
@@ -281,12 +298,12 @@ async function fetchText(url, headers, timeoutMs, method, body) {
 
 async function fetchJson(url, headers, timeoutMs, method, body) {
   const result = await fetchText(url, headers, timeoutMs, method, body);
-  let data;
-  try { data = result.text ? JSON.parse(result.text) : null; }
-  catch (error) { throw new Error('JSON yanıtı okunamadı.'); }
   if (!result.response.ok) {
     throw new Error('HTTP ' + result.response.status + ': ' + String(result.text || '').slice(0, 180));
   }
+  let data;
+  try { data = result.text ? JSON.parse(result.text) : null; }
+  catch (error) { throw new Error('JSON yanıtı okunamadı.'); }
   return { data: data, response: result.response };
 }
 
@@ -467,6 +484,7 @@ async function processGroup(group, stats) {
   } catch (error) {
     const retryAt = Date.now() + RETRY_ERROR_MS;
     const message = safeError(error);
+    const reason = normalizeFailureReason(message);
     const patches = group.records.map(function (record) {
       return {
         id: record.id,
@@ -481,11 +499,11 @@ async function processGroup(group, stats) {
     stats.failedGroups += 1;
     stats.dataErrorRecords += patches.length;
     stats.updatedRecords += patches.length;
-    const failureKey = group.market + '|' + group.timeframe + '|' + message;
+    const failureKey = group.market + '|' + group.timeframe + '|' + reason;
     const failure = stats.failureReasons[failureKey] || {
       market: group.market,
       timeframe: group.timeframe,
-      reason: message,
+      reason: reason,
       groups: 0,
       records: 0,
       sampleSymbols: []
@@ -555,6 +573,7 @@ async function main() {
   const rows = await readAllSignals();
   const records = rows.map(recordFromRow);
   const pending = summarizePending(records);
+  const ignoredTestRecords = records.filter(isTestSignal).length;
   const forceRetryErrors = process.env.RETRY_DATA_ERRORS === 'true';
   const stats = await runWorker(records, Date.now(), { forceRetryErrors: forceRetryErrors });
   const failureBreakdown = Object.keys(stats.failureReasons).map(function (key) {
@@ -565,6 +584,7 @@ async function main() {
   console.log('Grap-AI arka plan sonuç değerlendirmesi tamamlandı: ' +
     JSON.stringify({
       scanned: rows.length,
+      ignoredTestRecords: ignoredTestRecords,
       pendingBefore: pending.total,
       normalPendingBefore: pending.normal,
       dataErrorsBefore: pending.dataErrors,
@@ -591,6 +611,7 @@ module.exports = {
   intervalMs: intervalMs,
   recordFromRow: recordFromRow,
   isPending: isPending,
+  isTestSignal: isTestSignal,
   isExpired: isExpired,
   summarizePending: summarizePending,
   shouldEvaluate: shouldEvaluate,
