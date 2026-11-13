@@ -216,7 +216,7 @@
     var cached = cacheRead(key);
     var age = cached ? Math.max(0, Date.now() - cached.savedAt) : Infinity;
 
-    if (cached && age <= ttlMs && valid(cached.value, options.validate)) {
+    if (cached && ttlMs > 0 && age <= ttlMs && valid(cached.value, options.validate)) {
       lastInfo[key] = {
         cached: true,
         stale: false,
