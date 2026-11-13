@@ -1,6 +1,5 @@
 (function () {
   'use strict';
-  var VEKIL = 'https://grafik-vekil.hellomotherfck1.workers.dev/?u=';
   var Ajan = { hacim: null };
   window.Ajan = Ajan;
 
