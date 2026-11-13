@@ -65,11 +65,17 @@ try {
     sharedPoolModule.save === 'function' && sharedPoolModule.adminRead === 'function' &&
     sharedPoolModule.patch === 'function', JSON.stringify(sharedPoolModule));
   const sharedPoolIsolation = await page.evaluate(async () => {
-    const result = await window.GrapAISharedResults.kaydet([{
+    const saved = await window.GrapAISharedResults.kaydet([{
       id: 'E2E_ISOLATION_TEST|1h|1', symbol: 'E2EISOLATIONUSDT',
       timeframe: '1h', decision: 'BEKLE'
     }]);
-    return window.__GRAP_AI_E2E_TEST__ === true && result && result.skipped === true;
+    const patched = await window.GrapAISharedResults.patchMany([{
+      id: 'E2E_ISOLATION_TEST|1h|1', patch: { directionStatus: 'completed' }
+    }]);
+    const read = await window.GrapAISharedResults.adminRecords();
+    return window.__GRAP_AI_E2E_TEST__ === true &&
+      saved && saved.skipped === true && patched && patched.skipped === true &&
+      read && read.isAdmin === false && read.records.length === 0;
   });
   check('E2E testleri üretim ortak havuzuna yazmıyor', sharedPoolIsolation,
     'Test kayıtları yalnızca geçici tarayıcı hafızasında tutuluyor');
