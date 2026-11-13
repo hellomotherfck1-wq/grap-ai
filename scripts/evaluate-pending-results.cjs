@@ -58,11 +58,12 @@ function summarizePending(records) {
   };
 }
 
-function shouldEvaluate(record, now) {
+function shouldEvaluate(record, now, options) {
   const step = intervalMs(record.timeframe);
   if (!isPending(record) || !step || !isNumber(record.signalAt) || record.signalAt <= 0) return false;
   if (now < record.signalAt + step) return false;
-  if (isNumber(record.nextCheckAt) && now < record.nextCheckAt) return false;
+  const forceRetryError = !!(options && options.forceRetryErrors && record.lastError);
+  if (isNumber(record.nextCheckAt) && now < record.nextCheckAt && !forceRetryError) return false;
   return true;
 }
 
@@ -239,10 +240,10 @@ function evaluationPatch(record, bars, now) {
   return patch;
 }
 
-function groupPending(records, now) {
+function groupPending(records, now, options) {
   const groups = Object.create(null);
   (records || []).forEach(function (record) {
-    if (!shouldEvaluate(record, now)) return;
+    if (!shouldEvaluate(record, now, options)) return;
     const key = record.market + '|' + record.symbol + '|' + record.timeframe;
     if (!groups[key]) groups[key] = {
       market: record.market, symbol: record.symbol, timeframe: record.timeframe, records: []
@@ -433,6 +434,21 @@ async function processGroup(group, stats) {
     stats.failedGroups += 1;
     stats.dataErrorRecords += patches.length;
     stats.updatedRecords += patches.length;
+    const failureKey = group.market + '|' + group.timeframe + '|' + message;
+    const failure = stats.failureReasons[failureKey] || {
+      market: group.market,
+      timeframe: group.timeframe,
+      reason: message,
+      groups: 0,
+      records: 0,
+      sampleSymbols: []
+    };
+    failure.groups += 1;
+    failure.records += patches.length;
+    if (failure.sampleSymbols.length < 5 && failure.sampleSymbols.indexOf(group.symbol) < 0) {
+      failure.sampleSymbols.push(group.symbol);
+    }
+    stats.failureReasons[failureKey] = failure;
     return;
   }
 
@@ -462,8 +478,8 @@ async function processGroup(group, stats) {
   stats.updatedRecords += patches.length;
 }
 
-async function runWorker(records, now) {
-  const groups = groupPending(records, now);
+async function runWorker(records, now, options) {
+  const groups = groupPending(records, now, options);
   const stats = {
     groups: groups.length,
     failedGroups: 0,
@@ -471,7 +487,8 @@ async function runWorker(records, now) {
     completedRecords: 0,
     expiredRecords: 0,
     dataErrorRecords: 0,
-    updatedRecords: 0
+    updatedRecords: 0,
+    failureReasons: Object.create(null)
   };
   let index = 0;
   async function worker() {
@@ -491,7 +508,13 @@ async function main() {
   const rows = await readAllSignals();
   const records = rows.map(recordFromRow);
   const pending = summarizePending(records);
-  const stats = await runWorker(records, Date.now());
+  const forceRetryErrors = process.env.RETRY_DATA_ERRORS === 'true';
+  const stats = await runWorker(records, Date.now(), { forceRetryErrors: forceRetryErrors });
+  const failureBreakdown = Object.keys(stats.failureReasons).map(function (key) {
+    return stats.failureReasons[key];
+  }).sort(function (a, b) {
+    return b.records - a.records;
+  });
   console.log('Grap-AI arka plan sonuç değerlendirmesi tamamlandı: ' +
     JSON.stringify({
       scanned: rows.length,
@@ -499,12 +522,14 @@ async function main() {
       normalPendingBefore: pending.normal,
       dataErrorsBefore: pending.dataErrors,
       expiredBefore: pending.expired,
+      forceRetryErrors: forceRetryErrors,
       groups: stats.groups,
       updated: stats.updatedRecords,
       newlyCompleted: stats.completedRecords,
       expiredNow: stats.expiredRecords,
       dataErrorRecords: stats.dataErrorRecords,
-      failedGroups: stats.failedGroups
+      failedGroups: stats.failedGroups,
+      failureBreakdown: failureBreakdown
     }));
 }
 
