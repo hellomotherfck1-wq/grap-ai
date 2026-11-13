@@ -8,7 +8,7 @@
   <meta name="color-scheme" content="dark">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/stil.css?v=7">
+  <link rel="stylesheet" href="css/stil.css?v=8">
   <title>Graph AI — Piyasa Analizi</title>
 </head>
 <body>
@@ -164,6 +164,26 @@
           <div id="son-analizler" class="son-analizler"></div>
         </div>
 
+        <div class="kart admin-gunluk-ajan" id="admin-gunluk-ajan">
+          <div class="admin-rapor-baslik">
+            <div>
+              <h3>🧠 Günlük Sistem Raporu</h3>
+              <p class="alt">Sistem sağlığı, son hatalar ve analiz sonuçları · yalnızca yönetici</p>
+            </div>
+            <span id="admin-ajan-durum" class="admin-rapor-durum admin-rapor-bekle">RAPOR BEKLENİYOR</span>
+          </div>
+          <p id="admin-ajan-ozet" class="admin-rapor-ozet">Günlük rapor yükleniyor…</p>
+          <div id="admin-ajan-metrikler" class="admin-rapor-metrikler"></div>
+          <h4>Son hatalar ve ajanın yorumu</h4>
+          <div id="admin-ajan-hatalar" class="admin-rapor-liste"></div>
+          <h4>Sistem kontrolleri</h4>
+          <div id="admin-ajan-kontroller" class="admin-rapor-liste"></div>
+          <h4>Analiz sonuçlarının özeti</h4>
+          <div id="admin-ajan-sonuclar" class="admin-rapor-liste"></div>
+          <p id="admin-ajan-zaman" class="admin-guncelleme">Henüz rapor oluşturulmadı.</p>
+          <div id="admin-ajan-gecmis" class="admin-rapor-gecmis-liste"></div>
+        </div>
+
         <details class="kart admin-notlar" id="admin-gelistirme-notlari">
           <summary>
             <span>🗂️ Eski geliştirme notları</span>
@@ -284,7 +304,8 @@
   <script src="js/coin-tahmin.js?v=11"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/ortak-sonuc-havuzu.js?v=1"></script>
+  <script src="js/system-monitor.js?v=1"></script>
   <script src="js/ajan-performans.js?v=15"></script>
-  <script src="js/admin.js?v=2"></script>
+  <script src="js/admin.js?v=3"></script>
 </body>
 </html>
