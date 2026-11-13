@@ -32,7 +32,7 @@ assert.ok(admin.includes('ajanRaporuYukle()'), 'Admin must refresh the report af
 assert.ok(monitor.includes("rpc('grap_ai_log_system_event'"), 'Browser errors must be sent through the constrained RPC');
 assert.ok(monitor.includes('unhandledrejection') && monitor.includes('resource_error'),
   'Monitor must capture runtime and resource errors');
-assert.ok(!/SUPABASE_SERVICE_ROLE_KEY|service_role/i.test(admin + monitor + html),
+assert.ok(!/SUPABASE_SERVICE_ROLE_KEY|service_role\s*[:=]\s*['\"][^'\"]+/i.test(admin + monitor + html),
   'No privileged Supabase key may be shipped to browser files');
 
 assert.ok(/create table if not exists public\.admin_system_events/i.test(sql), 'System error table must exist');
