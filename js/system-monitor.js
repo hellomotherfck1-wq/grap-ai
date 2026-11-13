@@ -8,12 +8,6 @@
   var DEVICE_KEY = 'grap-ai-system-monitor-device-v1';
   var lastLogged = Object.create(null);
   var ephemeralDeviceId = null;
-  var monitoredHosts = [
-    'binance.com', 'binance.vision', 'finance.yahoo.com',
-    'grafik-vekil.hellomotherfck1.workers.dev', 'allorigins.win',
-    'news.google.com', 'kap.org.tr'
-  ];
-
   function deviceId() {
     try {
       var saved = localStorage.getItem(DEVICE_KEY);
@@ -100,31 +94,17 @@
       reason && reason.message ? reason.message : String(reason || 'İşlenmeyen Promise hatası'), {});
   });
 
-  var originalFetch = window.fetch;
-  if (typeof originalFetch === 'function') {
-    window.fetch = function (input, init) {
-      var rawUrl = typeof input === 'string' ? input : input && input.url ? input.url : '';
-      var host = '';
-      try { host = new URL(rawUrl, window.location.href).hostname; } catch (e) {}
-      var tracked = monitoredHosts.some(function (item) {
-        return host === item || host.endsWith('.' + item);
-      });
 
-      return originalFetch.apply(this, arguments).then(function (response) {
-        if (tracked && !response.ok) {
-          log('api_error', rawUrl, 'HTTP ' + response.status, { status: response.status });
-        }
-        return response;
-      }).catch(function (error) {
-        if (tracked) {
-          log('api_error', rawUrl, error && error.message ? error.message : 'Veri kaynağına erişilemedi', {});
-        }
-        throw error;
-      });
-    };
+  function logApiFailure(source, error, details) {
+    var info = details && typeof details === 'object' ? Object.assign({}, details) : {};
+    info.final = true;
+    log('api_error', source, error && error.message ? error.message : String(error || 'API isteği başarısız'), info);
   }
 
-  window.GrapAISystemMonitor = { log: log };
+  // Do not monitor every fetch attempt globally: fallback providers commonly
+  // return errors before a later provider succeeds. Call apiFailure only when
+  // the whole application-level data operation has failed.
+  window.GrapAISystemMonitor = { log: log, apiFailure: logApiFailure };
   var pendingErrors = Array.isArray(window.__GrapAISystemPendingErrors)
     ? window.__GrapAISystemPendingErrors.slice(0, 30) : [];
   window.__GrapAISystemPendingErrors = [];
