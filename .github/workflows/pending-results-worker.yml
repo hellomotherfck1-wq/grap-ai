@@ -1,6 +1,12 @@
 name: Grap-AI pending result evaluator
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/evaluate-pending-results.cjs"
+      - ".github/workflows/pending-results-worker.yml"
+      - ".github/tests/pending-results-worker-smoke.cjs"
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
@@ -39,7 +45,7 @@ jobs:
         env:
           SUPABASE_URL: https://qkkhguyngmsddnkunyws.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          RETRY_DATA_ERRORS: ${{ inputs.retry_data_errors || false }}
+          RETRY_DATA_ERRORS: ${{ github.event_name == 'push' || inputs.retry_data_errors || false }}
         run: |
           if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
             echo "::error::SUPABASE_SERVICE_ROLE_KEY secret is missing."
