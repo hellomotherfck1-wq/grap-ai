@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      retry_data_errors:
+        description: "Daha önce veri hatası alan kayıtları bekleme süresini atlayarak yeniden dene"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -30,6 +36,7 @@ jobs:
         env:
           SUPABASE_URL: https://qkkhguyngmsddnkunyws.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RETRY_DATA_ERRORS: ${{ inputs.retry_data_errors || false }}
         run: |
           if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
             echo "::error::SUPABASE_SERVICE_ROLE_KEY secret is missing."
