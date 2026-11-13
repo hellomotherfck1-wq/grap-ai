@@ -87,9 +87,19 @@ async function supabaseRows(table, filters, maxRows) {
     });
     const count = Math.min(pageSize, (maxRows || 5000) - offset);
     url.searchParams.set('limit', String(count));
-    const result = await fetchJson(url.toString(), Object.assign({}, supabaseHeaders(), {
-      Range: offset + '-' + (offset + count - 1)
-    }), 15000);
+    let result;
+    try {
+      result = await fetchJson(url.toString(), Object.assign({}, supabaseHeaders(), {
+        Range: offset + '-' + (offset + count - 1)
+      }), 15000);
+    } catch (error) {
+      // PostgREST returns 416 when the next page starts beyond the final row.
+      // This commonly happens when the result count is an exact page-size multiple.
+      if (rows.length > 0 && /HTTP 416|Requested range not satisfiable/i.test(error.message)) {
+        break;
+      }
+      throw error;
+    }
     const page = Array.isArray(result.data) ? result.data : [];
     rows.push.apply(rows, page);
     if (page.length < count) break;
