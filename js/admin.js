@@ -184,7 +184,10 @@
     ozet.textContent = view.summary;
     raporMetrik(metrikler, 'Son 30 gün sinyal', results.totalSignals || 0);
     raporMetrik(metrikler, 'Tamamlanan ölçüm', results.completedDirection || 0);
-    raporMetrik(metrikler, 'Bekleyen sonuç', results.pending || 0);
+    raporMetrik(metrikler, 'Bekleyen sonuç toplam', results.pending || 0);
+    raporMetrik(metrikler, 'Normal bekleyen', results.pendingNormal || 0);
+    raporMetrik(metrikler, 'Veri hatası bekleyen', results.pendingDataErrors || 0);
+    raporMetrik(metrikler, 'Süresi geçmiş', results.expired || 0);
     raporMetrik(metrikler, '7 gün ziyaret', activity.visits || 0);
     raporMetrik(metrikler, '7 gün analiz', activity.analyses || 0);
 
