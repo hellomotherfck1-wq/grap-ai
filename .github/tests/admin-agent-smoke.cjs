@@ -77,7 +77,7 @@ assert.ok(agent.includes('const analysisWarningTotal = signals.filter') &&
   'Each signal with auditor findings must be counted once even if it has multiple warning items');
 assert.ok(admin.includes('Yazılım ve API hataları') &&
   admin.includes('Coin bazlı analiz / denetçi uyarıları') &&
-  admin.includes('Yazılım/API hatası') && admin.includes('Denetçi uyarısı'),
+  admin.includes('Farklı yazılım/API hatası') && admin.includes('Denetçi uyarısı'),
   'Admin UI must display separate software-error and coin-level analysis-warning sections');
 assert.ok(agent.includes("url.searchParams.set('limit', String(count))") &&
   agent.includes("url.searchParams.set('offset', String(offset))") && !/Range:\s*offset/.test(agent),
