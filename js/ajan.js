@@ -438,78 +438,44 @@
     Veri.yahoo = async function (sembol, zd) {
       var p = { '15m': ['15m', '5d'], '1h': ['60m', '1mo'], '1d': ['1d', '6mo'] }[zd];
       if (!p) throw new Error('[ajan] Desteklenmeyen zaman dilimi: ' + zd);
-
       var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
         encodeURIComponent(sembol) + '?interval=' + p[0] + '&range=' + p[1];
-      var yollar = [
-        { ad: 'Cloudflare vekil', url: VEKIL + encodeURIComponent(url), tekrar: true },
-        { ad: 'Yahoo Finance', url: url },
-        { ad: 'AllOrigins', url: 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url) },
-        { ad: 'CORS proxy', url: 'https://corsproxy.io/?' + encodeURIComponent(url) }
-      ];
-      var hatalar = [];
-
-      for (var i = 0; i < yollar.length; i++) {
-        var yol = yollar[i];
-        var deneme = 0;
-        var enFazla = yol.tekrar ? 2 : 1;
-
-        while (deneme < enFazla) {
-          deneme++;
-          try {
-            // Her kaynak için ayrı 9 saniye sınırı: tek bir vekil sunucunun
-            // 25 saniye boyunca bütün grafik aramasını kilitlemesini önler.
-            var j = await this.getir(yol.url, 9000);
-            var r0 = j && j.chart && j.chart.result && j.chart.result[0];
-            if (!r0 || !Array.isArray(r0.timestamp)) {
-              var aciklama = j && j.chart && j.chart.error &&
-                (j.chart.error.description || j.chart.error.code);
-              throw new Error(aciklama || 'Grafik verisi bulunamadı');
-            }
-
-            var q = r0.indicators && r0.indicators.quote && r0.indicators.quote[0];
-            if (!q || !Array.isArray(q.open) || !Array.isArray(q.high) ||
-                !Array.isArray(q.low) || !Array.isArray(q.close)) {
-              throw new Error('Mum verisi eksik');
-            }
-
-            var out = [];
-            r0.timestamp.forEach(function (tt, index) {
-              if (q.open[index] == null || q.high[index] == null ||
-                  q.low[index] == null || q.close[index] == null) return;
-              var t = Number(tt);
-              var o = Number(q.open[index]);
-              var h = Number(q.high[index]);
-              var l = Number(q.low[index]);
-              var c = Number(q.close[index]);
-              if (!Number.isFinite(t) || !Number.isFinite(o) ||
-                  !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c)) return;
-              var hacim = q.volume && q.volume[index] != null ? Number(q.volume[index]) : 0;
-              out.push({
-                t: t * 1000, o: o, h: h, l: l, c: c,
-                v: Number.isFinite(hacim) ? hacim : 0
-              });
-            });
-
-            if (out.length < 20) throw new Error('Yeterli veri yok (' + out.length + ' mum)');
-            return out;
-          } catch (e) {
-            var mesaj = e && e.name === 'AbortError' ? 'zaman aşımı' :
-              (e && e.message ? e.message : String(e));
-            hatalar.push(yol.ad + (deneme > 1 ? ' (2. deneme)' : '') + ': ' + mesaj);
-
-            // Vekil 429/5xx verirse yalnızca bir kez daha dene.
-            // Zaman aşımında beklemek yerine hemen diğer veri kaynağına geç.
-            var geciciSunucuHatasi = /^HTTP (408|425|429|5\d\d)\b/.test(mesaj);
-            if (!(yol.tekrar && deneme < enFazla && geciciSunucuHatasi)) break;
-            await new Promise(function (resolve) { setTimeout(resolve, 350); });
-          }
+      if (!window.GrapAIDataTransport) throw new Error('Ortak veri aktarım katmanı yüklenmedi.');
+      var j = await window.GrapAIDataTransport.json(url, {
+        cacheTtlMs: zd === '1d' ? 5 * 60 * 1000 : 90 * 1000,
+        staleMaxAgeMs: 24 * 60 * 60 * 1000,
+        timeoutMs: 6500,
+        validate: function (payload) {
+          var r = payload && payload.chart && payload.chart.result && payload.chart.result[0];
+          var q = r && r.indicators && r.indicators.quote && r.indicators.quote[0];
+          return !!(r && Array.isArray(r.timestamp) && r.timestamp.length >= 20 &&
+            q && Array.isArray(q.open) && Array.isArray(q.high) &&
+            Array.isArray(q.low) && Array.isArray(q.close));
         }
-      }
-
-      throw new Error('[ajan] Piyasa verisi alınamadı. ' + hatalar.join(' | ') +
-        '. İnternet bağlantısını ve sembolü kontrol et.');
+      });
+      var r0 = j.chart.result[0];
+      var q = r0.indicators.quote[0];
+      var out = [];
+      r0.timestamp.forEach(function (tt, index) {
+        if (q.open[index] == null || q.high[index] == null ||
+            q.low[index] == null || q.close[index] == null) return;
+        var t = Number(tt);
+        var o = Number(q.open[index]);
+        var h = Number(q.high[index]);
+        var l = Number(q.low[index]);
+        var c = Number(q.close[index]);
+        if (!Number.isFinite(t) || !Number.isFinite(o) ||
+            !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c)) return;
+        var hacim = q.volume && q.volume[index] != null ? Number(q.volume[index]) : 0;
+        out.push({
+          t: t * 1000, o: o, h: h, l: l, c: c,
+          v: Number.isFinite(hacim) ? hacim : 0
+        });
+      });
+      if (out.length < 20) throw new Error('Yeterli veri yok (' + out.length + ' mum)');
+      return out;
     };
+
 
     // Ajan performans defterinde gerçek sinyallerin sonucunu ölçmek için daha uzun fiyat geçmişi.
     // Yahoo Finance herkese açık chart ucu / Binance public klines kullanılır; ücretli API anahtarı gerekmez.
@@ -538,16 +504,18 @@
             if (!aralik.yahoo) throw new Error('4 saatlik geçmiş yalnızca Binance kripto için desteklenir.');
             var yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
               encodeURIComponent(aday.sembol) + '?interval=' + aralik.yahoo[0] + '&range=' + aralik.yahoo[1];
-            var controller = new AbortController();
-            var timeout = setTimeout(function () { controller.abort(); }, 30000);
-            var payload;
-            try {
-              var response = await fetch(VEKIL + encodeURIComponent(yahooUrl), { signal: controller.signal });
-              if (!response.ok) throw new Error('Yahoo geçmiş veri HTTP ' + response.status);
-              payload = await response.json();
-            } finally {
-              clearTimeout(timeout);
-            }
+            if (!window.GrapAIDataTransport) throw new Error('Ortak veri aktarım katmanı yüklenmedi.');
+            var payload = await window.GrapAIDataTransport.json(yahooUrl, {
+              cacheTtlMs: 60 * 60 * 1000,
+              staleMaxAgeMs: 24 * 60 * 60 * 1000,
+              timeoutMs: 6500,
+              validate: function (value) {
+                var chartData = value && value.chart && value.chart.result && value.chart.result[0];
+                var quoteData = chartData && chartData.indicators && chartData.indicators.quote && chartData.indicators.quote[0];
+                return !!(chartData && Array.isArray(chartData.timestamp) &&
+                  chartData.timestamp.length >= 80 && quoteData);
+              }
+            });
             var chart = payload && payload.chart && payload.chart.result && payload.chart.result[0];
             if (!chart || !Array.isArray(chart.timestamp)) throw new Error('Yahoo Finance geçmiş verisi bulunamadı.');
             var quote = chart.indicators && chart.indicators.quote && chart.indicators.quote[0];
@@ -579,10 +547,13 @@
         }
       }
       var finalError = new Error('Ücretsiz geçmiş veri alınamadı' + (sonHata ? ': ' + (sonHata.message || sonHata) : '.'));
-      if (typeof window !== 'undefined' && window.GrapAISystemMonitor &&
+      if (sonHata && sonHata.grapAiLogged) {
+        finalError.grapAiLogged = true;
+      } else if (typeof window !== 'undefined' && window.GrapAISystemMonitor &&
           typeof window.GrapAISystemMonitor.apiFailure === 'function') {
         window.GrapAISystemMonitor.apiFailure('Veri.gecmis/' + String(girdi || 'bilinmeyen'),
           finalError, { symbol: String(girdi || '').slice(0, 80), timeframe: zd || '1d' });
+        finalError.grapAiLogged = true;
       }
       throw finalError;
     };
