@@ -55,8 +55,9 @@ assert.ok(agent.includes('directional.reliable') && agent.includes('results.pend
   'Agent must summarize evaluated and pending signal results');
 assert.ok(agent.includes('groupErrors') && agent.includes('checkExternalApis'),
   'Agent must inspect recent errors and external data providers');
-assert.ok(/HTTP 416\|Requested range not satisfiable/.test(agent) && /rows\.length > 0/.test(agent),
-  'Supabase pagination must stop gracefully when the final page is out of range');
+assert.ok(agent.includes("url.searchParams.set('limit', String(count))") &&
+  agent.includes("url.searchParams.set('offset', String(offset))") && !/Range:\s*offset/.test(agent),
+  'Supabase pagination must use non-negative PostgREST offset/limit query parameters');
 assert.ok(!agent.includes('GITHUB_STEP_SUMMARY') && !agent.includes('writeStepSummary'),
   'Private report details must not be exposed in public workflow summaries');
 assert.ok(worker.includes('graph-ai-v52') && worker.includes('./js/system-monitor.js'),
