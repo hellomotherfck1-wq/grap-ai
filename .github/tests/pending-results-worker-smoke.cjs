@@ -61,8 +61,8 @@ assert.equal(expired.directionStatus, 'expired');
 
 assert.ok(admin.includes('pendingDataErrors') && admin.includes('pendingNormal'),
   'The results panel must split normal pending records from data-source errors');
-assert.ok(!shared.includes('offset < 50000'),
-  'The admin shared pool must paginate all retained records, not stop at 50,000');
+assert.ok(shared.includes('offset < 50000'),
+  'The mobile admin view keeps a 50,000-row safety ceiling; server worker pagination is independent');
 assert.ok(daily.includes(': Infinity;') && daily.includes('pendingDataErrors'),
   'The daily report must read beyond 5,000 and split pending reasons');
 assert.ok(workflow.includes('*/15 * * * *') && workflow.includes('SUPABASE_SERVICE_ROLE_KEY'),
