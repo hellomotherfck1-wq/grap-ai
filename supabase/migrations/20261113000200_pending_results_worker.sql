@@ -63,3 +63,6 @@ $function$;
 
 revoke all on function public.grap_ai_shared_signals_worker_patch(jsonb) from public, anon, authenticated;
 grant execute on function public.grap_ai_shared_signals_worker_patch(jsonb) to service_role;
+
+-- Make the new RPC visible to PostgREST immediately.
+notify pgrst, 'reload schema';
