@@ -1035,11 +1035,14 @@
     var average = completedTrades.length
       ? completedTrades.reduce(function (sum, r) { return sum + r.tradeResult.netPct; }, 0) / completedTrades.length : null;
     var wr = winRate(completedTrades);
-    var pending = all.filter(function (r) {
+    var pendingRecords = all.filter(function (r) {
       return r.directionStatus === 'pending' ||
         (r.decision === 'AL' && r.tradeStatus === 'pending') ||
         (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired');
-    }).length;
+    });
+    var pending = pendingRecords.length;
+    var pendingDataErrors = pendingRecords.filter(function (r) { return !!r.lastError; }).length;
+    var pendingNormal = pending - pendingDataErrors;
     var expired = all.filter(function (r) {
       return r.directionStatus === 'expired' ||
         (r.decision === 'AL' && r.tradeStatus === 'expired') ||
@@ -1059,7 +1062,9 @@
       ['SAT satış/tutma testi', String(completedSales.length)],
       ['SAT: satış daha iyi', String(salesBetter)],
       ['SAT: tutmak daha iyi', String(holdsBetter)],
-      ['Sonuç bekleyen', String(pending)],
+      ['Sonuç bekleyen toplam', String(pending)],
+      ['Normal bekleyen', String(pendingNormal)],
+      ['Veri hatası bekleyen', String(pendingDataErrors)],
       ['BEKLE değerlendirildi', String(observedWait.length)],
       ['Düşüşten kaçınma', String(avoided)],
       ['Yükseliş kaçırma', String(missed)],
@@ -1143,7 +1148,7 @@
     table.appendChild(body); wrap.appendChild(table); card.appendChild(wrap);
 
     card.appendChild(el('p', 'backtest-not',
-      'Spot AL simülasyonu sonraki mum açılışından başlar; stop/hedef veya 10 mum çıkışı kullanılır. Varsayılan toplam maliyet %0,20 olup yeni sinyaller için değiştirilebilir. SAT için short açılmaz: eldeki coin sonraki mum açılışında satılmış varsayılır ve 10 mum tutmaya kıyasla fiyat farkı ölçülür. SAT karşılaştırması komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy kârı değildir. Ajanların AL/SAT yön isabeti bütün kaydedilen oyların sonraki 10 kapanmış mumdaki fiyat yönüyle karşılaştırılmasıdır. BEKLE kazanma oranına katılmaz. İşlemler bağımsız sinyal bazındadır; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar Sonuç ekranını açınca ücretsiz kaynaktan güncellenir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
+      'Spot AL simülasyonu sonraki mum açılışından başlar; stop/hedef veya 10 mum çıkışı kullanılır. Varsayılan toplam maliyet %0,20 olup yeni sinyaller için değiştirilebilir. SAT için short açılmaz: eldeki coin sonraki mum açılışında satılmış varsayılır ve 10 mum tutmaya kıyasla fiyat farkı ölçülür. SAT karşılaştırması komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy kârı değildir. Ajanların AL/SAT yön isabeti bütün kaydedilen oyların sonraki 10 kapanmış mumdaki fiyat yönüyle karşılaştırılmasıdır. BEKLE kazanma oranına katılmaz. İşlemler bağımsız sinyal bazındadır; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar ortak havuzda yaklaşık 15 dakikada bir arka planda güncellenir; bu ekrandan elle de yenilenebilir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
     root.appendChild(card);
 
     refresh.addEventListener('click', function () { updateResults(); });
