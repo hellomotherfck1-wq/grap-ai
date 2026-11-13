@@ -624,5 +624,7 @@ module.exports = {
   groupPending: groupPending,
   normalizeBybitBars: normalizeBybitBars,
   normalizeGateBars: normalizeGateBars,
+  fetchBybitBars: fetchBybitBars,
+  fetchGateBars: fetchGateBars,
   safeError: safeError
 };
