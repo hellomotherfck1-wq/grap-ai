@@ -1244,6 +1244,7 @@
     if (button) button.disabled = true;
     setStatus('Bekleyen sinyallerin ücretsiz fiyat verileri kontrol ediliyor…');
     return prune().then(allRecords).then(function (records) {
+      records = records.filter(function (record) { return !isTestRecord(record); });
       var groups = Object.create(null);
       records.forEach(function (r) {
         var needsTrade = r.decision === 'AL' && r.tradeStatus === 'pending';
@@ -1352,6 +1353,7 @@
       }
       return Promise.all([worker(), worker(), worker()]).then(function () {
         return allRecords().then(function (fresh) {
+          fresh = fresh.filter(function (record) { return !isTestRecord(record); });
           render(fresh);
           var pendingNow = fresh.filter(function (r) {
             return r.directionStatus === 'pending' ||
