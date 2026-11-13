@@ -8,12 +8,31 @@ const daily = fs.readFileSync('scripts/admin-daily-agent.cjs', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/20261113000200_pending_results_worker.sql', 'utf8');
 const workflow = fs.readFileSync('.github/workflows/pending-results-worker.yml', 'utf8');
 
-new Function(fs.readFileSync('scripts/evaluate-pending-results.cjs', 'utf8'));
+const workerSource = fs.readFileSync('scripts/evaluate-pending-results.cjs', 'utf8');
+new Function(workerSource);
 
 assert.equal(worker.intervalMs('15m'), 900000);
 assert.equal(worker.intervalMs('1h'), 3600000);
 assert.equal(worker.intervalMs('4h'), 14400000);
 assert.equal(worker.intervalMs('1d'), 86400000);
+
+const bybitBars = worker.normalizeBybitBars([
+  ['2000000000000', '100', '110', '90', '105'],
+  ['1999999940000', '99', '101', '98', '100']
+]);
+assert.deepEqual(bybitBars, [
+  { t: 1999999940000, o: 99, h: 101, l: 98, c: 100 },
+  { t: 2000000000000, o: 100, h: 110, l: 90, c: 105 }
+]);
+const gateBars = worker.normalizeGateBars([
+  ['2000000000', '12', '105', '110', '90', '100']
+]);
+assert.deepEqual(gateBars, [
+  { t: 2000000000000, o: 100, h: 110, l: 90, c: 105 }
+]);
+assert.ok(workerSource.includes('api.bybit.com/v5/market/kline') &&
+  workerSource.includes('api.gateio.ws/api/v4/spot/candlesticks'),
+  'Crypto data evaluation must use the Bybit and Gate public candle APIs');
 
 const now = 2000000000000;
 const step = worker.intervalMs('1h');
