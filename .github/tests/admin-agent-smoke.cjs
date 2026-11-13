@@ -55,12 +55,21 @@ assert.ok(agent.includes('directional.reliable') && agent.includes('results.pend
   'Agent must summarize evaluated and pending signal results');
 assert.ok(agent.includes('groupErrors') && agent.includes('checkExternalApis'),
   'Agent must inspect recent errors and external data providers');
+assert.ok(agent.includes("const key = type + '|' + sourceLabel + '|' + clean") &&
+  agent.includes('softwareFindings') && agent.includes('analysisFindings'),
+  'Findings must be grouped by source/asset and separated into software versus analysis warnings');
+assert.ok(agent.includes('analysisWarningTotal') && agent.includes('softwareErrorTotal'),
+  'Report totals must keep software errors separate from auditor warnings');
+assert.ok(admin.includes('Yazılım ve API hataları') &&
+  admin.includes('Coin bazlı analiz / denetçi uyarıları') &&
+  admin.includes('Yazılım/API hatası') && admin.includes('Denetçi uyarısı'),
+  'Admin UI must display separate software-error and coin-level analysis-warning sections');
 assert.ok(agent.includes("url.searchParams.set('limit', String(count))") &&
   agent.includes("url.searchParams.set('offset', String(offset))") && !/Range:\s*offset/.test(agent),
   'Supabase pagination must use non-negative PostgREST offset/limit query parameters');
 assert.ok(!agent.includes('GITHUB_STEP_SUMMARY') && !agent.includes('writeStepSummary'),
   'Private report details must not be exposed in public workflow summaries');
-assert.ok(worker.includes('graph-ai-v52') && worker.includes('./js/system-monitor.js'),
+assert.ok(worker.includes('graph-ai-v53') && worker.includes('./js/system-monitor.js'),
   'Service worker must cache the monitor and use the new cache version');
 
 console.log('PASS daily admin agent, error logging, report privacy, and service-worker checks');
