@@ -22,6 +22,15 @@
     return typeof window !== 'undefined' && window.__GRAP_AI_E2E_TEST__ === true;
   }
 
+  function isTestSignal(record) {
+    if (!record) return false;
+    var sources = Array.isArray(record.sources) ? record.sources : [record.source];
+    var testSource = sources.some(function (source) {
+      return /^E2E(?:\b|[\s_-])/i.test(String(source || '').trim());
+    });
+    return testSource || /^E2E[A-Z0-9]*USDT$/i.test(String(record.symbol || ''));
+  }
+
   function uuid() {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') {
       return window.crypto.randomUUID();
@@ -202,7 +211,7 @@
             createdAt: Number(payload.createdAt) || dbCreated,
             updatedAt: Number(payload.updatedAt) || dbUpdated
           });
-        });
+        }).filter(function (record) { return !isTestSignal(record); });
         return { records: records, isAdmin: true, error: null };
       });
     }).catch(function (error) {
