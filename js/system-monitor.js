@@ -118,4 +118,10 @@
   }
 
   window.GrapAISystemMonitor = { log: log };
+  var pendingErrors = Array.isArray(window.__GrapAISystemPendingErrors)
+    ? window.__GrapAISystemPendingErrors.slice(0, 30) : [];
+  window.__GrapAISystemPendingErrors = [];
+  pendingErrors.forEach(function (item) {
+    if (item) log(item.type, item.source, item.message, item.details);
+  });
 })();
