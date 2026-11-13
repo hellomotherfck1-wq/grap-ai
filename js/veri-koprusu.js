@@ -81,21 +81,28 @@
     try { return validator(value) !== false; } catch (e) { return false; }
   }
 
-  function routeState(id) {
-    if (!routeHealth[id]) routeHealth[id] = { failures: 0, blockedUntil: 0 };
-    return routeHealth[id];
+  function routeKey(route, target) {
+    var host = 'unknown';
+    try { host = new URL(String(target)).hostname || host; } catch (e) {}
+    return route.id + '|' + host;
   }
 
-  function markRouteFailure(route, error) {
-    var state = routeState(route.id);
+  function routeState(route, target) {
+    var key = routeKey(route, target);
+    if (!routeHealth[key]) routeHealth[key] = { failures: 0, blockedUntil: 0 };
+    return routeHealth[key];
+  }
+
+  function markRouteFailure(route, target, error) {
+    var state = routeState(route, target);
     state.failures = Math.min(3, state.failures + 1);
     var delays = [0, 15000, 45000, 120000];
     state.blockedUntil = Date.now() + delays[state.failures];
     state.lastError = String(error && error.message ? error.message : error || 'Bilinmeyen hata').slice(0, 160);
   }
 
-  function markRouteSuccess(route) {
-    routeHealth[route.id] = { failures: 0, blockedUntil: 0, lastError: null };
+  function markRouteSuccess(route, target) {
+    routeHealth[routeKey(route, target)] = { failures: 0, blockedUntil: 0, lastError: null };
   }
 
   async function readRoute(route, target, type, timeoutMs) {
@@ -140,7 +147,7 @@
 
     for (var i = 0; i < routes.length; i++) {
       var route = routes[i];
-      var state = routeState(route.id);
+      var state = routeState(route, url);
       if (state.blockedUntil > Date.now()) {
         failures.push(route.name + ': geçici olarak beklemede');
         continue;
@@ -151,7 +158,7 @@
         if (!valid(value, options.validate)) {
           throw new Error('Kaynak yanıtı beklenen veri biçiminde değil');
         }
-        markRouteSuccess(route);
+        markRouteSuccess(route, url);
         cacheWrite(key, value);
         lastInfo[key] = {
           cached: false,
@@ -161,7 +168,7 @@
         };
         return value;
       } catch (error) {
-        markRouteFailure(route, error);
+        markRouteFailure(route, url, error);
         failures.push(route.name + ': ' + String(error && error.message ? error.message : error));
       }
     }
@@ -247,14 +254,20 @@
     },
     health: function () {
       return routes.map(function (route) {
-        var state = routeState(route.id);
-        return {
-          provider: route.name,
-          failures: state.failures,
-          coolingDown: state.blockedUntil > Date.now(),
-          retryAfterMs: Math.max(0, state.blockedUntil - Date.now()),
-          lastError: state.lastError || null
-        };
+        var prefix = route.id + '|';
+        var hosts = Object.keys(routeHealth).filter(function (key) {
+          return key.indexOf(prefix) === 0;
+        }).map(function (key) {
+          var state = routeHealth[key];
+          return {
+            host: key.slice(prefix.length),
+            failures: state.failures,
+            coolingDown: state.blockedUntil > Date.now(),
+            retryAfterMs: Math.max(0, state.blockedUntil - Date.now()),
+            lastError: state.lastError || null
+          };
+        });
+        return { provider: route.name, hosts: hosts };
       });
     },
     clear: function () {
