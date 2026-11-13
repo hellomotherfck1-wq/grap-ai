@@ -497,17 +497,21 @@ async function main() {
   const results = summarizeResults(signals);
   const visits = events.filter(function (event) { return event.event_type === 'visit'; }).length;
   const analyses = events.filter(function (event) { return event.event_type === 'analiz'; }).length;
-  const errorTotal = browserErrors.length + results.signalErrors + results.auditorErrorSignals + results.auditorWarningCount;
+  const softwareErrorTotal = browserErrors.length + results.signalErrors;
+  const analysisWarningTotal = results.auditorErrorSignals + results.auditorWarningCount;
+  const issueTotal = softwareErrorTotal + analysisWarningTotal;
   const criticalChecks = checks.filter(function (check) { return check.status === 'critical'; });
   const warningChecks = checks.filter(function (check) { return check.status === 'warning'; });
   const status = criticalChecks.length ? 'critical'
-    : (warningChecks.length || errorTotal ? 'warning' : 'ok');
+    : (warningChecks.length || issueTotal ? 'warning' : 'ok');
 
   let summary;
   if (status === 'critical') {
-    summary = 'Günlük kontrolde ' + criticalChecks.length + ' kritik sorun bulundu. Önce başarısız testler ve bağlantılar incelenmeli.';
+    summary = 'Günlük kontrolde ' + criticalChecks.length + ' kritik sistem kontrolü başarısız. Önce başarısız testler ve bağlantılar incelenmeli.';
   } else if (status === 'warning') {
-    summary = 'Sistem kontrolleri tamamlandı; ' + warningChecks.length + ' uyarı ve ' + errorTotal + ' hata/sinyal kaydı incelenmeli.';
+    summary = 'Sistem kontrolleri tamamlandı; ' + softwareErrorTotal +
+      ' yazılım/API hata kaydı ve ' + analysisWarningTotal +
+      ' analiz/denetçi uyarısı ayrı olarak raporlandı.';
   } else {
     summary = 'Günlük sistem kontrolü temiz. Kritik bağlantı veya test hatası görülmedi.';
   }
@@ -526,8 +530,13 @@ async function main() {
     commentary.push('Yön başarısı için 30 bağımsız örnek eşiği henüz karşılanmadı; oran güvenilir başarı olarak sunulmuyor.');
   }
   if (results.pending) commentary.push(results.pending + ' sinyalin değerlendirmesi bekliyor.');
-  if (errorTotal) commentary.push(errorTotal + ' hata/sinyal hata kaydı için aşağıdaki bulgular incelenmeli.');
-  if (!errorTotal) commentary.push('Son 24 saatte kaydedilmiş tarayıcı veya sinyal hatası yok.');
+  if (softwareErrorTotal) {
+    commentary.push(softwareErrorTotal + ' yazılım/API hata kaydı var; bunlar coin bazında ayrı gruplandı.');
+  }
+  if (analysisWarningTotal) {
+    commentary.push(analysisWarningTotal + ' denetçi uyarısı var; bunlar yazılım arızalarından ayrı analiz riski olarak gösteriliyor.');
+  }
+  if (!issueTotal) commentary.push('Son 24 saatte yazılım veya analiz uyarısı kaydedilmedi.');
 
   const report = {
     report_date: turkeyDate(),
@@ -541,12 +550,16 @@ async function main() {
       timezone: 'Europe/Istanbul',
       checks: checks,
       errors: {
-        total: errorTotal,
+        total: softwareErrorTotal,
+        softwareTotal: softwareErrorTotal,
+        analysisWarningTotal: analysisWarningTotal,
         browser: browserErrors.length,
         signal: results.signalErrors,
         auditor: results.auditorErrorSignals,
         auditorWarnings: results.auditorWarningCount,
-        findings: findings
+        findings: findings.findings,
+        softwareFindings: findings.softwareFindings,
+        analysisFindings: findings.analysisFindings
       },
       results: results,
       activity: { windowDays: 7, visits: visits, analyses: analyses },
