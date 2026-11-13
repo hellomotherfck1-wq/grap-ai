@@ -1,18 +1,9 @@
 (function () {
   'use strict';
 
-  var PROXY = 'https://grafik-vekil.hellomotherfck1.workers.dev/?u=';
-  var ALL_ORIGINS = 'https://api.allorigins.win/raw?url=';
   var KAP = 'https://www.kap.org.tr';
   var YAHOO = 'https://query1.finance.yahoo.com';
   var MAX_AGE = 7 * 24 * 60 * 60 * 1000;
-
-  function logFinalSourceFailure(url, error) {
-    if (window.GrapAISystemMonitor &&
-        typeof window.GrapAISystemMonitor.apiFailure === 'function') {
-      window.GrapAISystemMonitor.apiFailure(url || 'Haber veri kaynağı', error, { service: 'haber' });
-    }
-  }
 
   function norm(value) {
     return String(value || '').toLocaleLowerCase('tr-TR')
@@ -53,45 +44,27 @@
   }
 
   async function getText(url) {
-    var routes = [PROXY + encodeURIComponent(url), ALL_ORIGINS + encodeURIComponent(url)];
-    var lastError;
-    for (var i = 0; i < routes.length; i++) {
-      var controller = new AbortController();
-      var timer = setTimeout(function () { controller.abort(); }, 16000);
-      try {
-        var response = await fetch(routes[i], { method: 'GET', cache: 'no-store', signal: controller.signal });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return await response.text();
-      } catch (error) {
-        lastError = error && error.name === 'AbortError' ? new Error('Kaynak zaman aşımına uğradı') : error;
-      } finally {
-        clearTimeout(timer);
+    if (!window.GrapAIDataTransport) throw new Error('Ortak veri aktarım katmanı yüklenmedi.');
+    return window.GrapAIDataTransport.text(url, {
+      cacheTtlMs: 10 * 60 * 1000,
+      staleMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
+      timeoutMs: 6500,
+      validate: function (value) {
+        return typeof value === 'string' && /<rss\\b|<feed\\b/i.test(value);
       }
-    }
-    var finalError = lastError || new Error('Haber kaynağına erişilemedi');
-    logFinalSourceFailure(url, finalError);
-    throw finalError;
+    });
   }
 
   async function getJson(url) {
-    var routes = [PROXY + encodeURIComponent(url), ALL_ORIGINS + encodeURIComponent(url)];
-    var lastError;
-    for (var i = 0; i < routes.length; i++) {
-      var controller = new AbortController();
-      var timer = setTimeout(function () { controller.abort(); }, 16000);
-      try {
-        var response = await fetch(routes[i], { method: 'GET', cache: 'no-store', signal: controller.signal });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return await response.json();
-      } catch (error) {
-        lastError = error && error.name === 'AbortError' ? new Error('Kaynak zaman aşımına uğradı') : error;
-      } finally {
-        clearTimeout(timer);
+    if (!window.GrapAIDataTransport) throw new Error('Ortak veri aktarım katmanı yüklenmedi.');
+    return window.GrapAIDataTransport.json(url, {
+      cacheTtlMs: 10 * 60 * 1000,
+      staleMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
+      timeoutMs: 6500,
+      validate: function (value) {
+        return value !== null && typeof value === 'object';
       }
-    }
-    var finalError = lastError || new Error('Haber kaynağına erişilemedi');
-    logFinalSourceFailure(url, finalError);
-    throw finalError;
+    });
   }
 
   function codeOf(asset) {
