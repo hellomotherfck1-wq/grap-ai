@@ -52,9 +52,11 @@ assert.ok(agent.includes('const recentSignalErrors = signals.filter') &&
   agent.includes('NOW.getTime() - 24 * 60 * 60 * 1000') &&
   agent.includes('groupErrors(browserErrors, signals, recentSignalErrors)'),
   'Daily software-error report must exclude stale lastError values from the 30-day signal window');
-assert.ok(admin.includes('Farklı yazılım/API hatası') &&
-  admin.includes('Tekrarlanan hata kaydı'),
-  'Admin metrics must distinguish unique software errors from repeated event records');
+assert.ok(admin.includes('function raporGorunumu') &&
+  !admin.includes('Farklı yazılım/API hatası') &&
+  !admin.includes('Yazılım ve API hataları') &&
+  admin.includes('Geçici yazılım/API bağlantı kayıtları gösterilmiyor'),
+  'Routine software/API errors must stay hidden from the admin UI');
 assert.ok(!/SUPABASE_SERVICE_ROLE_KEY|service_role\s*[:=]\s*['\"][^'\"]+/i.test(admin + monitor + html),
   'No privileged Supabase key may be shipped to browser files');
 
@@ -85,19 +87,28 @@ assert.ok(!agent.includes('.slice(0, 8)'),
   'Coin-level analysis findings must not be silently truncated to a small fixed number');
 assert.ok(agent.includes('analysisWarningTotal') && agent.includes('softwareErrorTotal'),
   'Report totals must keep software errors separate from auditor warnings');
+assert.ok(agent.includes("binanceResults.length ? 'ok' : 'info'") &&
+  agent.includes("count ? 'ok' : 'info'") &&
+  agent.includes("'Arka plan tanılama kayıtları', 'info'") &&
+  agent.includes("warningChecks.length || analysisWarningTotal ? 'warning' : 'ok'") &&
+  !agent.includes('const issueTotal = softwareErrorTotal + analysisWarningTotal'),
+  'Transient provider and browser noise must not change user-facing status; critical checks remain active');
+assert.ok(agent.includes('softwareFindings: findings.softwareFindings') &&
+  agent.includes('softwareOccurrences: softwareErrorOccurrences'),
+  'Hidden software/API diagnostics must remain stored privately for troubleshooting');
 assert.ok(agent.includes('const analysisWarningTotal = signals.filter') &&
   agent.includes('Number(payload.auditorWarningCount) > 0'),
   'Each signal with auditor findings must be counted once even if it has multiple warning items');
-assert.ok(admin.includes('Yazılım ve API hataları') &&
-  admin.includes('Coin bazlı analiz / denetçi uyarıları') &&
-  admin.includes('Farklı yazılım/API hatası') && admin.includes('Denetçi uyarısı'),
-  'Admin UI must display separate software-error and coin-level analysis-warning sections');
+assert.ok(admin.includes('Coin bazlı analiz / denetçi uyarıları') &&
+  admin.includes('Denetçi uyarısı') &&
+  !admin.includes("raporBulguBolumu('Yazılım ve API hataları'"),
+  'Admin UI must show analysis warnings but not routine software/API error cards');
 assert.ok(agent.includes("url.searchParams.set('limit', String(count))") &&
   agent.includes("url.searchParams.set('offset', String(offset))") && !/Range:\s*offset/.test(agent),
   'Supabase pagination must use non-negative PostgREST offset/limit query parameters');
 assert.ok(!agent.includes('GITHUB_STEP_SUMMARY') && !agent.includes('writeStepSummary'),
   'Private report details must not be exposed in public workflow summaries');
-assert.ok(worker.includes('graph-ai-v55') && worker.includes('./js/system-monitor.js') &&
+assert.ok(worker.includes('graph-ai-v56') && worker.includes('./js/system-monitor.js') &&
   worker.includes('./js/veri-koprusu.js'),
   'Service worker must cache the monitor and shared data transport with the new cache version');
 
