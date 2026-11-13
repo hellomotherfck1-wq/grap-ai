@@ -51,6 +51,15 @@ assert.deepEqual(worker.summarizePending(pendingRows), {
 assert.equal(worker.shouldEvaluate(waitRecord, now), true);
 assert.equal(worker.shouldEvaluate(Object.assign({}, waitRecord, { nextCheckAt: now + 1000 }), now), false);
 assert.equal(worker.shouldEvaluate(Object.assign({}, waitRecord, { signalAt: now }), now), false);
+const delayedError = Object.assign({}, waitRecord, {
+  lastError: 'HTTP 503',
+  nextCheckAt: now + 1000
+});
+assert.equal(worker.shouldEvaluate(delayedError, now), false);
+assert.equal(worker.shouldEvaluate(delayedError, now, { forceRetryErrors: true }), true,
+  'Manual diagnostic retry must bypass the cooldown only for records with data errors');
+assert.equal(worker.groupPending([delayedError], now).length, 0);
+assert.equal(worker.groupPending([delayedError], now, { forceRetryErrors: true }).length, 1);
 assert.equal(worker.groupPending([waitRecord], now).length, 1);
 
 const expired = worker.expiredPatch({
@@ -65,8 +74,9 @@ assert.ok(shared.includes('offset < 50000'),
   'The mobile admin view keeps a 50,000-row safety ceiling; server worker pagination is independent');
 assert.ok(daily.includes(': Infinity;') && daily.includes('pendingDataErrors'),
   'The daily report must read beyond 5,000 and split pending reasons');
-assert.ok(workflow.includes('*/15 * * * *') && workflow.includes('SUPABASE_SERVICE_ROLE_KEY'),
-  'The background worker must run every 15 minutes using only the Actions secret');
+assert.ok(workflow.includes('*/15 * * * *') && workflow.includes('SUPABASE_SERVICE_ROLE_KEY') &&
+  workflow.includes('retry_data_errors') && workflow.includes('RETRY_DATA_ERRORS'),
+  'The background worker must run every 15 minutes and support a manual data-error retry using only the Actions secret');
 assert.ok(migration.includes("auth.role(), '') <> 'service_role'") &&
   migration.includes('grant execute on function public.grap_ai_shared_signals_worker_patch(jsonb) to service_role') &&
   migration.includes("notify pgrst, 'reload schema'"),
