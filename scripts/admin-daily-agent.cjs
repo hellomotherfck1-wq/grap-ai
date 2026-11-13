@@ -122,6 +122,16 @@ function safeText(value) {
     .slice(0, 450);
 }
 
+function isTestSignalRow(row) {
+  const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+  const sources = Array.isArray(payload.sources) ? payload.sources : [payload.source];
+  const testSource = sources.some(function (source) {
+    return /^E2E(?:\b|[\s_-])/i.test(String(source || '').trim());
+  });
+  const symbol = String(row && row.symbol || payload.symbol || '');
+  return testSource || /^E2E[A-Z0-9]*USDT$/i.test(symbol);
+}
+
 function groupErrors(events, signals, recentErrorSignals) {
   const softwareGroups = new Map();
   const analysisGroups = new Map();
@@ -489,12 +499,16 @@ async function main() {
   }
 
   try {
-    signals = await supabaseRows('agent_signals_shared', {
+    const fetchedSignals = await supabaseRows('agent_signals_shared', {
       select: 'signal_id,symbol,market,timeframe,decision,signal_at,payload,created_at,updated_at',
       created_at: 'gte.' + isoAgo(24 * 30),
       order: 'signal_at.desc'
     });
-    addCheck(checks, 'Supabase ortak sonuç havuzu', 'ok', 'Son 30 günden ' + signals.length + ' sinyal okundu.');
+    const ignoredTestSignals = fetchedSignals.filter(isTestSignalRow).length;
+    signals = fetchedSignals.filter(function (row) { return !isTestSignalRow(row); });
+    addCheck(checks, 'Supabase ortak sonuç havuzu', 'ok',
+      'Son 30 günden ' + signals.length + ' gerçek sinyal okundu; ' +
+      ignoredTestSignals + ' otomatik test kaydı rapor dışında bırakıldı.');
   } catch (error) {
     addCheck(checks, 'Supabase ortak sonuç havuzu', 'critical', error.message);
   }
