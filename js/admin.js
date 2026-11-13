@@ -200,6 +200,9 @@
       'Satış daha iyi ' + ((results.spotSAT || {}).sellBetter || 0) +
       ' · Tutmak daha iyi ' + ((results.spotSAT || {}).holdBetter || 0) +
       ' · Benzer ' + ((results.spotSAT || {}).similar || 0));
+    raporSatir(sonuclar, 'BEKLE değerlendirmesi',
+      'Düşüşten kaçınma ' + ((results.waitResults || {}).avoidDown || 0) +
+      ' · Yükseliş kaçırma ' + ((results.waitResults || {}).missedUp || 0));
     const caution = document.createElement('p');
     caution.className = 'admin-rapor-bos';
     caution.textContent = results.caution || 'Sinyal ölçümleri gerçek portföy getirisi değildir.';
