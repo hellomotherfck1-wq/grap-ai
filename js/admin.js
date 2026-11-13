@@ -78,6 +78,186 @@
 
   let istatistikYukleniyor = false;
 
+  let ajanRaporuYukleniyor = false;
+
+  function raporTarihi(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? String(value) : date.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
+  }
+
+  function raporMetrik(parent, label, value) {
+    const item = document.createElement('div');
+    item.className = 'admin-rapor-metrik';
+    const name = document.createElement('span');
+    name.textContent = label;
+    const number = document.createElement('strong');
+    number.textContent = String(value);
+    item.append(name, number);
+    parent.appendChild(item);
+  }
+
+  function raporSatir(parent, label, value, status) {
+    const item = document.createElement('div');
+    item.className = 'admin-rapor-satir' + (status ? ' durum-' + status : '');
+    const name = document.createElement('span');
+    name.textContent = label;
+    const detail = document.createElement('strong');
+    detail.textContent = String(value);
+    item.append(name, detail);
+    parent.appendChild(item);
+  }
+
+  function ajanRaporuCiz(reports) {
+    const durum = $('admin-ajan-durum');
+    const ozet = $('admin-ajan-ozet');
+    const metrikler = $('admin-ajan-metrikler');
+    const hatalar = $('admin-ajan-hatalar');
+    const kontroller = $('admin-ajan-kontroller');
+    const sonuclar = $('admin-ajan-sonuclar');
+    const zaman = $('admin-ajan-zaman');
+    const gecmis = $('admin-ajan-gecmis');
+    if (!durum || !ozet || !metrikler || !hatalar || !kontroller || !sonuclar) return;
+
+    [metrikler, hatalar, kontroller, sonuclar, gecmis].forEach(function (node) {
+      if (node) node.replaceChildren();
+    });
+
+    if (!Array.isArray(reports) || !reports.length) {
+      durum.className = 'admin-rapor-durum admin-rapor-bekle';
+      durum.textContent = 'RAPOR BEKLENİYOR';
+      ozet.textContent = 'Henüz günlük rapor kaydı yok. Supabase günlük ajan SQL kurulumu ve GitHub Actions secret ayarından sonra ilk rapor burada görünecek.';
+      raporSatir(kontroller, 'Günlük ajan', 'İlk çalıştırma bekleniyor', 'warning');
+      if (zaman) zaman.textContent = 'Rapor henüz oluşturulmadı.';
+      return;
+    }
+
+    const latest = reports[0];
+    const details = latest.details || {};
+    const results = details.results || {};
+    const errors = details.errors || {};
+    const activity = details.activity || {};
+    const status = ['ok', 'warning', 'critical'].indexOf(latest.status) >= 0 ? latest.status : 'warning';
+
+    durum.className = 'admin-rapor-durum admin-rapor-' + status;
+    durum.textContent = status === 'ok' ? 'SİSTEM NORMAL' : status === 'critical' ? 'KRİTİK SORUN' : 'UYARI VAR';
+    ozet.textContent = latest.summary || 'Günlük sistem raporu hazır.';
+    raporMetrik(metrikler, 'Son 30 gün sinyal', results.totalSignals || 0);
+    raporMetrik(metrikler, 'Tamamlanan ölçüm', results.completedDirection || 0);
+    raporMetrik(metrikler, 'Bekleyen sonuç', results.pending || 0);
+    raporMetrik(metrikler, 'Hata kaydı', errors.total || 0);
+    raporMetrik(metrikler, '7 gün ziyaret', activity.visits || 0);
+    raporMetrik(metrikler, '7 gün analiz', activity.analyses || 0);
+
+    const findings = Array.isArray(errors.findings) ? errors.findings : [];
+    if (!findings.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-rapor-bos';
+      empty.textContent = 'Rapor içinde hata bulgusu bulunmuyor.';
+      hatalar.appendChild(empty);
+    } else {
+      findings.forEach(function (finding) {
+        const card = document.createElement('div');
+        card.className = 'admin-rapor-bulgu admin-rapor-bulgu-' + (finding.severity || 'info');
+        const title = document.createElement('strong');
+        title.textContent = finding.title || 'Hata bulgusu';
+        const meta = document.createElement('small');
+        meta.textContent = (finding.source || 'Kaynak bilinmiyor') +
+          ' · Tekrar: ' + (finding.count || 0) +
+          (finding.lastSeen ? ' · Son: ' + raporTarihi(finding.lastSeen) : '');
+        const explanation = document.createElement('p');
+        explanation.textContent = finding.explanation || 'Ajan bu hata için ek açıklama bulamadı.';
+        const action = document.createElement('p');
+        action.className = 'admin-rapor-oneri';
+        action.textContent = 'Öneri: ' + (finding.action || 'Tekrar edip etmediğini izle.');
+        card.append(title, meta, explanation, action);
+        hatalar.appendChild(card);
+      });
+    }
+
+    const checks = Array.isArray(details.checks) ? details.checks : [];
+    if (!checks.length) {
+      raporSatir(kontroller, 'Kontroller', 'Rapor ayrıntısı bulunamadı', 'warning');
+    } else {
+      checks.forEach(function (check) {
+        raporSatir(kontroller, check.name || 'Kontrol', check.detail || check.status || '—',
+          check.status === 'ok' ? 'ok' : check.status === 'critical' ? 'critical' : 'warning');
+      });
+    }
+
+    const decisions = results.decisions || {};
+    raporSatir(sonuclar, 'Karar dağılımı',
+      'AL ' + (decisions.AL || 0) + ' · SAT ' + (decisions.SAT || 0) + ' · BEKLE ' + (decisions.BEKLE || 0));
+    const directional = results.directional || {};
+    const rateText = directional.reliable && Number.isFinite(Number(directional.rate))
+      ? '%' + Number(directional.rate).toFixed(1).replace('.', ',') + ' (' + (directional.correct || 0) + ' doğru / ' + (directional.wrong || 0) + ' yanlış)'
+      : 'Yeterli bağımsız örnek yok (' + (directional.sampleCount || 0) + '/30)';
+    raporSatir(sonuclar, 'Yön ölçümü', rateText);
+    raporSatir(sonuclar, 'Spot AL simülasyonu',
+      'Kârlı ' + ((results.spotAL || {}).wins || 0) + ' · Zararlı ' + ((results.spotAL || {}).losses || 0) +
+      ' · Başa baş ' + ((results.spotAL || {}).flat || 0));
+    raporSatir(sonuclar, 'Spot SAT karşılaştırması',
+      'Satış daha iyi ' + ((results.spotSAT || {}).sellBetter || 0) +
+      ' · Tutmak daha iyi ' + ((results.spotSAT || {}).holdBetter || 0) +
+      ' · Benzer ' + ((results.spotSAT || {}).similar || 0));
+    const caution = document.createElement('p');
+    caution.className = 'admin-rapor-bos';
+    caution.textContent = results.caution || 'Sinyal ölçümleri gerçek portföy getirisi değildir.';
+    sonuclar.appendChild(caution);
+
+    if (Array.isArray(details.commentary)) {
+      details.commentary.forEach(function (line) {
+        const p = document.createElement('p');
+        p.className = 'admin-rapor-yorum';
+        p.textContent = line;
+        sonuclar.appendChild(p);
+      });
+    }
+
+    if (zaman) {
+      zaman.textContent = 'Rapor tarihi: ' + (latest.report_date || '—') +
+        ' · Son kontrol: ' + raporTarihi(latest.checked_at);
+    }
+
+    if (gecmis && reports.length > 1) {
+      reports.slice(1).forEach(function (item) {
+        const detailsNode = document.createElement('details');
+        detailsNode.className = 'admin-rapor-gecmis';
+        const summary = document.createElement('summary');
+        summary.textContent = (item.report_date || 'Eski rapor') + ' · ' +
+          (item.status === 'ok' ? 'Normal' : item.status === 'critical' ? 'Kritik' : 'Uyarı');
+        const paragraph = document.createElement('p');
+        paragraph.textContent = item.summary || 'Özet bulunmuyor.';
+        detailsNode.append(summary, paragraph);
+        gecmis.appendChild(detailsNode);
+      });
+    }
+  }
+
+  async function ajanRaporuYukle() {
+    const durum = $('admin-ajan-durum');
+    const ozet = $('admin-ajan-ozet');
+    if (!supabase || ajanRaporuYukleniyor || !durum || !ozet) return;
+    ajanRaporuYukleniyor = true;
+    durum.textContent = 'RAPOR YÜKLENİYOR…';
+    try {
+      const { data, error } = await supabase
+        .from('admin_daily_reports')
+        .select('report_date,status,summary,details,checked_at')
+        .order('report_date', { ascending: false })
+        .limit(7);
+      if (error) throw error;
+      ajanRaporuCiz(Array.isArray(data) ? data : []);
+    } catch (error) {
+      durum.className = 'admin-rapor-durum admin-rapor-warning';
+      durum.textContent = 'RAPOR OKUNAMADI';
+      ozet.textContent = 'Günlük rapor alınamadı: ' + (error && error.message ? error.message : String(error)) +
+        ' · Supabase migration ve yönetici okuma iznini kontrol et.';
+    } finally {
+      ajanRaporuYukleniyor = false;
+    }
+  }
+
   async function istatistikYukle() {
     const ist = $('istatistikler');
     const sonlar = $('son-analizler');
@@ -195,6 +375,7 @@
       panel.hidden = false;
       mesaj('Yönetici oturumu açık.');
       await istatistikYukle();
+      await ajanRaporuYukle();
     } catch (e) {
       await ortakHavuzYetkisi(false);
       giris.hidden = false;
@@ -221,7 +402,7 @@
       const cikisBtn = $('admin-cikis-btn');
       const yenileBtn = $('admin-yenile-btn');
 
-      if (yenileBtn) yenileBtn.addEventListener('click', () => istatistikYukle());
+      if (yenileBtn) yenileBtn.addEventListener('click', () => { istatistikYukle(); ajanRaporuYukle(); });
 
       if (girisBtn) girisBtn.addEventListener('click', async () => {
         if (girisBtn.disabled) return;
