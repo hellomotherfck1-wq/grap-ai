@@ -7,6 +7,7 @@
 
   var DEVICE_KEY = 'grap-ai-system-monitor-device-v1';
   var lastLogged = Object.create(null);
+  var ephemeralDeviceId = null;
   var monitoredHosts = [
     'binance.com', 'binance.vision', 'finance.yahoo.com',
     'grafik-vekil.hellomotherfck1.workers.dev', 'allorigins.win',
@@ -26,10 +27,13 @@
       localStorage.setItem(DEVICE_KEY, saved);
       return saved;
     } catch (e) {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0;
-        return (c === 'x' ? r : (r & 3 | 8)).toString(16);
-      });
+      if (!ephemeralDeviceId) {
+        ephemeralDeviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          var r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+        });
+      }
+      return ephemeralDeviceId;
     }
   }
 
