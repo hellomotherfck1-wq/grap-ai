@@ -325,31 +325,78 @@ async function readAllSignals() {
   return rows;
 }
 
-async function fetchBinanceBars(symbol, timeframe) {
-  const hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
-  let lastError = null;
-  for (const host of hosts) {
-    try {
-      const url = host + '/api/v3/klines?symbol=' + encodeURIComponent(symbol) +
-        '&interval=' + encodeURIComponent(timeframe) + '&limit=1000';
-      const result = await fetchJson(url, { Accept: 'application/json' }, 18000);
-      if (!Array.isArray(result.data)) throw new Error('Binance mum yanıtı geçersiz.');
-      const bars = result.data.map(function (row) {
-        return {
-          t: Number(row[0]), o: Number(row[1]), h: Number(row[2]),
-          l: Number(row[3]), c: Number(row[4])
-        };
-      }).filter(function (bar) {
-        return isNumber(bar.t) && isNumber(bar.o) && isNumber(bar.h) &&
-          isNumber(bar.l) && isNumber(bar.c);
-      });
-      if (bars.length < 80) throw new Error('Yeterli Binance geçmiş verisi yok.');
-      return bars;
-    } catch (error) {
-      lastError = error;
-    }
+function normalizeBybitBars(rows) {
+  return (Array.isArray(rows) ? rows : []).map(function (row) {
+    return {
+      t: Number(row[0]), o: Number(row[1]), h: Number(row[2]),
+      l: Number(row[3]), c: Number(row[4])
+    };
+  }).filter(function (bar) {
+    return isNumber(bar.t) && isNumber(bar.o) && isNumber(bar.h) &&
+      isNumber(bar.l) && isNumber(bar.c);
+  }).sort(function (a, b) { return a.t - b.t; });
+}
+
+function normalizeGateBars(rows) {
+  return (Array.isArray(rows) ? rows : []).map(function (row) {
+    return {
+      t: Number(row[0]) * 1000,
+      o: Number(row[5]),
+      h: Number(row[3]),
+      l: Number(row[4]),
+      c: Number(row[2])
+    };
+  }).filter(function (bar) {
+    return isNumber(bar.t) && isNumber(bar.o) && isNumber(bar.h) &&
+      isNumber(bar.l) && isNumber(bar.c);
+  }).sort(function (a, b) { return a.t - b.t; });
+}
+
+async function fetchBybitBars(symbol, timeframe) {
+  const intervals = { '15m': '15', '1h': '60', '4h': '240', '1d': 'D' };
+  const interval = intervals[timeframe];
+  if (!interval) throw new Error('Bybit bu zaman dilimini desteklemiyor: ' + timeframe);
+  const url = 'https://api.bybit.com/v5/market/kline?category=spot&symbol=' +
+    encodeURIComponent(symbol) + '&interval=' + interval + '&limit=1000';
+  const result = await fetchJson(url, { Accept: 'application/json' }, 18000);
+  const payload = result.data || {};
+  if (Number(payload.retCode) !== 0) {
+    throw new Error('Bybit API ' + String(payload.retCode) + ': ' +
+      String(payload.retMsg || 'Piyasa verisi alınamadı.'));
   }
-  throw lastError || new Error('Binance verisi alınamadı.');
+  const bars = normalizeBybitBars(payload.result && payload.result.list);
+  if (bars.length < 80) throw new Error('Yeterli Bybit geçmiş verisi yok.');
+  return bars;
+}
+
+async function fetchGateBars(symbol, timeframe) {
+  const intervals = { '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d' };
+  const interval = intervals[timeframe];
+  if (!interval) throw new Error('Gate.io bu zaman dilimini desteklemiyor: ' + timeframe);
+  const base = String(symbol).replace(/USDT$/i, '');
+  const pair = base + '_USDT';
+  const url = 'https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=' +
+    encodeURIComponent(pair) + '&interval=' + interval + '&limit=1000';
+  const result = await fetchJson(url, { Accept: 'application/json' }, 18000);
+  if (!Array.isArray(result.data)) throw new Error('Gate.io mum yanıtı geçersiz.');
+  const bars = normalizeGateBars(result.data);
+  if (bars.length < 80) throw new Error('Yeterli Gate.io geçmiş verisi yok.');
+  return bars;
+}
+
+async function fetchCryptoBars(symbol, timeframe) {
+  const errors = [];
+  try {
+    return await fetchBybitBars(symbol, timeframe);
+  } catch (error) {
+    errors.push('Bybit: ' + safeError(error));
+  }
+  try {
+    return await fetchGateBars(symbol, timeframe);
+  } catch (error) {
+    errors.push('Gate.io: ' + safeError(error));
+  }
+  throw new Error('Kripto veri kaynakları yanıt vermedi. ' + errors.join(' | '));
 }
 
 async function fetchYahooBars(symbol, timeframe) {
@@ -392,7 +439,7 @@ async function fetchYahooBars(symbol, timeframe) {
 
 async function fetchGroupBars(group) {
   if (group.market === 'Kripto' || /USDT$/i.test(group.symbol)) {
-    return fetchBinanceBars(group.symbol, group.timeframe);
+    return fetchCryptoBars(group.symbol, group.timeframe);
   }
   if (group.market === 'BIST' && group.timeframe !== '1d') {
     throw new Error('BIST geçmiş verisi yalnızca günlük periyotta destekleniyor.');
@@ -555,5 +602,7 @@ module.exports = {
   expiredPatch: expiredPatch,
   evaluationPatch: evaluationPatch,
   groupPending: groupPending,
+  normalizeBybitBars: normalizeBybitBars,
+  normalizeGateBars: normalizeGateBars,
   safeError: safeError
 };
