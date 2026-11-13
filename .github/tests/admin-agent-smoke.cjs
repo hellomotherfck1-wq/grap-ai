@@ -39,6 +39,10 @@ assert.ok(!monitor.includes('var originalFetch = window.fetch') &&
 assert.ok(agent.includes('event.details.final === true') &&
   agent.includes('findings.softwareFindings.length') && agent.includes('softwareErrorOccurrences'),
   'Daily report must ignore legacy per-attempt API noise and separate distinct errors from repeated records');
+assert.ok(agent.includes('const recentSignalErrors = signals.filter') &&
+  agent.includes('NOW.getTime() - 24 * 60 * 60 * 1000') &&
+  agent.includes('groupErrors(browserErrors, signals, recentSignalErrors)'),
+  'Daily software-error report must exclude stale lastError values from the 30-day signal window');
 assert.ok(admin.includes('Farklı yazılım/API hatası') &&
   admin.includes('Tekrarlanan hata kaydı'),
   'Admin metrics must distinguish unique software errors from repeated event records');
