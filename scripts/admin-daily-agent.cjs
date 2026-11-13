@@ -80,26 +80,33 @@ function supabaseHeaders() {
 async function supabaseRows(table, filters, maxRows) {
   const rows = [];
   const pageSize = 1000;
-  for (let offset = 0; offset < (maxRows || 5000); offset += pageSize) {
+  const requestedMax = Number(maxRows);
+  const totalLimit = Number.isFinite(requestedMax) && requestedMax > 0
+    ? Math.floor(requestedMax) : 5000;
+
+  for (let offset = 0; offset < totalLimit; offset += pageSize) {
     const url = new URL(SUPABASE_URL + '/rest/v1/' + table);
     Object.keys(filters || {}).forEach(function (key) {
       url.searchParams.set(key, filters[key]);
     });
-    const count = Math.min(pageSize, (maxRows || 5000) - offset);
+
+    const count = Math.min(pageSize, totalLimit - offset);
+    if (count <= 0) break;
+
+    // Use PostgREST's query pagination consistently. Combining Range headers
+    // with a limit query parameter can produce PGRST103 on some deployments.
     url.searchParams.set('limit', String(count));
+    url.searchParams.set('offset', String(offset));
+
     let result;
     try {
-      result = await fetchJson(url.toString(), Object.assign({}, supabaseHeaders(), {
-        Range: offset + '-' + (offset + count - 1)
-      }), 15000);
+      result = await fetchJson(url.toString(), supabaseHeaders(), 15000);
     } catch (error) {
-      // PostgREST returns 416 when the next page starts beyond the final row.
-      // This commonly happens when the result count is an exact page-size multiple.
-      if (rows.length > 0 && /HTTP 416|Requested range not satisfiable/i.test(error.message)) {
-        break;
-      }
+      // An out-of-range page means there are no more rows to read.
+      if (/HTTP 416|Requested range not satisfiable/i.test(error.message)) break;
       throw error;
     }
+
     const page = Array.isArray(result.data) ? result.data : [];
     rows.push.apply(rows, page);
     if (page.length < count) break;
