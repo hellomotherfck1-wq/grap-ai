@@ -1,7 +1,6 @@
 (function () {
   'use strict';
 
-  var PROXY = 'https://grafik-vekil.hellomotherfck1.workers.dev/?u=';
   var YAHOO = 'https://query1.finance.yahoo.com';
 
   function raw(x) {
@@ -37,29 +36,15 @@
   }
 
   async function jsonGet(url) {
-    var routes = [
-      PROXY + encodeURIComponent(url),
-      'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
-    ];
-    var lastError;
-    for (var i = 0; i < routes.length; i++) {
-      var controller = new AbortController();
-      var timer = setTimeout(function () { controller.abort(); }, 18000);
-      try {
-        var response = await fetch(routes[i], {
-          method: 'GET',
-          cache: 'no-store',
-          signal: controller.signal
-        });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return await response.json();
-      } catch (e) {
-        lastError = e && e.name === 'AbortError' ? new Error('kaynak zaman aşımına uğradı') : e;
-      } finally {
-        clearTimeout(timer);
+    if (!window.GrapAIDataTransport) throw new Error('Ortak veri aktarım katmanı yüklenmedi.');
+    return window.GrapAIDataTransport.json(url, {
+      cacheTtlMs: 10 * 60 * 1000,
+      staleMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
+      timeoutMs: 6500,
+      validate: function (value) {
+        return !!(value && typeof value === 'object' && Array.isArray(value.news));
       }
-    }
-    throw lastError || new Error('Ücretsiz haber kaynağına erişilemedi');
+    });
   }
 
   async function haberGetir(sembol) {
