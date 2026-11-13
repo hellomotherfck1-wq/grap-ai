@@ -312,6 +312,7 @@ button:focus-visible, summary:focus-visible, label:focus-visible { outline: 2px 
 .admin-rapor-satir.durum-ok strong { color: #8bd7b0; }
 .admin-rapor-satir.durum-warning strong { color: #e8c778; }
 .admin-rapor-satir.durum-critical strong { color: #ffaaa5; }
+.admin-rapor-satir.durum-info strong { color: var(--soluk); }
 .admin-rapor-bulgu { padding: 10px; border: 1px solid var(--kenar); border-radius: 10px; background: rgba(10,17,25,.45); }
 .admin-rapor-bulgu strong { display: block; font-size: 12px; overflow-wrap: anywhere; }
 .admin-rapor-bulgu small { display: block; margin-top: 4px; color: var(--soluk); font-size: 10px; }
