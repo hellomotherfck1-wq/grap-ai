@@ -483,11 +483,16 @@ async function main() {
   }
 
   try {
-    browserErrors = await supabaseRows('admin_system_events', {
+    browserErrors = (await supabaseRows('admin_system_events', {
       select: 'event_type,source,message,details,created_at',
       created_at: 'gte.' + isoAgo(24),
       order: 'created_at.desc'
-    }, 1000);
+    }, 1000)).filter(function (event) {
+      // Older monitor versions logged every failed fallback attempt. Only keep
+      // API events explicitly marked as a final application-level failure.
+      return event.event_type !== 'api_error' ||
+        !!(event.details && event.details.final === true);
+    });
     addCheck(checks, 'Tarayıcı hata kayıtları', 'ok', 'Son 24 saatte ' + browserErrors.length + ' hata olayı bulundu.');
   } catch (error) {
     addCheck(checks, 'Tarayıcı hata kayıtları', 'warning', error.message);
@@ -497,7 +502,11 @@ async function main() {
   const results = summarizeResults(signals);
   const visits = events.filter(function (event) { return event.event_type === 'visit'; }).length;
   const analyses = events.filter(function (event) { return event.event_type === 'analiz'; }).length;
-  const softwareErrorTotal = browserErrors.length + results.signalErrors;
+  // Findings are deduplicated by error type + source + message. Keep the
+  // raw occurrence count separately so repeated events do not look like
+  // hundreds of different software defects.
+  const softwareErrorTotal = findings.softwareFindings.length;
+  const softwareErrorOccurrences = browserErrors.length + results.signalErrors;
   // Count each affected signal once even when it has both a medium/high level
   // and multiple auditor warning items.
   const analysisWarningTotal = signals.filter(function (row) {
@@ -516,7 +525,8 @@ async function main() {
     summary = 'Günlük kontrolde ' + criticalChecks.length + ' kritik sistem kontrolü başarısız. Önce başarısız testler ve bağlantılar incelenmeli.';
   } else if (status === 'warning') {
     summary = 'Sistem kontrolleri tamamlandı; ' + softwareErrorTotal +
-      ' yazılım/API hata kaydı ve ' + analysisWarningTotal +
+      ' farklı yazılım/API hata grubu (' + softwareErrorOccurrences +
+      ' kayıt) ve ' + analysisWarningTotal +
       ' sinyalde analiz/denetçi uyarısı ayrı olarak raporlandı.';
   } else {
     summary = 'Günlük sistem kontrolü temiz. Kritik bağlantı veya test hatası görülmedi.';
@@ -537,7 +547,8 @@ async function main() {
   }
   if (results.pending) commentary.push(results.pending + ' sinyalin değerlendirmesi bekliyor.');
   if (softwareErrorTotal) {
-    commentary.push(softwareErrorTotal + ' yazılım/API hata kaydı var; bunlar coin bazında ayrı gruplandı.');
+    commentary.push(softwareErrorTotal + ' farklı yazılım/API hata grubu var; tekrarlarla birlikte ' +
+      softwareErrorOccurrences + ' kayıt oluşmuş. Başarısız yedek kaynak denemeleri artık hata sayılmıyor.');
   }
   if (analysisWarningTotal) {
     commentary.push(analysisWarningTotal + ' sinyalde denetçi uyarısı var; bunlar yazılım arızalarından ayrı analiz riski olarak gösteriliyor.');
@@ -558,6 +569,7 @@ async function main() {
       errors: {
         total: softwareErrorTotal,
         softwareTotal: softwareErrorTotal,
+        softwareOccurrences: softwareErrorOccurrences,
         analysisWarningTotal: analysisWarningTotal,
         browser: browserErrors.length,
         signal: results.signalErrors,
