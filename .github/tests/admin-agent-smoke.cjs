@@ -111,6 +111,11 @@ assert.ok(admin.includes('hatalar.hidden = true') &&
 assert.ok(agent.includes("url.searchParams.set('limit', String(count))") &&
   agent.includes("url.searchParams.set('offset', String(offset))") && !/Range:\s*offset/.test(agent),
   'Supabase pagination must use non-negative PostgREST offset/limit query parameters');
+assert.ok(agent.includes(': Infinity;') &&
+  !/agent_signals_shared'[\s\S]*?order: 'signal_at\.desc'\s*\},\s*5000\)/.test(agent),
+  'Daily signal reporting must paginate beyond the old 5,000-row ceiling');
+assert.ok(agent.includes('pendingNormal') && agent.includes('pendingDataErrors'),
+  'Daily reports must separate normal pending results from data-source errors');
 assert.ok(!agent.includes('GITHUB_STEP_SUMMARY') && !agent.includes('writeStepSummary'),
   'Private report details must not be exposed in public workflow summaries');
 assert.ok(worker.includes('graph-ai-v56') && worker.includes('./js/system-monitor.js') &&
