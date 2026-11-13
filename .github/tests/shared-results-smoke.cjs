@@ -32,7 +32,7 @@ const adminNotesIndex = html.indexOf('id="admin-gelistirme-notlari"');
 assert.ok(adminPanelStart >= 0 && adminNotesIndex > adminPanelStart, 'Development notes must stay inside the authenticated admin panel');
 assert.ok(html.includes("Eski geliştirme notları") && html.includes("Ajan performans karnesi") && html.includes("Giriş ve veri güvenliği"), 'Admin notes must retain historical project decisions');
 assert.ok(helper.includes(".from(TABLE)"), 'Admin must read the shared table');
-assert.ok(!helper.includes('offset < 50000'), 'Admin shared-pool reads must not stop at a fixed 50,000-row cap');
+assert.ok(helper.includes('offset < 50000'), 'Admin browser history keeps a 50,000-row safety ceiling for mobile memory use');
 assert.ok(admin.includes('window.GrapAISharedResults.client'), 'Admin login must reuse the shared Supabase session');
 assert.ok(performance.includes('shared.syncLocal(local)'), 'Existing local records must be backfilled');
 assert.ok(performance.includes('shared.patchMany(remotePatches)'), 'Evaluation outcomes must sync in batches');
