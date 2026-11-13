@@ -405,14 +405,14 @@ async function fetchGateBars(symbol, timeframe) {
 async function fetchCryptoBars(symbol, timeframe) {
   const errors = [];
   try {
-    return await fetchBybitBars(symbol, timeframe);
-  } catch (error) {
-    errors.push('Bybit: ' + safeError(error));
-  }
-  try {
     return await fetchGateBars(symbol, timeframe);
   } catch (error) {
     errors.push('Gate.io: ' + safeError(error));
+  }
+  try {
+    return await fetchBybitBars(symbol, timeframe);
+  } catch (error) {
+    errors.push('Bybit: ' + safeError(error));
   }
   throw new Error('Kripto veri kaynakları yanıt vermedi. ' + errors.join(' | '));
 }
