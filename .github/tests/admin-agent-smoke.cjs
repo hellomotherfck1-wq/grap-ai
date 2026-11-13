@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const html = fs.readFileSync('index.html', 'utf8');
 const admin = fs.readFileSync('js/admin.js', 'utf8');
 const monitor = fs.readFileSync('js/system-monitor.js', 'utf8');
+const transport = fs.readFileSync('js/veri-koprusu.js', 'utf8');
 const worker = fs.readFileSync('sw.js', 'utf8');
 const sql = fs.readFileSync('supabase/migrations/20261113000100_admin_daily_agent.sql', 'utf8');
 const agent = fs.readFileSync('scripts/admin-daily-agent.cjs', 'utf8');
@@ -11,6 +12,7 @@ const workflow = fs.readFileSync('.github/workflows/admin-daily-agent.yml', 'utf
 
 new Function(admin);
 new Function(monitor);
+new Function(transport);
 new Function(agent);
 
 const panelStart = html.indexOf('<div id="admin-panel" hidden>');
@@ -27,6 +29,13 @@ const monitorScript = html.indexOf('js/system-monitor.js');
 const adminScript = html.indexOf('js/admin.js');
 assert.ok(sharedScript >= 0 && monitorScript > sharedScript && adminScript > monitorScript,
   'Shared Supabase client must load before error monitor and admin UI');
+const transportScript = html.indexOf('js/veri-koprusu.js');
+const marketDataScript = html.indexOf('js/veri.js');
+assert.ok(transportScript >= 0 && marketDataScript > transportScript,
+  'Shared external data transport must load before market-data modules');
+assert.ok(transport.includes('inflight') && transport.includes('staleMaxAgeMs') &&
+  transport.includes('blockedUntil') && transport.includes('apiFailure'),
+  'Shared data transport must deduplicate requests, cache stale responses, cool down failing proxies, and log final failures');
 
 assert.ok(admin.includes("from('admin_daily_reports')"), 'Admin must load saved daily reports');
 assert.ok(admin.includes('ajanRaporuYukle()'), 'Admin must refresh the report after authorized login');
@@ -88,7 +97,8 @@ assert.ok(agent.includes("url.searchParams.set('limit', String(count))") &&
   'Supabase pagination must use non-negative PostgREST offset/limit query parameters');
 assert.ok(!agent.includes('GITHUB_STEP_SUMMARY') && !agent.includes('writeStepSummary'),
   'Private report details must not be exposed in public workflow summaries');
-assert.ok(worker.includes('graph-ai-v54') && worker.includes('./js/system-monitor.js'),
-  'Service worker must cache the monitor and use the new cache version');
+assert.ok(worker.includes('graph-ai-v55') && worker.includes('./js/system-monitor.js') &&
+  worker.includes('./js/veri-koprusu.js'),
+  'Service worker must cache the monitor and shared data transport with the new cache version');
 
 console.log('PASS daily admin agent, error logging, report privacy, and service-worker checks');
