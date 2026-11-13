@@ -10,9 +10,34 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/stil.css?v=8">
   <title>Graph AI — Piyasa Analizi</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/ortak-sonuc-havuzu.js?v=1"></script>
-  <script src="js/system-monitor.js?v=1"></script>
+  <script>
+    (function () {
+      var queue = window.__GrapAISystemPendingErrors = [];
+      function save(type, source, message, details) {
+        if (window.GrapAISystemMonitor) return;
+        if (queue.length >= 30) queue.shift();
+        queue.push({ type: type, source: source, message: message, details: details || {} });
+      }
+      window.addEventListener('error', function (event) {
+        if (window.GrapAISystemMonitor) return;
+        if (event.target && event.target !== window) {
+          var target = event.target;
+          save('resource_error', target.src || target.href || 'kaynak',
+            'Kaynak yüklenemedi', { tag: String(target.tagName || 'unknown').slice(0, 30) });
+        } else {
+          save('js_error', event.filename || 'window', event.message || 'JavaScript hatası', {
+            line: Number(event.lineno) || 0, column: Number(event.colno) || 0
+          });
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function (event) {
+        if (window.GrapAISystemMonitor) return;
+        var reason = event.reason;
+        save('unhandled_rejection', 'window',
+          reason && reason.message ? reason.message : String(reason || 'İşlenmeyen Promise hatası'), {});
+      });
+    })();
+  </script>
 </head>
 <body>
   <main>
@@ -305,6 +330,9 @@
   <script src="js/haber-ajani.js?v=1"></script>
   <script src="js/kripto-ajanlari.js?v=2"></script>
   <script src="js/coin-tahmin.js?v=11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/ortak-sonuc-havuzu.js?v=1"></script>
+  <script src="js/system-monitor.js?v=1"></script>
   <script src="js/ajan-performans.js?v=15"></script>
   <script src="js/admin.js?v=3"></script>
 </body>
