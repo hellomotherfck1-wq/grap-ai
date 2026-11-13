@@ -463,7 +463,7 @@ async function main() {
   const results = summarizeResults(signals);
   const visits = events.filter(function (event) { return event.event_type === 'visit'; }).length;
   const analyses = events.filter(function (event) { return event.event_type === 'analiz'; }).length;
-  const errorTotal = browserErrors.length + results.signalErrors + results.auditorErrorSignals;
+  const errorTotal = browserErrors.length + results.signalErrors + results.auditorErrorSignals + results.auditorWarningCount;
   const criticalChecks = checks.filter(function (check) { return check.status === 'critical'; });
   const warningChecks = checks.filter(function (check) { return check.status === 'warning'; });
   const status = criticalChecks.length ? 'critical'
