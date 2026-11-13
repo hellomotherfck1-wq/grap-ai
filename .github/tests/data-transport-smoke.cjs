@@ -81,7 +81,7 @@ vm.runInNewContext(source, context);
   await transport.json(url, options);
   assert.equal(calls.length, 2, 'Fresh data must be served from cache without another API request');
 
-  const secondUrl = 'https://www.kap.org.tr/tr/api/member/filter/TEST';
+  const secondUrl = 'https://query1.finance.yahoo.com/v10/finance/quoteSummary/TEST';
   await transport.json(secondUrl, options);
   assert.equal(calls.length, 3, 'A failed proxy must enter cooldown for subsequent requests');
   assert.ok(calls[2].startsWith('https://api.allorigins.win/'),
