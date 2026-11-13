@@ -99,10 +99,15 @@ assert.ok(agent.includes('softwareFindings: findings.softwareFindings') &&
 assert.ok(agent.includes('const analysisWarningTotal = signals.filter') &&
   agent.includes('Number(payload.auditorWarningCount) > 0'),
   'Each signal with auditor findings must be counted once even if it has multiple warning items');
-assert.ok(admin.includes('Coin bazlı analiz / denetçi uyarıları') &&
-  admin.includes('Denetçi uyarısı') &&
-  !admin.includes("raporBulguBolumu('Yazılım ve API hataları'"),
-  'Admin UI must show analysis warnings but not routine software/API error cards');
+assert.ok(admin.includes('hatalar.hidden = true') &&
+  admin.includes('hataAciklama.hidden = true') && admin.includes('hataBaslik.hidden = true') &&
+  !admin.includes('Coin bazlı analiz / denetçi uyarıları') &&
+  !admin.includes('Denetçi uyarısı') &&
+  !admin.includes('Denetçi uyarılı sinyal') &&
+  !admin.includes('analysisWarningCount') && !admin.includes('analysisFindings') &&
+  !admin.includes("raporBulguBolumu('Yazılım ve API hataları'") &&
+  agent.includes('analysisWarningTotal'),
+  'Coin-level auditor warnings and counts must stay hidden from the admin UI while remaining stored in daily reports');
 assert.ok(agent.includes("url.searchParams.set('limit', String(count))") &&
   agent.includes("url.searchParams.set('offset', String(offset))") && !/Range:\s*offset/.test(agent),
   'Supabase pagination must use non-negative PostgREST offset/limit query parameters');
