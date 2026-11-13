@@ -68,7 +68,8 @@ assert.ok(daily.includes(': Infinity;') && daily.includes('pendingDataErrors'),
 assert.ok(workflow.includes('*/15 * * * *') && workflow.includes('SUPABASE_SERVICE_ROLE_KEY'),
   'The background worker must run every 15 minutes using only the Actions secret');
 assert.ok(migration.includes("auth.role(), '') <> 'service_role'") &&
-  migration.includes('grant execute on function public.grap_ai_shared_signals_worker_patch(jsonb) to service_role'),
+  migration.includes('grant execute on function public.grap_ai_shared_signals_worker_patch(jsonb) to service_role') &&
+  migration.includes("notify pgrst, 'reload schema'"),
   'Only the server-side service role may execute the batch patch function');
 
 console.log('PASS pending-result classification, candle evaluation, pagination, and worker security checks');
