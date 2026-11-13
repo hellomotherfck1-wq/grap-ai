@@ -108,6 +108,45 @@
     parent.appendChild(item);
   }
 
+  function raporGorunumu(report) {
+    const details = report && report.details || {};
+    const errors = details.errors || {};
+    const rawChecks = Array.isArray(details.checks) ? details.checks : [];
+    const softProvider = /^(?:Binance Spot veri kaynağı|Yahoo Finance \/ BIST fiyat verisi|Tarayıcı hata kayıtları|Arka plan tanılama kayıtları)$/i;
+    const checks = rawChecks.map(function (check) {
+      const name = String(check.name || '');
+      if (!softProvider.test(name)) return check;
+      if (name === 'Arka plan tanılama kayıtları' || name === 'Tarayıcı hata kayıtları') {
+        return Object.assign({}, check, {
+          status: 'info',
+          detail: 'Tanılama kayıtları arka planda saklanır; hata kartı olarak gösterilmez.'
+        });
+      }
+      if (check.status === 'ok') return check;
+      return Object.assign({}, check, {
+        status: 'info',
+        detail: 'Anlık veri sağlayıcısı yanıt vermedi; geçici erişim durumu hata olarak gösterilmez.'
+      });
+    });
+    const critical = checks.some(function (check) { return check.status === 'critical'; });
+    const warning = checks.some(function (check) { return check.status === 'warning'; });
+    const analysisWarningCount = errors.analysisWarningTotal !== undefined
+      ? Number(errors.analysisWarningTotal) || 0
+      : (Number(errors.auditor) || 0) + (Number(errors.auditorWarnings) || 0);
+    const status = critical ? 'critical' : (warning || analysisWarningCount ? 'warning' : 'ok');
+    let summary;
+    if (critical) {
+      summary = 'Kritik sistem kontrolü başarısız. Ayrıntıyı sistem kontrolleri bölümünde görebilirsin.';
+    } else if (warning) {
+      summary = 'Bazı temel sistem kontrollerinde uyarı var. Geçici yazılım/API bağlantı kayıtları gösterilmiyor.';
+    } else if (analysisWarningCount) {
+      summary = 'Sistem kontrolleri normal; ' + analysisWarningCount + ' sinyalde analiz kalite uyarısı bulunuyor.';
+    } else {
+      summary = 'Sistem kontrolleri normal. Geçici yazılım/API bağlantı kayıtları arka planda tutuluyor.';
+    }
+    return { status: status, summary: summary, checks: checks, analysisWarningCount: analysisWarningCount };
+  }
+
   function ajanRaporuCiz(reports) {
     const durum = $('admin-ajan-durum');
     const ozet = $('admin-ajan-ozet');
@@ -137,95 +176,63 @@
     const results = details.results || {};
     const errors = details.errors || {};
     const activity = details.activity || {};
-    const status = ['ok', 'warning', 'critical'].indexOf(latest.status) >= 0 ? latest.status : 'warning';
+    const view = raporGorunumu(latest);
+    const status = view.status;
 
     durum.className = 'admin-rapor-durum admin-rapor-' + status;
     durum.textContent = status === 'ok' ? 'SİSTEM NORMAL' : status === 'critical' ? 'KRİTİK SORUN' : 'UYARI VAR';
-    ozet.textContent = latest.summary || 'Günlük sistem raporu hazır.';
+    ozet.textContent = view.summary;
     raporMetrik(metrikler, 'Son 30 gün sinyal', results.totalSignals || 0);
     raporMetrik(metrikler, 'Tamamlanan ölçüm', results.completedDirection || 0);
     raporMetrik(metrikler, 'Bekleyen sonuç', results.pending || 0);
-    const softwareErrorCount = errors.softwareTotal !== undefined
-      ? Number(errors.softwareTotal) || 0
-      : (Number(errors.browser) || 0) + (Number(errors.signal) || 0);
-    const analysisWarningCount = errors.analysisWarningTotal !== undefined
-      ? Number(errors.analysisWarningTotal) || 0
-      : (Number(errors.auditor) || 0) + (Number(errors.auditorWarnings) || 0);
-    const softwareErrorOccurrences = errors.softwareOccurrences !== undefined
-      ? Number(errors.softwareOccurrences) || 0
-      : softwareErrorCount;
-    raporMetrik(metrikler, 'Farklı yazılım/API hatası', softwareErrorCount);
-    raporMetrik(metrikler, 'Tekrarlanan hata kaydı', softwareErrorOccurrences);
-    raporMetrik(metrikler, 'Denetçi uyarılı sinyal', analysisWarningCount);
+    raporMetrik(metrikler, 'Denetçi uyarılı sinyal', view.analysisWarningCount);
     raporMetrik(metrikler, '7 gün ziyaret', activity.visits || 0);
     raporMetrik(metrikler, '7 gün analiz', activity.analyses || 0);
 
     const legacyFindings = Array.isArray(errors.findings) ? errors.findings : [];
-    const hasSplitFindings = Array.isArray(errors.softwareFindings) ||
-      Array.isArray(errors.analysisFindings);
-    const softwareFindings = hasSplitFindings
-      ? (Array.isArray(errors.softwareFindings) ? errors.softwareFindings : [])
-      : legacyFindings.filter(function (finding) {
-          return finding.category !== 'analysis' &&
-            !/^Denetçi\b/i.test(String(finding.title || ''));
-        });
-    const analysisFindings = hasSplitFindings
-      ? (Array.isArray(errors.analysisFindings) ? errors.analysisFindings : [])
+    const analysisFindings = Array.isArray(errors.analysisFindings)
+      ? errors.analysisFindings
       : legacyFindings.filter(function (finding) {
           return finding.category === 'analysis' ||
             /^Denetçi\b/i.test(String(finding.title || ''));
         });
 
-    function raporBulguBolumu(baslik, findings, category) {
-      const heading = document.createElement('h4');
-      heading.textContent = baslik;
-      hatalar.appendChild(heading);
-
-      if (!findings.length) {
-        const empty = document.createElement('p');
-        empty.className = 'admin-rapor-bos';
-        empty.textContent = category === 'analysis'
-          ? 'Coin bazlı denetçi uyarısı bulunmuyor.'
-          : 'Yazılım veya API hatası bulunmuyor.';
-        hatalar.appendChild(empty);
-        return;
-      }
-
-      findings.forEach(function (finding) {
+    const heading = document.createElement('h4');
+    heading.textContent = 'Coin bazlı analiz / denetçi uyarıları';
+    hatalar.appendChild(heading);
+    if (!analysisFindings.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-rapor-bos';
+      empty.textContent = 'Coin bazlı denetçi uyarısı bulunmuyor.';
+      hatalar.appendChild(empty);
+    } else {
+      analysisFindings.forEach(function (finding) {
         const card = document.createElement('div');
-        const severity = category === 'analysis' ? 'warning' : (finding.severity || 'info');
-        card.className = 'admin-rapor-bulgu admin-rapor-bulgu-' + severity;
+        card.className = 'admin-rapor-bulgu admin-rapor-bulgu-warning';
         const title = document.createElement('strong');
-        title.textContent = finding.title || (category === 'analysis' ? 'Denetçi uyarısı' : 'Hata bulgusu');
+        title.textContent = finding.title || 'Denetçi uyarısı';
         const meta = document.createElement('small');
-        meta.textContent = category === 'analysis'
-          ? (finding.source || 'Varlık bilinmiyor') +
-            ' · Sinyal: ' + (finding.count || 0) +
-            ' · Uyarı maddesi: ' + (finding.warningCount || 0) +
-            (finding.lastSeen ? ' · Son: ' + raporTarihi(finding.lastSeen) : '')
-          : (finding.source || 'Kaynak bilinmiyor') +
-            ' · Tekrar: ' + (finding.count || 0) +
-            (finding.lastSeen ? ' · Son: ' + raporTarihi(finding.lastSeen) : '');
+        meta.textContent = (finding.source || 'Varlık bilinmiyor') +
+          ' · Sinyal: ' + (finding.count || 0) +
+          ' · Uyarı maddesi: ' + (finding.warningCount || 0) +
+          (finding.lastSeen ? ' · Son: ' + raporTarihi(finding.lastSeen) : '');
         const explanation = document.createElement('p');
         explanation.textContent = finding.explanation || 'Ajan bu kayıt için ek açıklama bulamadı.';
         const action = document.createElement('p');
         action.className = 'admin-rapor-oneri';
-        action.textContent = 'Öneri: ' + (finding.action || 'İlgili kaydı incele.');
+        action.textContent = 'Öneri: ' + (finding.action || 'İlgili sinyalin denetçi maddelerini incele.');
         card.append(title, meta, explanation, action);
         hatalar.appendChild(card);
       });
     }
 
-    raporBulguBolumu('Yazılım ve API hataları', softwareFindings, 'software');
-    raporBulguBolumu('Coin bazlı analiz / denetçi uyarıları', analysisFindings, 'analysis');
-
-    const checks = Array.isArray(details.checks) ? details.checks : [];
-    if (!checks.length) {
+    if (!view.checks.length) {
       raporSatir(kontroller, 'Kontroller', 'Rapor ayrıntısı bulunamadı', 'warning');
     } else {
-      checks.forEach(function (check) {
+      view.checks.forEach(function (check) {
         raporSatir(kontroller, check.name || 'Kontrol', check.detail || check.status || '—',
-          check.status === 'ok' ? 'ok' : check.status === 'critical' ? 'critical' : 'warning');
+          check.status === 'ok' ? 'ok' : check.status === 'critical' ? 'critical' :
+            check.status === 'warning' ? 'warning' : '');
       });
     }
 
@@ -254,6 +261,7 @@
 
     if (Array.isArray(details.commentary)) {
       details.commentary.forEach(function (line) {
+        if (/yazılım\/API hata grubu|yazılım veya analiz uyarısı kaydedilmedi/i.test(String(line))) return;
         const p = document.createElement('p');
         p.className = 'admin-rapor-yorum';
         p.textContent = line;
@@ -268,19 +276,19 @@
 
     if (gecmis && reports.length > 1) {
       reports.slice(1).forEach(function (item) {
+        const oldView = raporGorunumu(item);
         const detailsNode = document.createElement('details');
         detailsNode.className = 'admin-rapor-gecmis';
         const summary = document.createElement('summary');
         summary.textContent = (item.report_date || 'Eski rapor') + ' · ' +
-          (item.status === 'ok' ? 'Normal' : item.status === 'critical' ? 'Kritik' : 'Uyarı');
+          (oldView.status === 'ok' ? 'Normal' : oldView.status === 'critical' ? 'Kritik' : 'Uyarı');
         const paragraph = document.createElement('p');
-        paragraph.textContent = item.summary || 'Özet bulunmuyor.';
+        paragraph.textContent = oldView.summary;
         detailsNode.append(summary, paragraph);
         gecmis.appendChild(detailsNode);
       });
     }
   }
-
   async function ajanRaporuYukle() {
     const durum = $('admin-ajan-durum');
     const ozet = $('admin-ajan-ozet');
