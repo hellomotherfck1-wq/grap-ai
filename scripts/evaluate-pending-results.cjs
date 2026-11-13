@@ -39,7 +39,7 @@ function isTestSignal(record) {
   if (!record) return false;
   const sources = Array.isArray(record.sources) ? record.sources : [record.source];
   const testSource = sources.some(function (source) {
-    return /^E2E(?:\\b|[\\s_-])/i.test(String(source || '').trim());
+    return /^E2E(?:\b|[\s_-])/i.test(String(source || '').trim());
   });
   return testSource || /^E2E[A-Z0-9]*USDT$/i.test(String(record.symbol || ''));
 }
