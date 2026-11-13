@@ -183,31 +183,34 @@ const Veri = {
     if (symbol.endsWith('.IS') || isMappedEquity) zd = '1d';
     const p = { '15m': ['15m', '5d'], '1h': ['60m', '1mo'], '1d': ['1d', '6mo'] }[zd];
     if (!p) throw new Error('Yahoo Finance bu zaman dilimini desteklemiyor: ' + zd);
-    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sembol) + '?interval=' + p[0] + '&range=' + p[1];
-    const yollar = [
-      u => u,
-      u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-      u => 'https://corsproxy.io/?' + encodeURIComponent(u)
-    ];
-    let son;
-    for (const y of yollar) {
-      try {
-        const j = await this.getir(y(url));
-        const r = j.chart && j.chart.result && j.chart.result[0];
-        if (!r || !r.timestamp) { const e = new Error('Sembol bulunamadı'); e.kesin = true; throw e; }
-        const q = r.indicators.quote[0];
-        const out = [];
-        r.timestamp.forEach((t, i) => {
-          if (q.open[i] != null && q.high[i] != null && q.low[i] != null && q.close[i] != null)
-            out.push({ t: t * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i], v: q.volume && q.volume[i] != null ? Number(q.volume[i]) : null });
+    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
+      encodeURIComponent(sembol) + '?interval=' + p[0] + '&range=' + p[1];
+    if (!window.GrapAIDataTransport) throw new Error('Ortak veri aktarım katmanı yüklenmedi.');
+    const j = await window.GrapAIDataTransport.json(url, {
+      cacheTtlMs: zd === '1d' ? 5 * 60 * 1000 : 90 * 1000,
+      staleMaxAgeMs: 24 * 60 * 60 * 1000,
+      timeoutMs: 6500,
+      validate: function (payload) {
+        const r = payload && payload.chart && payload.chart.result && payload.chart.result[0];
+        const q = r && r.indicators && r.indicators.quote && r.indicators.quote[0];
+        return !!(r && Array.isArray(r.timestamp) && r.timestamp.length >= 20 &&
+          q && Array.isArray(q.open) && Array.isArray(q.high) &&
+          Array.isArray(q.low) && Array.isArray(q.close));
+      }
+    });
+    const r = j.chart.result[0];
+    const q = r.indicators.quote[0];
+    const out = [];
+    r.timestamp.forEach((t, i) => {
+      if (q.open[i] != null && q.high[i] != null && q.low[i] != null && q.close[i] != null)
+        out.push({
+          t: t * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i],
+          v: q.volume && q.volume[i] != null ? Number(q.volume[i]) : null
         });
-        if (out.length < 20) throw new Error('Yeterli veri yok');
-        return out;
-      } catch (e) { son = e; if (e.kesin) throw e; }
-    }
-    throw son;
+    });
+    if (out.length < 20) throw new Error('Yeterli veri yok');
+    return out;
   },
-
   async ara(girdi, zd, durum) {
     const l = this.coz(girdi);
     if (!l.length) throw new Error('Varlık adı anlaşılamadı.');
@@ -232,10 +235,13 @@ const Veri = {
       } catch (e) { hata = e; }
     }
     const finalError = new Error('Veri bulunamadı' + (hata ? ' (' + hata.message + ').' : '.'));
-    if (typeof window !== 'undefined' && window.GrapAISystemMonitor &&
+    if (hata && hata.grapAiLogged) {
+      finalError.grapAiLogged = true;
+    } else if (typeof window !== 'undefined' && window.GrapAISystemMonitor &&
         typeof window.GrapAISystemMonitor.apiFailure === 'function') {
       window.GrapAISystemMonitor.apiFailure('Veri.ara/' + String(girdi || 'bilinmeyen'),
         finalError, { symbol: String(girdi || '').slice(0, 80), timeframe: istenenZd });
+      finalError.grapAiLogged = true;
     }
     throw finalError;
   },
