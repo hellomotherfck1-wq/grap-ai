@@ -122,7 +122,7 @@ function safeText(value) {
     .slice(0, 450);
 }
 
-function groupErrors(events, signals) {
+function groupErrors(events, signals, recentErrorSignals) {
   const softwareGroups = new Map();
   const analysisGroups = new Map();
 
@@ -169,10 +169,6 @@ function groupErrors(events, signals) {
     const market = row.market || payload.market || '';
     const source = market ? String(symbol) + ' · ' + String(market) : symbol;
     const date = row.updated_at || row.created_at;
-
-    if (payload.lastError) {
-      addSoftware('signal_error', source, payload.lastError, date, 'warning');
-    }
 
     const auditorLevel = String(payload.auditorError || '').trim();
     const warningCount = Math.max(0, Math.floor(Number(payload.auditorWarningCount) || 0));
@@ -225,6 +221,18 @@ function groupErrors(events, signals) {
         : 'Tek seferlik bir uygulama veya veri kaynağı hatası kaydedilmiş.';
       item.action = 'Önce belirtilen kaynağı incele; tekrarlıyorsa ilgili modülün kayıtlarını kontrol et.';
     }
+  });
+
+  (recentErrorSignals || signals || []).forEach(function (row) {
+    const payload = row.payload || {};
+    if (!payload.lastError) return;
+    const symbol = row.symbol || payload.symbol || 'Bilinmeyen varlık';
+    const market = row.market || payload.market || '';
+    const timeframe = row.timeframe || payload.timeframe || '';
+    const source = String(symbol) + (market ? ' · ' + String(market) : '') +
+      (timeframe ? ' · ' + String(timeframe) : '');
+    addSoftware('signal_error', source, payload.lastError,
+      row.updated_at || row.created_at, 'warning');
   });
 
   const analysisFindings = Array.from(analysisGroups.values()).map(function (item) {
@@ -498,7 +506,13 @@ async function main() {
     addCheck(checks, 'Tarayıcı hata kayıtları', 'warning', error.message);
   }
 
-  const findings = groupErrors(browserErrors, signals);
+  const recentSignalErrors = signals.filter(function (row) {
+    const payload = row.payload || {};
+    const stamp = Date.parse(row.updated_at || row.created_at || '');
+    return !!payload.lastError && Number.isFinite(stamp) &&
+      stamp >= NOW.getTime() - 24 * 60 * 60 * 1000;
+  });
+  const findings = groupErrors(browserErrors, signals, recentSignalErrors);
   const results = summarizeResults(signals);
   const visits = events.filter(function (event) { return event.event_type === 'visit'; }).length;
   const analyses = events.filter(function (event) { return event.event_type === 'analiz'; }).length;
@@ -506,7 +520,7 @@ async function main() {
   // raw occurrence count separately so repeated events do not look like
   // hundreds of different software defects.
   const softwareErrorTotal = findings.softwareFindings.length;
-  const softwareErrorOccurrences = browserErrors.length + results.signalErrors;
+  const softwareErrorOccurrences = browserErrors.length + recentSignalErrors.length;
   // Count each affected signal once even when it has both a medium/high level
   // and multiple auditor warning items.
   const analysisWarningTotal = signals.filter(function (row) {
@@ -572,7 +586,7 @@ async function main() {
         softwareOccurrences: softwareErrorOccurrences,
         analysisWarningTotal: analysisWarningTotal,
         browser: browserErrors.length,
-        signal: results.signalErrors,
+        signal: recentSignalErrors.length,
         auditor: results.auditorErrorSignals,
         auditorWarnings: results.auditorWarningCount,
         findings: findings.findings,
