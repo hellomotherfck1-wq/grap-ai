@@ -7,6 +7,13 @@
   var YAHOO = 'https://query1.finance.yahoo.com';
   var MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
+  function logFinalSourceFailure(url, error) {
+    if (window.GrapAISystemMonitor &&
+        typeof window.GrapAISystemMonitor.apiFailure === 'function') {
+      window.GrapAISystemMonitor.apiFailure(url || 'Haber veri kaynağı', error, { service: 'haber' });
+    }
+  }
+
   function norm(value) {
     return String(value || '').toLocaleLowerCase('tr-TR')
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -61,7 +68,9 @@
         clearTimeout(timer);
       }
     }
-    throw lastError || new Error('Haber kaynağına erişilemedi');
+    var finalError = lastError || new Error('Haber kaynağına erişilemedi');
+    logFinalSourceFailure(url, finalError);
+    throw finalError;
   }
 
   async function getJson(url) {
@@ -80,7 +89,9 @@
         clearTimeout(timer);
       }
     }
-    throw lastError || new Error('Haber kaynağına erişilemedi');
+    var finalError = lastError || new Error('Haber kaynağına erişilemedi');
+    logFinalSourceFailure(url, finalError);
+    throw finalError;
   }
 
   function codeOf(asset) {
