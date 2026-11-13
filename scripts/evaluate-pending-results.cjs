@@ -324,6 +324,7 @@ async function readAllSignals() {
     const url = new URL(SUPABASE_URL + '/rest/v1/agent_signals_shared');
     url.searchParams.set('select', 'signal_id,symbol,market,timeframe,decision,signal_at,payload,created_at,updated_at');
     url.searchParams.set('created_at', 'gte.' + cutoff);
+    url.searchParams.set('symbol', 'not.like.E2E*');
     url.searchParams.set('order', 'signal_at.asc');
     url.searchParams.set('limit', String(PAGE_SIZE));
     url.searchParams.set('offset', String(offset));
@@ -573,7 +574,6 @@ async function main() {
   const rows = await readAllSignals();
   const records = rows.map(recordFromRow);
   const pending = summarizePending(records);
-  const ignoredTestRecords = records.filter(isTestSignal).length;
   const forceRetryErrors = process.env.RETRY_DATA_ERRORS === 'true';
   const stats = await runWorker(records, Date.now(), { forceRetryErrors: forceRetryErrors });
   const failureBreakdown = Object.keys(stats.failureReasons).map(function (key) {
@@ -584,7 +584,6 @@ async function main() {
   console.log('Grap-AI arka plan sonuç değerlendirmesi tamamlandı: ' +
     JSON.stringify({
       scanned: rows.length,
-      ignoredTestRecords: ignoredTestRecords,
       pendingBefore: pending.total,
       normalPendingBefore: pending.normal,
       dataErrorsBefore: pending.dataErrors,
