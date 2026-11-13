@@ -18,6 +18,10 @@
   var adminAuthorized = false;
   var initError = null;
 
+  function isE2ETestMode() {
+    return typeof window !== 'undefined' && window.__GRAP_AI_E2E_TEST__ === true;
+  }
+
   function uuid() {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') {
       return window.crypto.randomUUID();
@@ -71,6 +75,7 @@
   }
 
   function kaydet(records) {
+    if (isE2ETestMode()) return Promise.resolve({ ok: true, skipped: true, count: 0 });
     if (!client) return Promise.resolve({ ok: false, error: initError || 'Supabase bağlantısı hazır değil.' });
     var list = (Array.isArray(records) ? records : []).filter(function (record) {
       return record && record.id && record.symbol && record.timeframe && record.decision;
@@ -112,6 +117,7 @@
   }
 
   function patchMany(patches) {
+    if (isE2ETestMode()) return Promise.resolve({ ok: true, skipped: true, count: 0 });
     if (!client) return Promise.resolve({ ok: false, error: initError || 'Supabase bağlantısı hazır değil.' });
     var allowed = [
       'decision', 'generalDecision', 'technicalDecision', 'volumeDecision',
@@ -154,6 +160,7 @@
   }
 
   function adminRecords() {
+    if (isE2ETestMode()) return Promise.resolve({ records: [], isAdmin: false, error: null });
     if (!adminAuthorized) {
       return Promise.resolve({ records: [], isAdmin: false, error: null });
     }
