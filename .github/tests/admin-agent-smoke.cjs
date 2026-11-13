@@ -55,7 +55,7 @@ assert.ok(agent.includes('directional.reliable') && agent.includes('results.pend
   'Agent must summarize evaluated and pending signal results');
 assert.ok(agent.includes('groupErrors') && agent.includes('checkExternalApis'),
   'Agent must inspect recent errors and external data providers');
-assert.ok(worker.includes('graph-ai-v51') && worker.includes('./js/system-monitor.js'),
+assert.ok(worker.includes('graph-ai-v52') && worker.includes('./js/system-monitor.js'),
   'Service worker must cache the monitor and use the new cache version');
 
 console.log('PASS daily admin agent, error logging, report privacy, and service-worker checks');
