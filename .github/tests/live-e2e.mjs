@@ -45,9 +45,12 @@ try {
     { timeout: 45000 }
   );
   check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma / Haber / Kripto ajanları');
+  const dataTransportModule = await page.evaluate(() => ({
+    json: typeof window.GrapAIDataTransport?.json,
+    text: typeof window.GrapAIDataTransport?.text
+  }));
   check('Ortak veri aktarım katmanı yüklendi',
-    typeof window.GrapAIDataTransport.json === 'function' &&
-    typeof window.GrapAIDataTransport.text === 'function',
+    dataTransportModule.json === 'function' && dataTransportModule.text === 'function',
     'Yedek kaynak, önbellek ve tekilleştirilmiş istek desteği');
   const sharedPoolModule = await page.evaluate(() => ({
     loaded: !!window.GrapAISharedResults,
