@@ -11,6 +11,7 @@ const workflow = fs.readFileSync('.github/workflows/admin-daily-agent.yml', 'utf
 
 new Function(admin);
 new Function(monitor);
+new Function(agent);
 
 const panelStart = html.indexOf('<div id="admin-panel" hidden>');
 const reportStart = html.indexOf('id="admin-gunluk-ajan"');
