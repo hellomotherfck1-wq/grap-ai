@@ -82,7 +82,7 @@ async function supabaseRows(table, filters, maxRows) {
   const pageSize = 1000;
   const requestedMax = Number(maxRows);
   const totalLimit = Number.isFinite(requestedMax) && requestedMax > 0
-    ? Math.floor(requestedMax) : 5000;
+    ? Math.floor(requestedMax) : Infinity;
 
   for (let offset = 0; offset < totalLimit; offset += pageSize) {
     const url = new URL(SUPABASE_URL + '/rest/v1/' + table);
@@ -312,6 +312,11 @@ function summarizeResults(rows) {
     if (payload.waitResult === 'missed-up') waitMissedUp += 1;
   });
 
+  const pendingDataErrors = pending.filter(function (row) {
+    return !!(row.payload && row.payload.lastError);
+  }).length;
+  const pendingNormal = pending.length - pendingDataErrors;
+
   const directionalCalls = completed.filter(function (item) {
     return item.decision === 'AL' || item.decision === 'SAT';
   }).sort(function (a, b) {
@@ -355,6 +360,8 @@ function summarizeResults(rows) {
     decisions: decisions,
     completedDirection: completed.length,
     pending: pending.length,
+    pendingNormal: pendingNormal,
+    pendingDataErrors: pendingDataErrors,
     expired: expired.length,
     signalErrors: signalErrors.length,
     auditorErrorSignals: auditorErrorSignals,
@@ -456,7 +463,8 @@ async function main() {
   const testFiles = [
     '.github/tests/crypto-agent-smoke.cjs',
     '.github/tests/shared-results-smoke.cjs',
-    '.github/tests/admin-agent-smoke.cjs'
+    '.github/tests/admin-agent-smoke.cjs',
+    '.github/tests/pending-results-worker-smoke.cjs'
   ];
   testFiles.forEach(function (file) {
     const result = runNode([file], 90000);
@@ -474,7 +482,7 @@ async function main() {
       select: 'event_type,created_at',
       created_at: 'gte.' + isoAgo(24 * 7),
       order: 'created_at.desc'
-    }, 5000);
+    });
     addCheck(checks, 'Supabase kullanım kayıtları', 'ok', 'Son 7 günden ' + events.length + ' kayıt okundu.');
   } catch (error) {
     addCheck(checks, 'Supabase kullanım kayıtları', 'critical', error.message);
@@ -485,7 +493,7 @@ async function main() {
       select: 'signal_id,symbol,market,timeframe,decision,signal_at,payload,created_at,updated_at',
       created_at: 'gte.' + isoAgo(24 * 30),
       order: 'signal_at.desc'
-    }, 5000);
+    });
     addCheck(checks, 'Supabase ortak sonuç havuzu', 'ok', 'Son 30 günden ' + signals.length + ' sinyal okundu.');
   } catch (error) {
     addCheck(checks, 'Supabase ortak sonuç havuzu', 'critical', error.message);
@@ -563,7 +571,8 @@ async function main() {
   } else {
     commentary.push('Yön başarısı için 30 bağımsız örnek eşiği henüz karşılanmadı; oran güvenilir başarı olarak sunulmuyor.');
   }
-  if (results.pending) commentary.push(results.pending + ' sinyalin değerlendirmesi bekliyor.');
+  if (results.pendingNormal) commentary.push(results.pendingNormal + ' sinyal normal değerlendirme sırasını bekliyor.');
+  if (results.pendingDataErrors) commentary.push(results.pendingDataErrors + ' sinyal veri kaynağı hatası nedeniyle yeniden denenecek.');
   if (analysisWarningTotal) {
     commentary.push(analysisWarningTotal + ' sinyalde denetçi uyarısı var; bunlar yazılım arızalarından ayrı analiz riski olarak gösteriliyor.');
   }
