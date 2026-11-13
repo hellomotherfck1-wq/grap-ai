@@ -137,6 +137,15 @@ function groupErrors(events, signals) {
     if (payload.lastError) {
       add('signal_error', row.symbol || 'Sinyal', payload.lastError, row.updated_at || row.created_at, 'warning');
     }
+    if (payload.auditorError && payload.auditorError !== 'Düşük') {
+      add('agent_audit', row.symbol || 'Sinyal',
+        'Denetçi hata seviyesi: ' + payload.auditorError, row.updated_at || row.created_at, 'warning');
+    }
+    if (Number(payload.auditorWarningCount) > 0) {
+      add('agent_audit_warning', row.symbol || 'Sinyal',
+        'Denetçi ' + Number(payload.auditorWarningCount) + ' uyarı kaydetti',
+        row.updated_at || row.created_at, 'warning');
+    }
   });
 
   const findings = Array.from(groups.values()).sort(function (a, b) {
@@ -144,6 +153,7 @@ function groupErrors(events, signals) {
   }).slice(0, 6);
 
   findings.forEach(function (item) {
+    if (item.count >= 5 || (item.severity === 'warning' && item.count >= 3)) item.severity = 'critical';
     if (item.source === 'Bilinmeyen kaynak') item.source = 'Uygulama';
     if (item.title.toLowerCase().indexOf('http 429') >= 0) {
       item.explanation = 'Veri sağlayıcı istek sınırına takılmış olabilir.';
@@ -190,6 +200,7 @@ function summarizeResults(rows) {
   let alWins = 0, alLosses = 0, alFlat = 0;
   let satSellBetter = 0, satHoldBetter = 0, satSimilar = 0;
   let waitAvoidDown = 0, waitMissedUp = 0;
+  let auditorErrorSignals = 0, auditorWarningCount = 0;
 
   function intervalMs(timeframe) {
     return ({
@@ -225,6 +236,8 @@ function summarizeResults(rows) {
     }
 
     if (payload.lastError) signalErrors.push(row);
+    if (payload.auditorError && payload.auditorError !== 'Düşük') auditorErrorSignals += 1;
+    auditorWarningCount += Math.max(0, Number(payload.auditorWarningCount) || 0);
     if (payload.tradeResult && payload.tradeResult.outcome === 'win') alWins += 1;
     if (payload.tradeResult && payload.tradeResult.outcome === 'loss') alLosses += 1;
     if (payload.tradeResult && payload.tradeResult.outcome === 'flat') alFlat += 1;
@@ -280,6 +293,8 @@ function summarizeResults(rows) {
     pending: pending.length,
     expired: expired.length,
     signalErrors: signalErrors.length,
+    auditorErrorSignals: auditorErrorSignals,
+    auditorWarningCount: auditorWarningCount,
     waitResults: { avoidDown: waitAvoidDown, missedUp: waitMissedUp },
     directional: {
       sampleCount: directionalCount,
@@ -448,7 +463,7 @@ async function main() {
   const results = summarizeResults(signals);
   const visits = events.filter(function (event) { return event.event_type === 'visit'; }).length;
   const analyses = events.filter(function (event) { return event.event_type === 'analiz'; }).length;
-  const errorTotal = browserErrors.length + results.signalErrors;
+  const errorTotal = browserErrors.length + results.signalErrors + results.auditorErrorSignals;
   const criticalChecks = checks.filter(function (check) { return check.status === 'critical'; });
   const warningChecks = checks.filter(function (check) { return check.status === 'warning'; });
   const status = criticalChecks.length ? 'critical'
@@ -495,6 +510,8 @@ async function main() {
         total: errorTotal,
         browser: browserErrors.length,
         signal: results.signalErrors,
+        auditor: results.auditorErrorSignals,
+        auditorWarnings: results.auditorWarningCount,
         findings: findings
       },
       results: results,
