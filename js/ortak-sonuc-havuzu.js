@@ -187,6 +187,7 @@
         return client.from(TABLE)
           .select('signal_id, device_id, device_ids, payload, created_at, updated_at')
           .gte('created_at', cutoff)
+          .not('symbol', 'like', 'E2E%')
           .order('signal_at', { ascending: false })
           .range(offset, offset + 999)
           .then(function (result) {
