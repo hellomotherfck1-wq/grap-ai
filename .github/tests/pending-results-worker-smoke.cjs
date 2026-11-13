@@ -42,6 +42,8 @@ assert.deepEqual(gateBars, [
 assert.ok(workerSource.includes('api.bybit.com/v5/market/kline') &&
   workerSource.includes('api.gateio.ws/api/v4/spot/candlesticks'),
   'Crypto data evaluation must use the Bybit and Gate public candle APIs');
+assert.ok(workerSource.includes("url.searchParams.set('symbol', 'not.like.E2E*')"),
+  'The worker must exclude synthetic E2E symbols at the database query');
 
 const now = 2000000000000;
 const step = worker.intervalMs('1h');
@@ -99,8 +101,9 @@ assert.equal(expired.directionStatus, 'expired');
 assert.ok(admin.includes('pendingDataErrors') && admin.includes('pendingNormal') &&
   admin.includes('function isTestRecord') && admin.includes('return !isTestRecord(record)'),
   'The results panel must split pending reasons and exclude synthetic E2E records');
-assert.ok(daily.includes('function isTestSignalRow') && daily.includes('fetchedSignals.filter'),
-  'The daily admin report must exclude synthetic E2E signals from statistics');
+assert.ok(daily.includes('function isTestSignalRow') && daily.includes('fetchedSignals.filter') &&
+  daily.includes("symbol: 'not.like.E2E*'"),
+  'The daily admin report must exclude synthetic E2E signals from database reads and statistics');
 assert.ok(admin.includes('records = records.filter(function (record) { return !isTestRecord(record); });') &&
   admin.includes('fresh = fresh.filter(function (record) { return !isTestRecord(record); });'),
   'Manual result evaluation must also ignore synthetic E2E signals');
