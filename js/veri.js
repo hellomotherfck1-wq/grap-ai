@@ -231,7 +231,13 @@ const Veri = {
         return Object.assign({}, a, { mumlar, zd: etkinZd, cekim: new Date() });
       } catch (e) { hata = e; }
     }
-    throw new Error('Veri bulunamadı' + (hata ? ' (' + hata.message + ').' : '.'));
+    const finalError = new Error('Veri bulunamadı' + (hata ? ' (' + hata.message + ').' : '.'));
+    if (typeof window !== 'undefined' && window.GrapAISystemMonitor &&
+        typeof window.GrapAISystemMonitor.apiFailure === 'function') {
+      window.GrapAISystemMonitor.apiFailure('Veri.ara/' + String(girdi || 'bilinmeyen'),
+        finalError, { symbol: String(girdi || '').slice(0, 80), timeframe: istenenZd });
+    }
+    throw finalError;
   },
 
   donustur(v, adet) {
