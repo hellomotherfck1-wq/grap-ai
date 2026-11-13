@@ -59,6 +59,8 @@ assert.ok(agent.includes('groupErrors') && agent.includes('checkExternalApis'),
 assert.ok(agent.includes("const key = type + '|' + sourceLabel + '|' + clean") &&
   agent.includes('softwareFindings') && agent.includes('analysisFindings'),
   'Findings must be grouped by source/asset and separated into software versus analysis warnings');
+assert.ok(!agent.includes('.slice(0, 8)'),
+  'Coin-level analysis findings must not be silently truncated to a small fixed number');
 assert.ok(agent.includes('analysisWarningTotal') && agent.includes('softwareErrorTotal'),
   'Report totals must keep software errors separate from auditor warnings');
 assert.ok(agent.includes('const analysisWarningTotal = signals.filter') &&
