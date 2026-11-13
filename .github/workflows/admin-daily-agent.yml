@@ -1,0 +1,43 @@
+name: Grap-AI daily admin agent
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # Her gün 08:00 Türkiye saati
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  daily-admin-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Run daily system agent and publish private admin report
+        env:
+          SUPABASE_URL: https://qkkhguyngmsddnkunyws.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: \${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: \${{ github.repository }}
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::warning::SUPABASE_SERVICE_ROLE_KEY secret is missing. The report was not published."
+            {
+              echo "# Grap-AI daily admin agent"
+              echo ""
+              echo "The daily checks were not published because the repository secret SUPABASE_SERVICE_ROLE_KEY is missing."
+              echo "Add the Supabase service_role key under Settings > Secrets and variables > Actions."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          node scripts/admin-daily-agent.cjs
