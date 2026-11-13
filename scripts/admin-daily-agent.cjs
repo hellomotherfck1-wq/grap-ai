@@ -182,25 +182,40 @@ function groupErrors(events, signals) {
 }
 
 function summarizeResults(rows) {
-  const payloads = (rows || []).map(function (row) { return row.payload || {}; });
   const decisions = { AL: 0, SAT: 0, BEKLE: 0 };
-  const evaluated = [];
+  const completed = [];
   const pending = [];
   const expired = [];
   const signalErrors = [];
   let alWins = 0, alLosses = 0, alFlat = 0;
   let satSellBetter = 0, satHoldBetter = 0, satSimilar = 0;
+  let waitAvoidDown = 0, waitMissedUp = 0;
+
+  function intervalMs(timeframe) {
+    return ({
+      '15m': 15 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '4h': 4 * 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000
+    })[timeframe] || 0;
+  }
 
   (rows || []).forEach(function (row) {
     const payload = row.payload || {};
     const decision = row.decision || payload.decision || 'BEKLE';
     if (Object.prototype.hasOwnProperty.call(decisions, decision)) decisions[decision] += 1;
 
-    if (payload.directionStatus === 'completed' && Number.isFinite(Number(payload.forwardPct))) {
-      evaluated.push({
+    if (payload.directionStatus === 'completed' &&
+        payload.forwardPct !== null && payload.forwardPct !== undefined &&
+        Number.isFinite(Number(payload.forwardPct))) {
+      completed.push({
+        row: row,
+        payload: payload,
         decision: decision,
         forwardPct: Number(payload.forwardPct),
-        costPct: Number.isFinite(Number(payload.costPct)) ? Number(payload.costPct) : 0
+        costPct: Number.isFinite(Number(payload.costPct)) ? Number(payload.costPct) : 0,
+        signalAt: Number(row.signal_at || payload.signalAt),
+        timeframe: row.timeframe || payload.timeframe || ''
       });
     } else if (payload.directionStatus === 'expired' || payload.tradeStatus === 'expired' ||
                payload.spotStatus === 'expired') {
@@ -216,14 +231,44 @@ function summarizeResults(rows) {
     if (payload.spotResult && payload.spotResult.outcome === 'sell-better') satSellBetter += 1;
     if (payload.spotResult && payload.spotResult.outcome === 'hold-better') satHoldBetter += 1;
     if (payload.spotResult && payload.spotResult.outcome === 'similar') satSimilar += 1;
+    if (payload.waitResult === 'avoid-down') waitAvoidDown += 1;
+    if (payload.waitResult === 'missed-up') waitMissedUp += 1;
+  });
+
+  const directionalCalls = completed.filter(function (item) {
+    return item.decision === 'AL' || item.decision === 'SAT';
+  }).sort(function (a, b) {
+    return a.signalAt - b.signalAt;
+  });
+  const lastEndByAsset = Object.create(null);
+  const independent = [];
+  let overlapExcluded = 0;
+  let unknownHorizon = 0;
+
+  directionalCalls.forEach(function (item) {
+    const exitAt = Number(item.payload.directionResult && item.payload.directionResult.exitAt);
+    const step = intervalMs(item.timeframe);
+    const signalAt = item.signalAt;
+    if (!Number.isFinite(exitAt) || !step || !Number.isFinite(signalAt) || exitAt < signalAt) {
+      unknownHorizon += 1;
+      return;
+    }
+    const assetKey = String(item.row.symbol || item.payload.symbol || '') + '|' + item.timeframe;
+    const previousEnd = lastEndByAsset[assetKey];
+    if (Number.isFinite(previousEnd) && signalAt < previousEnd) {
+      overlapExcluded += 1;
+      return;
+    }
+    independent.push(item);
+    lastEndByAsset[assetKey] = exitAt + step;
   });
 
   let correct = 0, wrong = 0, flat = 0;
-  evaluated.forEach(function (item) {
+  independent.forEach(function (item) {
     if (Math.abs(item.forwardPct) <= item.costPct) flat += 1;
     else if ((item.decision === 'AL' && item.forwardPct > 0) ||
              (item.decision === 'SAT' && item.forwardPct < 0)) correct += 1;
-    else if (item.decision === 'AL' || item.decision === 'SAT') wrong += 1;
+    else wrong += 1;
   });
 
   const directionalCount = correct + wrong;
@@ -231,15 +276,19 @@ function summarizeResults(rows) {
     windowDays: 30,
     totalSignals: (rows || []).length,
     decisions: decisions,
-    completedDirection: evaluated.length,
+    completedDirection: completed.length,
     pending: pending.length,
     expired: expired.length,
     signalErrors: signalErrors.length,
+    waitResults: { avoidDown: waitAvoidDown, missedUp: waitMissedUp },
     directional: {
-      sampleCount: evaluated.length,
+      sampleCount: directionalCount,
+      independentCount: independent.length,
       correct: correct,
       wrong: wrong,
       flat: flat,
+      overlapExcluded: overlapExcluded,
+      unknownHorizon: unknownHorizon,
       rate: directionalCount ? correct / directionalCount * 100 : null,
       reliable: directionalCount >= 30
     },
@@ -252,7 +301,6 @@ function summarizeResults(rows) {
     caution: 'Bu değerler geçmiş sinyal yönü ve simülasyon özetidir; gerçek portföy getirisi veya yatırım tavsiyesi değildir.'
   };
 }
-
 async function checkExternalApis(checks) {
   const binanceHosts = [
     'https://data-api.binance.vision/api/v3/ping',
@@ -302,7 +350,7 @@ async function checkGithubActions(checks) {
       return;
     }
     const ageHours = (NOW.getTime() - Date.parse(latest.updated_at || latest.created_at)) / 3600000;
-    const ok = latest.conclusion === 'success';
+    const ok = latest.conclusion === 'success' && ageHours <= 48;
     addCheck(checks, 'GitHub tarayıcı testleri', ok ? 'ok' : 'warning',
       'Son tamamlanan test: ' + latest.conclusion + ' · ' +
       new Date(latest.updated_at || latest.created_at).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }) +
