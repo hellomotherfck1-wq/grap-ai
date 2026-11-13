@@ -101,6 +101,9 @@ assert.ok(admin.includes('pendingDataErrors') && admin.includes('pendingNormal')
   'The results panel must split pending reasons and exclude synthetic E2E records');
 assert.ok(daily.includes('function isTestSignalRow') && daily.includes('fetchedSignals.filter'),
   'The daily admin report must exclude synthetic E2E signals from statistics');
+assert.ok(admin.includes('records = records.filter(function (record) { return !isTestRecord(record); });') &&
+  admin.includes('fresh = fresh.filter(function (record) { return !isTestRecord(record); });'),
+  'Manual result evaluation must also ignore synthetic E2E signals');
 assert.ok(shared.includes('window.__GRAP_AI_E2E_TEST__') && shared.includes('skipped: true') &&
   e2e.includes('window.__GRAP_AI_E2E_TEST__'),
   'Browser E2E writes must be isolated from the production shared result pool');
