@@ -7,6 +7,7 @@ const shared = fs.readFileSync('js/ortak-sonuc-havuzu.js', 'utf8');
 const daily = fs.readFileSync('scripts/admin-daily-agent.cjs', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/20261113000200_pending_results_worker.sql', 'utf8');
 const workflow = fs.readFileSync('.github/workflows/pending-results-worker.yml', 'utf8');
+const e2e = fs.readFileSync('.github/tests/live-e2e.mjs', 'utf8');
 
 const workerSource = fs.readFileSync('scripts/evaluate-pending-results.cjs', 'utf8');
 new Function(workerSource);
@@ -15,6 +16,14 @@ assert.equal(worker.intervalMs('15m'), 900000);
 assert.equal(worker.intervalMs('1h'), 3600000);
 assert.equal(worker.intervalMs('4h'), 14400000);
 assert.equal(worker.intervalMs('1d'), 86400000);
+const fakeTestSignal = {
+  symbol: 'E2EALL0USDT', source: 'E2E tam tarama',
+  decision: 'BEKLE', directionStatus: 'pending'
+};
+assert.equal(worker.isTestSignal(fakeTestSignal), true);
+assert.equal(worker.isPending(fakeTestSignal), false,
+  'Synthetic E2E records must not enter the production pending queue');
+assert.equal(worker.isTestSignal({ symbol: 'BTCUSDT', source: 'Grafik analizi' }), false);
 
 const bybitBars = worker.normalizeBybitBars([
   ['2000000000000', '100', '110', '90', '105'],
@@ -87,8 +96,14 @@ const expired = worker.expiredPatch({
 assert.equal(expired.tradeStatus, 'expired');
 assert.equal(expired.directionStatus, 'expired');
 
-assert.ok(admin.includes('pendingDataErrors') && admin.includes('pendingNormal'),
-  'The results panel must split normal pending records from data-source errors');
+assert.ok(admin.includes('pendingDataErrors') && admin.includes('pendingNormal') &&
+  admin.includes('function isTestRecord') && admin.includes('return !isTestRecord(record)'),
+  'The results panel must split pending reasons and exclude synthetic E2E records');
+assert.ok(daily.includes('function isTestSignalRow') && daily.includes('fetchedSignals.filter'),
+  'The daily admin report must exclude synthetic E2E signals from statistics');
+assert.ok(shared.includes('window.__GRAP_AI_E2E_TEST__') && shared.includes('skipped: true') &&
+  e2e.includes('window.__GRAP_AI_E2E_TEST__'),
+  'Browser E2E writes must be isolated from the production shared result pool');
 assert.ok(shared.includes('offset < 50000'),
   'The mobile admin view keeps a 50,000-row safety ceiling; server worker pagination is independent');
 assert.ok(daily.includes(': Infinity;') && daily.includes('pendingDataErrors'),
