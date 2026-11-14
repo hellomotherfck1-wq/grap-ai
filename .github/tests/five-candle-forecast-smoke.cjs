@@ -156,7 +156,7 @@ assert.ok(auditor.includes('5 mum sonrası tahmini fiyat') && auditor.includes('
 assert.ok(performance.includes('renderFiveBarForecast') &&
   performance.includes('absoluteErrorPct') && performance.includes('priceForecast') &&
   performance.includes('priceForecast: c.priceForecast') && performance.includes('chartRead') &&
-  performance.includes("directionStatus: c.directionStatus || 'pending'") && performance.includes('horizon: c.horizon'),
+  performance.includes("directionStatus: c.directionStatus || 'pending'") && performance.includes('horizon: num(c.horizon)'),
   'The Results section must display forecasts and measured price errors');
 assert.ok(shared.includes("'fkVeto', 'priceForecast'"),
   'Admin shared-result patches must allow the forecast payload');
