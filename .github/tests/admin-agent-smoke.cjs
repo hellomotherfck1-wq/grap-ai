@@ -118,7 +118,7 @@ assert.ok(agent.includes('pendingNormal') && agent.includes('pendingDataErrors')
   'Daily reports must separate normal pending results from data-source errors');
 assert.ok(!agent.includes('GITHUB_STEP_SUMMARY') && !agent.includes('writeStepSummary'),
   'Private report details must not be exposed in public workflow summaries');
-assert.ok(worker.includes('graph-ai-v60') && worker.includes('./js/system-monitor.js') &&
+assert.ok(worker.includes('graph-ai-v61') && worker.includes('./js/system-monitor.js') &&
   worker.includes('./js/veri-koprusu.js'),
   'Service worker must cache the monitor and shared data transport with the new cache version');
 
