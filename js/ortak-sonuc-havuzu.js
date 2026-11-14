@@ -134,7 +134,7 @@
       'directionStatus', 'forwardPct', 'directionResult', 'waitResult',
       'lastCheckedAt', 'nextCheckAt', 'lastError', 'updatedAt',
       'score', 'trend', 'rsi', 'auditorError', 'auditorWarningCount',
-      'fundamentalStatus', 'fkPE', 'fkValuation', 'fkVeto'
+      'fundamentalStatus', 'fkPE', 'fkValuation', 'fkVeto', 'priceForecast'
     ];
     var list = (Array.isArray(patches) ? patches : []).map(function (item) {
       var clean = {};
