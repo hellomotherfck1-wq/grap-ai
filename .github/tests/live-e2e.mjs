@@ -1429,7 +1429,7 @@ try {
     const initiallyCollapsed = !!notes && !notes.open;
     if (notes) notes.open = true;
     const expands = !!notes && notes.open;
-    const hasPerformance = (notes?.textContent || '').includes('30\'dan az bağımsız örnek');
+    const hasPerformance = (notes?.textContent || '').includes('En az 20 farklı 15 dakikalık zaman penceresi');
     const hasSecurity = (notes?.textContent || '').includes('service_role');
     if (notes) notes.open = false;
     return {
