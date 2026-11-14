@@ -233,7 +233,7 @@
     if (report.errors.length) {
       var warn = document.createElement('p');
       warn.className = 'alt';
-      warn.textContent = 'Eksik kaynak: ' + report.errors.join(' · ');
+      warn.textContent = 'Haber akışına şu anda erişilemiyor. Teknik ve finansal analiz mevcut verilerle tamamlandı; haber etkisi değerlendirmeye alınmadı.';
       container.appendChild(warn);
     }
   }
@@ -260,7 +260,7 @@
       window.HaberAjani.analizEt(v, { yahoo: report.news || [] }).then(function (newsReport) {
         window.HaberAjani.render(newsReport, newsBox);
       }).catch(function (error) {
-        newsBox.textContent = 'Haber Ajanı şu anda haber alamadı: ' + (error && error.message ? error.message : String(error));
+        newsBox.textContent = 'Haber kaynağı şu anda erişilemiyor; diğer analizler etkilenmedi.';
       });
     }
     return report;
@@ -289,7 +289,7 @@
         window.HaberAjani.render(newsReport, newsBox);
         status.textContent = 'Araştırma tamamlandı · ' + new Date().toLocaleString('tr-TR');
       }).catch(function (error) {
-        newsBox.textContent = 'Haber Ajanı şu anda haber alamadı: ' + (error && error.message ? error.message : String(error));
+        newsBox.textContent = 'Haber kaynağı şu anda erişilemiyor; diğer analizler etkilenmedi.';
         status.textContent = 'Araştırma tamamlandı · Haber kaynağına erişilemedi';
       });
     }

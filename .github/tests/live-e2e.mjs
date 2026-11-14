@@ -890,6 +890,8 @@ try {
     }
     await route.continue();
   });
+  await page.evaluate(() => window.GrapAIDataTransport.clear());
+  await page.waitForTimeout(100);
   const fallbackNews = await page.evaluate(async () => window.BistArastirma.haberGetir('FALLBACK'));
   check('Yahoo haberlerinde ikinci ücretsiz proxy yedeği', fallbackNews.length === 1 && fallbackNews[0].title.includes('AllOrigins'), fallbackNews.map(x => x.title).join(', ') || 'Haber alınamadı');
   await page.evaluate(() => window.GrapAIDataTransport.clear());
