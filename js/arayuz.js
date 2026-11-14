@@ -397,7 +397,7 @@ function grafikAra(ayar) {
         const arastirmaVerisi = Object.assign({}, v, { mumlar: kapaliMumlar });
         const arastirmaDn = Veri.donustur(arastirmaVerisi, 80);
         window.BistArastirma.grafikOzet(v, arastirmaDn, sonuc, arastirmaKutusu).catch(function (e) {
-          arastirmaKutusu.textContent = 'Araştırma ajanı şu anda veri alamadı: ' + (e && e.message ? e.message : String(e));
+          arastirmaKutusu.textContent = 'Araştırma şu anda tamamlanamadı. Veriler yenilendiğinde tekrar deneyebilirsin.';
         });
       }
 
