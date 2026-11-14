@@ -57,6 +57,9 @@ jobs:
       - name: Smoke test private daily admin agent
         run: node .github/tests/admin-agent-smoke.cjs
 
+      - name: Smoke test auditor five-candle forecast
+        run: node .github/tests/five-candle-forecast-smoke.cjs
+
       - name: Smoke test background pending result evaluator
         run: node .github/tests/pending-results-worker-smoke.cjs
 

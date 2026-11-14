@@ -333,6 +333,39 @@
     D.sorunlar.slice(0, 6).forEach(function (x) { dn.push((x.a >= 3 ? '🔴 ' : x.a === 2 ? '🟠 ' : '🟡 ') + x.t); });
     dn.push('Hacim ajanının yorumu: ' + D.teyit + '. Teknik ajanın yorumu: ' + D.teknikTeyit + '.');
 
+    var priceForecast = null;
+    if (s.meta && s.meta.zd === '15m') {
+      var forecastModel = window.GrapAIDenetciFiyatTahmini;
+      if (forecastModel && typeof forecastModel.olustur === 'function') {
+        priceForecast = forecastModel.olustur(s.meta.kapaliMumlar, {
+          timeframe: s.meta.zd,
+          source: s.meta.kaynak === 'b' ? 'Binance Spot' : 'Yahoo Finance',
+          sourceInfo: s.meta.kaynakBilgi || null,
+          fetchedAt: s.meta.veriAlimZamani,
+          lastClosedAt: s.meta.sinyalMumuZamani,
+          intervalMs: s.meta.sinyalAralikMs
+        }, Date.now());
+      } else {
+        priceForecast = { status: 'unavailable', reason: 'Tahmin becerisi yüklenemedi.' };
+      }
+      if (priceForecast && priceForecast.status === 'pending') {
+        var priceText = function (value) {
+          var amount = Number(value);
+          var digits = amount >= 1000 ? 2 : amount >= 1 ? 4 : 8;
+          return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: digits }).format(amount);
+        };
+        dn.push('🔮 5 mum sonrası tahmini fiyat (15 dk): ' + priceText(priceForecast.predictedPrice) + '.');
+        dn.push('Geçmiş benzer örnek aralığı: ' + priceText(priceForecast.predictedLow) +
+          ' – ' + priceText(priceForecast.predictedHigh) + ' · ' +
+          priceForecast.historicalSampleCount + ' benzer geçmiş örnek.');
+        dn.push('Gerçek sonuç, sonraki 5 kapanmış 15 dakikalık mumun beşincisinin kapanışıyla ölçülecek. Kaynak: ' +
+          priceForecast.sourceRoute + '.');
+      } else {
+        dn.push('5 mum sonrası fiyat tahmini üretilmedi: ' +
+          (priceForecast && priceForecast.reason ? priceForecast.reason : 'Doğrulanmış veri yetersiz.'));
+      }
+    }
+
     var tt = [];
     tt.push('🟩 Teknik Ajan: ' + T.ozet + (T.nedenler.length ? ' Nedenleri: ' + T.nedenler.join(' ') : ''));
     tt.push('🟩 Teknik Ajan: Benzer göstergeleri ayrı ayrı saymadım; trend, momentum, fiyat yapısı ve katılım gruplarını karşılaştırdım.');
@@ -347,13 +380,15 @@
     tt.push('🟧 Denetçi: Genel analiz ' + (s.karar || 'BEKLE') + ', teknik ajan ' + (T.var ? T.karar : 'veri yok') + '.' + (D.sorunlar.length ? ' Dikkat çeken nokta: ' + D.sorunlar[0].t : ' Ciddi bir sorun görmedim.'));
     tt.push('🟧 Denetçi: Hata payı ' + D.hata + '. Nihai karar: ' + N.son + ' (' + N.durum + ').');
 
-    return [
+    var cards = [
       { baslik: '⚖️ Nihai Karar (Denetçi): ' + N.son, satirlar: nh },
       { baslik: '🟩 Teknik Ajan', satirlar: T.satirlar },
       { baslik: '🟦 Hacim Ajanı', satirlar: H.satirlar.slice() },
       { baslik: '🟧 Denetçi Ajan (hata payı: ' + D.hata + ')', satirlar: dn },
       { baslik: '💬 Ajanların Tartışması', satirlar: tt }
     ];
+    cards.priceForecast = priceForecast && priceForecast.status === 'pending' ? priceForecast : null;
+    return cards;
   }
 
   // Her ajanın sürümünü tek noktadan takip et. Algoritma değiştiğinde
@@ -362,7 +397,7 @@
     general: 'analysis-v1',
     technical: 'technical-groups-v1',
     volume: 'volume-heuristic-v1',
-    auditor: 'auditor-check-v1',
+    auditor: 'auditor-check-v2',
     committee: 'committee-consensus-v1'
   });
   A.teknikAjani = teknikAjani;
@@ -375,6 +410,7 @@
       var y = eskiY.call(this, s, kal, uy);
       try {
         var yeni = kartlar3(s, kal, uy);
+        if (y && yeni) y.priceForecast = yeni.priceForecast || null;
         if (yeni && y && Array.isArray(y.kartlar)) {
           var kararEslesmesi = String(yeni[0] && yeni[0].baslik || '').match(/:\s*(AL|SAT|BEKLE)\s*$/i);
           if (kararEslesmesi) {

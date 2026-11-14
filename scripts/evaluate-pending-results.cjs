@@ -9,6 +9,7 @@ const RETENTION_DAYS = 365;
 const DEFAULT_HORIZON = 10;
 const DEFAULT_COST = 0.20;
 const RETRY_ERROR_MS = 6 * 60 * 60 * 1000;
+const priceForecastModel = require('../js/denetci-fiyat-tahmini.js');
 
 function intervalMs(timeframe) {
   return ({
@@ -48,13 +49,15 @@ function isPending(record) {
   if (isTestSignal(record)) return false;
   return record.directionStatus === 'pending' ||
     (record.decision === 'AL' && record.tradeStatus === 'pending') ||
-    (record.decision === 'SAT' && record.spotStatus !== 'completed' && record.spotStatus !== 'expired');
+    (record.decision === 'SAT' && record.spotStatus !== 'completed' && record.spotStatus !== 'expired') ||
+    (record.timeframe === '15m' && record.priceForecast && record.priceForecast.status === 'pending');
 }
 
 function isExpired(record) {
   return record.directionStatus === 'expired' ||
     (record.decision === 'AL' && record.tradeStatus === 'expired') ||
-    (record.decision === 'SAT' && record.spotStatus === 'expired');
+    (record.decision === 'SAT' && record.spotStatus === 'expired') ||
+    (record.timeframe === '15m' && record.priceForecast && record.priceForecast.status === 'expired');
 }
 
 function summarizePending(records) {
@@ -202,7 +205,8 @@ function evaluateRecord(record, bars, now) {
   return {
     trade: tradeResult(record, bars, now),
     spotSale: spotSaleResult(record, bars, now),
-    direction: directionResult(record, bars, now)
+    direction: directionResult(record, bars, now),
+    priceForecast: priceForecastModel.degerlendir(record, bars, now)
   };
 }
 
@@ -213,6 +217,11 @@ function expiredPatch(record) {
     tradeResult: record.decision === 'SAT' ? null : record.tradeResult,
     spotStatus: record.decision === 'SAT' && record.spotStatus !== 'completed' ? 'expired' : record.spotStatus,
     directionStatus: record.directionStatus === 'pending' ? 'expired' : record.directionStatus,
+    priceForecast: record.priceForecast && record.priceForecast.status === 'pending'
+      ? Object.assign({}, record.priceForecast, {
+          status: 'expired',
+          reason: 'Ücretsiz kaynağın geçmiş aralığı bu tahmini kapsamıyor.'
+        }) : record.priceForecast,
     lastError: 'Ücretsiz kaynağın geçmiş aralığı bu sinyali kapsamıyor.'
   };
 }
@@ -247,6 +256,7 @@ function evaluationPatch(record, bars, now) {
         : evaluated.direction.classification === 'up' ? 'missed-up' : 'flat';
     }
   }
+  if (evaluated.priceForecast) patch.priceForecast = evaluated.priceForecast;
   return patch;
 }
 
@@ -534,7 +544,8 @@ async function processGroup(group, stats) {
     patches.push({ id: record.id, patch: patch });
     if (patch.directionStatus === 'completed' ||
         patch.tradeStatus === 'completed' || patch.tradeStatus === 'skipped' ||
-        patch.spotStatus === 'completed') {
+        patch.spotStatus === 'completed' ||
+        (patch.priceForecast && patch.priceForecast.status === 'completed')) {
       stats.completedRecords += 1;
     }
     if (patch.lastError) stats.dataErrorRecords += 1;
@@ -621,6 +632,7 @@ module.exports = {
   evaluateRecord: evaluateRecord,
   expiredPatch: expiredPatch,
   evaluationPatch: evaluationPatch,
+  priceForecastResult: priceForecastModel.degerlendir,
   groupPending: groupPending,
   normalizeBybitBars: normalizeBybitBars,
   normalizeGateBars: normalizeGateBars,
