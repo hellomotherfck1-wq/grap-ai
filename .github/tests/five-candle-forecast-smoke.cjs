@@ -152,9 +152,9 @@ assert.ok(sql.includes("'fkVeto', 'priceForecast'") &&
   sql.includes("notify pgrst, 'reload schema'"),
   'Both secured Supabase patch RPCs must accept forecast outcomes');
 const listStart = coinScan.indexOf('var LISTE = [');
-const listEnd = coinScan.indexOf('\\n  ];', listStart);
+const listEnd = coinScan.indexOf('  ];', listStart);
 const listedCoins = listStart >= 0 && listEnd > listStart
-  ? (coinScan.slice(listStart, listEnd).match(/\\{\\s*q:\\s*'/g) || []).length : 0;
+  ? (coinScan.slice(listStart, listEnd).match(/{ q: '/g) || []).length : 0;
 assert.equal(listedCoins, 216, 'The forecast sweep must cover all 216 coins in the app list');
 assert.ok(coinScan.includes("Veri.binance(symbol, '15m', 120)") &&
   coinScan.includes('tumCoinTahminleriniUret') &&
