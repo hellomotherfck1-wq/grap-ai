@@ -1296,7 +1296,8 @@ try {
       coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.3.0' &&
       coinScan.forecastCount === coinScan.total &&
       coinScan.forecastReady + coinScan.forecastUnavailable === coinScan.total &&
-      coinScan.forecastReady > 0 && coinScan.status.startsWith('Tamamlandı'),
+      coinScan.forecastReady > 0 && coinScan.forecastSaved === coinScan.forecastReady &&
+      coinScan.status.startsWith('Tamamlandı'),
     JSON.stringify(coinScan)
   );
   check('İlk 20 coin derin kontrolünde 15m, 1h, 4h ve 1d zaman damgaları var',
