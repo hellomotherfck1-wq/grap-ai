@@ -208,7 +208,7 @@
     });
   }
 
-  function cleanPriceForecast(forecast, timeframe, signalAt) {
+  function cleanPriceForecast(forecast, timeframe, signalAt, signalPrice) {
     if (!forecast || typeof forecast !== 'object' || timeframe !== '15m' ||
         forecast.status !== 'pending' || forecast.timeframe !== '15m' ||
         Number(forecast.horizonBars) !== 5) return null;
@@ -217,9 +217,14 @@
     var low = Number(forecast.predictedLow);
     var high = Number(forecast.predictedHigh);
     var forecastAt = Number(forecast.signalAt);
-    if (![base, target, low, high, forecastAt].every(Number.isFinite) ||
-        base <= 0 || target <= 0 || low <= 0 || high <= 0 || low > high ||
-        Math.abs(forecastAt - signalAt) > 1) return null;
+    var predictedChange = Number(forecast.predictedChangePct);
+    var dueAt = Number(forecast.dueAt);
+    var samples = Number(forecast.historicalSampleCount);
+    if (![base, target, low, high, forecastAt, predictedChange, dueAt, samples, signalPrice].every(Number.isFinite) ||
+        base <= 0 || target <= 0 || low <= 0 || high <= 0 || signalPrice <= 0 || low > high ||
+        samples < 5 || Math.abs(base - signalPrice) / signalPrice > 0.000001 ||
+        Math.abs(forecastAt - signalAt) > 1 ||
+        Math.abs(dueAt - (signalAt + 5 * interval('15m'))) > 1) return null;
     return {
       status: 'pending',
       modelVersion: String(forecast.modelVersion || 'auditor-price-5bar-knn-v1').slice(0, 80),
@@ -230,7 +235,7 @@
       predictedPrice: target,
       predictedLow: low,
       predictedHigh: high,
-      predictedChangePct: Number(forecast.predictedChangePct),
+      predictedChangePct: predictedChange,
       historicalSampleCount: Math.max(0, Math.floor(Number(forecast.historicalSampleCount) || 0)),
       historicalCandidateCount: Math.max(0, Math.floor(Number(forecast.historicalCandidateCount) || 0)),
       nearestDistance: num(forecast.nearestDistance) ? forecast.nearestDistance : null,
@@ -240,7 +245,7 @@
       sourceFetchedAt: num(forecast.sourceFetchedAt) ? forecast.sourceFetchedAt : null,
       lastClosedCandleAt: num(forecast.lastClosedCandleAt) ? forecast.lastClosedCandleAt : null,
       signalAt: forecastAt,
-      dueAt: num(forecast.dueAt) ? forecast.dueAt : null,
+      dueAt: dueAt,
       createdAt: num(forecast.createdAt) ? forecast.createdAt : Date.now()
     };
   }
@@ -257,7 +262,7 @@
         ['AL', 'SAT', 'BEKLE'].indexOf(decision) < 0) return null;
     var now = Date.now();
     var source = String(input.source || 'Grafik analizi');
-    var priceForecast = cleanPriceForecast(input.priceForecast, tf, at);
+    var priceForecast = cleanPriceForecast(input.priceForecast, tf, at, price);
     return {
       id: idFor(symbol, tf, at),
       createdAt: now,
