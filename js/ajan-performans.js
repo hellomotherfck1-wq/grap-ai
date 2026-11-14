@@ -1466,7 +1466,7 @@
 
   function fetchGroupHistory(group) {
     if (group.market === 'Kripto' && typeof Veri.binance === 'function') {
-      return Veri.binance(group.symbol, group.timeframe, 1000).then(function (mumlar) {
+      return Veri.binance(group.symbol, group.timeframe, group.timeframe === '15m' ? 200 : 1000).then(function (mumlar) {
         return { mumlar: mumlar };
       });
     }
