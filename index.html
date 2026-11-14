@@ -263,9 +263,9 @@
           <details class="admin-not-grup">
             <summary>5. Ajan performans karnesi</summary>
             <ul>
-              <li>AL/SAT yön başarısı, sinyalden sonraki 10 kapanmış mumun fiyat hareketiyle ölçülür. BEKLE oyları ayrı tutulur.</li>
-              <li>Çakışan 10 mumluk ölçüm pencereleri bağımsız örnek sayılmaz; sonuçlar piyasa, periyot, ajan ve ajan sürümüne göre ayrılır.</li>
-              <li>30'dan az bağımsız örnek güvenilir başarı oranı için yeterli değildir. Yön isabeti, gerçek portföy kârı veya net işlem getirisi değildir.</li>
+              <li>Bu aşamadaki kripto testinde AL/SAT yön başarısı, sinyalden sonraki 5 kesintisiz 15 dakikalık mumla ölçülür. Eski kayıtlar kendi ufkunu korur; BEKLE oyları ayrı tutulur.</li>
+              <li>Çakışan 5 mumluk ölçüm pencereleri bağımsız örnek sayılmaz; sonuçlar 15 dakikalık zaman pencerelerine göre dengelenir.</li>
+              <li>En az 20 farklı 15 dakikalık zaman penceresi oluşmadan performans güvenilir kabul edilmez. Yön isabeti, gerçek portföy kârı veya net işlem getirisi değildir.</li>
               <li>Ham mum verileri performans kaydı olarak saklanmaz; eski ve ölçüm bitiş zamanı eksik kayıtlar bağımsız örnek hesabına alınmayabilir.</li>
             </ul>
           </details>
@@ -291,7 +291,7 @@
           <details class="admin-not-grup">
             <summary>8. Sonraki geliştirme adımı</summary>
             <ul>
-              <li>Önce 1–2 hafta boyunca yeterli sayıda bağımsız sinyal ve 10 mumluk değerlendirme birikmesi beklenir.</li>
+              <li>Önce 1–2 hafta boyunca farklı piyasa koşullarında yeterli sayıda 15 dakikalık test penceresi ve 5 mumluk değerlendirme birikmesi beklenir.</li>
               <li>Ardından hangi ajanın hangi piyasada ve periyotta zayıf kaldığı performans tablosundan belirlenir.</li>
               <li>AL/SAT eşikleri rastgele değiştirilmez; yalnızca ölçümle kanıtlanan sorun için hedefli kod değişikliği ve test hazırlanır.</li>
             </ul>
