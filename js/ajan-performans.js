@@ -640,7 +640,7 @@
       if (future.length < horizon) return null;
       exitIndex = horizon - 1;
       exit = future[exitIndex].c;
-      reason = hasPlan ? '10 mum zaman çıkışı' : '10 mum Spot AL yön testi (işlem planı yok)';
+      reason = hasPlan ? horizon + ' mum zaman çıkışı' : horizon + ' mum Spot AL yön testi (işlem planı yok)';
     }
 
     var sample = future.slice(0, exitIndex + 1);
@@ -664,7 +664,7 @@
   }
 
   function spotSaleResult(record, bars) {
-    // SAT: mevcut Spot pozisyonunu sonraki mum açılışında satıp 10 mum tutmaya kıyasla.
+    // SAT: mevcut Spot pozisyonunu sonraki mum açılışında satıp kayıtlı test ufku kadar tutmaya kıyasla.
     // Bu, gerçek portföy PnL'si değildir; alış maliyeti ve pozisyon miktarı bilinmez.
     if (record.decision !== 'SAT') return null;
     var future = futureBars(record, bars);
