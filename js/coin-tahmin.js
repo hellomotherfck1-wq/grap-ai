@@ -843,7 +843,7 @@
     box.className = 'kart';
     box.style.borderLeft = '4px solid #2f81f7';
     var h = document.createElement('summary');
-    h.textContent = 'Ajan oyları ve denetçi kontrolü';
+    h.textContent = 'Ajan oyları ve Denetçi kontrolü';
     box.appendChild(h);
 
     var rows = [
