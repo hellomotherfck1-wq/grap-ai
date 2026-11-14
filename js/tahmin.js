@@ -403,10 +403,12 @@
     }
 
     var v = await Veri.ara(item.q, zd, function () {});
-    var aralikMs = zd === '15m' ? 15 * 60 * 1000 : zd === '1h' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+    var aralikMs = typeof Veri.aralikMs === 'function' ? Veri.aralikMs(zd) : 24 * 60 * 60 * 1000;
     var kapanmisHam = Array.isArray(v.mumlar) ? v.mumlar.slice() : [];
     var sonHam = kapanmisHam.length ? kapanmisHam[kapanmisHam.length - 1] : null;
-    var sonMumAcik = !!(sonHam && Number.isFinite(Number(sonHam.t)) && Date.now() < Number(sonHam.t) + aralikMs);
+    var sonMumAcik = typeof v.sonMumAcik === 'boolean'
+      ? v.sonMumAcik
+      : !!(sonHam && Number.isFinite(Number(sonHam.t)) && Date.now() < Number(sonHam.t) + aralikMs);
     if (sonMumAcik) kapanmisHam.pop();
     if (kapanmisHam.length < 20) throw new Error('Kapanmış mum sayısı yetersiz.');
     var vKapanmis = Object.assign({}, v, { mumlar: kapanmisHam });

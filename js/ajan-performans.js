@@ -306,6 +306,18 @@
     return score > 0 ? 'AL' : 'SAT';
   }
 
+  function decisionFromResult(y, s) {
+    var cards = y && Array.isArray(y.kartlar) ? y.kartlar : [];
+    for (var i = 0; i < cards.length; i++) {
+      var title = String(cards[i] && cards[i].baslik || '');
+      if (title.indexOf('Nihai Karar') < 0) continue;
+      var match = title.match(/:\s*(AL|SAT|BEKLE)\s*$/i);
+      if (match) return match[1].toUpperCase();
+    }
+    var decision = String(y && y.karar || s && s.karar || 'BEKLE').toUpperCase();
+    return decision === 'AL' || decision === 'SAT' || decision === 'BEKLE' ? decision : 'BEKLE';
+  }
+
   function saveAnalysis(input) {
     var s = input.s || {};
     var y = input.y || {};
@@ -359,7 +371,7 @@
       stop: input.stop,
       target: input.target,
       rr: input.rr,
-      decision: y.karar || s.karar || 'BEKLE',
+      decision: decisionFromResult(y, s),
       generalDecision: votes.generalDecision,
       technicalDecision: votes.technicalDecision,
       volumeDecision: votes.volumeDecision,

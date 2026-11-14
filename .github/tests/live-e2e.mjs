@@ -315,6 +315,32 @@ try {
     performanceChecks.allVotesSaved, JSON.stringify(performanceChecks));
   check('Hacim verisi olmayan coine sahte BEKLE oyu yazılmıyor',
     performanceChecks.noVolumeSaved, JSON.stringify(performanceChecks));
+  const finalDecisionSync = await page.evaluate(async () => {
+    const P = window.AjanPerformans;
+    const id = P.kaydetAnaliz({
+      symbol: 'E2EFINALCARDUSDT',
+      name: 'Nihai karar kayıt testi',
+      market: 'Kripto',
+      timeframe: '1h',
+      signalAt: Date.now() - 2 * 60 * 60 * 1000,
+      price: 100,
+      s: { karar: 'AL', c: [] },
+      y: {
+        karar: 'AL',
+        kartlar: [{ baslik: '⚖️ Nihai Karar (Denetçi): BEKLE', satirlar: ['Karar: BEKLE'] }]
+      }
+    });
+    let record = null;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const rows = await P.listele();
+      record = rows.find(item => item.id === id) || null;
+      if (record) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return { id, decision: record ? record.decision : null };
+  });
+  check('Performans kaydı görünen nihai kurul kararını esas alıyor',
+    finalDecisionSync.decision === 'BEKLE', JSON.stringify(finalDecisionSync));
   const agentBreakdownChecks = await page.evaluate(() => {
     const P = window.AjanPerformans;
     const base = {

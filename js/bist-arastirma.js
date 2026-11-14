@@ -271,7 +271,9 @@
     if (typeof Veri.ara !== 'function') throw new Error('Piyasa veri modülü hazır değil.');
     status.textContent = 'Günlük fiyat ve hacim geçmişi alınıyor…';
     var v = await Veri.ara(sembol, '1d', function (message) { status.textContent = message; });
-    var dn = Veri.donustur(v, 120);
+    var mumlar = v.sonMumAcik && v.mumlar.length > 1 ? v.mumlar.slice(0, -1) : v.mumlar;
+    var dn = Veri.donustur(Object.assign({}, v, { mumlar: mumlar }), 120);
+    if (!dn || !dn.d || dn.d.length < 20) throw new Error('Kapanmış günlük mum sayısı araştırma için yetersiz.');
     var trend = Goruntu.trend(dn.m);
     var s = Analiz.yap(dn.m, trend);
     var panel = window.TahminAI && typeof window.TahminAI.ajanlaraSor === 'function'

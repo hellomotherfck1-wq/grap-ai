@@ -133,7 +133,7 @@ const Veri = {
           const parsed = Number(value);
           return Number.isFinite(parsed) ? parsed : null;
         };
-        const mumlar = rows.map(row => ({
+        const mumlar = this.mumlariDogrula(rows.map(row => ({
           t: Number(row[0]),
           o: Number(row[1]),
           h: Number(row[2]),
@@ -145,11 +145,7 @@ const Veri = {
           trades: n(row[8]),
           takerBuyBaseVolume: n(row[9]),
           takerBuyQuoteVolume: n(row[10])
-        })).filter(k =>
-          Number.isFinite(k.t) && Number.isFinite(k.o) &&
-          Number.isFinite(k.h) && Number.isFinite(k.l) &&
-          Number.isFinite(k.c)
-        );
+        })));
         if (mumlar.length < 20) throw new Error('Geçerli Binance mumu yetersiz');
         return mumlar;
       } catch (e) { son = e; }
@@ -157,21 +153,90 @@ const Veri = {
     throw son || new Error('Binance verisi alınamadı');
   },
 
-  kapanmisMumlar(mumlar, zd, simdi) {
-    const sure = {
+  mumlariDogrula(mumlar, simdi) {
+    const now = Number.isFinite(simdi) ? simdi : Date.now();
+    const byTime = new Map();
+    (Array.isArray(mumlar) ? mumlar : []).forEach(m => {
+      if (!m || typeof m !== 'object') return;
+      const t = Number(m.t), o = Number(m.o), h = Number(m.h);
+      const l = Number(m.l), close = Number(m.c);
+      if (![t, o, h, l, close].every(Number.isFinite) ||
+          t <= 0 || t > now + 5 * 60 * 1000 ||
+          o <= 0 || h <= 0 || l <= 0 || close <= 0 ||
+          h < Math.max(o, close) || l > Math.min(o, close) || h < l) return;
+      const clean = Object.assign({}, m, { t, o, h, l, c: close });
+      if (m.v === null || m.v === undefined || m.v === '') clean.v = null;
+      else {
+        const volume = Number(m.v);
+        if (!Number.isFinite(volume) || volume < 0) return;
+        clean.v = volume;
+      }
+      if (m.closeTime !== null && m.closeTime !== undefined) {
+        const closeTime = Number(m.closeTime);
+        if (!Number.isFinite(closeTime) || closeTime < t) return;
+        clean.closeTime = closeTime;
+      }
+      byTime.set(t, clean);
+    });
+    return Array.from(byTime.values()).sort((a, b) => a.t - b.t);
+  },
+
+  aralikMs(zd) {
+    return {
       '15m': 15 * 60 * 1000,
       '1h': 60 * 60 * 1000,
       '4h': 4 * 60 * 60 * 1000,
       '1d': 24 * 60 * 60 * 1000
-    }[zd];
+    }[zd] || 0;
+  },
+
+  sonMumAcikMi(mumlar, zd, meta, simdi, kaynak) {
+    const rows = Array.isArray(mumlar) ? mumlar : [];
+    const last = rows.length ? rows[rows.length - 1] : null;
+    const sure = this.aralikMs(zd);
+    const now = Number.isFinite(simdi) ? simdi : Date.now();
+    if (!last || !sure || !Number.isFinite(Number(last.t))) return false;
+
+    if (kaynak === 'b' && last.closeTime !== null && last.closeTime !== undefined) {
+      const closeTime = Number(last.closeTime);
+      if (Number.isFinite(closeTime) && closeTime >= now) return true;
+    }
+
+    const regular = meta && meta.currentTradingPeriod && meta.currentTradingPeriod.regular;
+    const start = regular ? Number(regular.start) * 1000 : NaN;
+    const end = regular ? Number(regular.end) * 1000 : NaN;
+    if (zd === '1d' && Number.isFinite(start) && Number.isFinite(end) && end > start) {
+      if (now < start || now >= end) return false;
+      const timezone = meta.exchangeTimezoneName || 'UTC';
+      try {
+        const day = ms => new Intl.DateTimeFormat('en-CA', {
+          timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit'
+        }).format(new Date(ms));
+        return day(Number(last.t)) === day(start);
+      } catch (e) {}
+    }
+
+    return now < Number(last.t) + sure;
+  },
+
+  kapanmisMumlar(mumlar, zd, simdi) {
+    const sure = this.aralikMs(zd);
     if (!sure) throw new Error('Desteklenmeyen mum zaman dilimi: ' + zd);
     const now = Number.isFinite(simdi) ? simdi : Date.now();
     return (Array.isArray(mumlar) ? mumlar : []).filter(m => {
-      if (!m || !Number.isFinite(Number(m.t))) return false;
-      if (m.closeTime !== null && m.closeTime !== undefined &&
-          Number.isFinite(Number(m.closeTime))) return Number(m.closeTime) < now;
-      return Number(m.t) + sure <= now;
+      const t = Number(m && m.t);
+      if (!m || !Number.isFinite(t) || t + sure > now) return false;
+      if (m.closeTime !== null && m.closeTime !== undefined) {
+        const closeTime = Number(m.closeTime);
+        if (Number.isFinite(closeTime) && closeTime >= now) return false;
+      }
+      return true;
     }).sort((a, b) => Number(a.t) - Number(b.t));
+  },
+
+  kapanmisYahooMumlar(mumlar, zd, meta, simdi) {
+    const rows = this.mumlariDogrula(mumlar, simdi);
+    return this.sonMumAcikMi(rows, zd, meta, simdi, 'y') ? rows.slice(0, -1) : rows;
   },
 
   async yahoo(sembol, zd) {
@@ -185,31 +250,41 @@ const Veri = {
     if (!p) throw new Error('Yahoo Finance bu zaman dilimini desteklemiyor: ' + zd);
     const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
       encodeURIComponent(sembol) + '?interval=' + p[0] + '&range=' + p[1];
-    if (!window.GrapAIDataTransport) throw new Error('Ortak veri aktarım katmanı yüklenmedi.');
-    const j = await window.GrapAIDataTransport.json(url, {
+    const transport = window.GrapAIDataTransport;
+    if (!transport || typeof transport.json !== 'function' || typeof transport.info !== 'function') {
+      throw new Error('Ortak veri aktarım katmanı veya kaynak güncelliği kontrolü yüklenmedi.');
+    }
+    const j = await transport.json(url, {
       cacheTtlMs: zd === '1d' ? 5 * 60 * 1000 : 90 * 1000,
-      staleMaxAgeMs: 24 * 60 * 60 * 1000,
+      staleMaxAgeMs: 0,
       timeoutMs: 6500,
       validate: function (payload) {
         const r = payload && payload.chart && payload.chart.result && payload.chart.result[0];
         const q = r && r.indicators && r.indicators.quote && r.indicators.quote[0];
         return !!(r && Array.isArray(r.timestamp) && r.timestamp.length >= 20 &&
-          q && Array.isArray(q.open) && Array.isArray(q.high) &&
-          Array.isArray(q.low) && Array.isArray(q.close));
+          q && Array.isArray(q.open) && q.open.length >= 20 &&
+          Array.isArray(q.high) && q.high.length >= 20 &&
+          Array.isArray(q.low) && q.low.length >= 20 &&
+          Array.isArray(q.close) && q.close.length >= 20);
       }
     });
+    const sourceInfo = transport.info(url, 'json');
+    if (!sourceInfo || sourceInfo.failed || sourceInfo.stale) {
+      throw new Error('Yahoo Finance verisinin güncelliği doğrulanamadı; eski önbellek verisiyle analiz durduruldu.');
+    }
     const r = j.chart.result[0];
     const q = r.indicators.quote[0];
     const out = [];
     r.timestamp.forEach((t, i) => {
       if (q.open[i] != null && q.high[i] != null && q.low[i] != null && q.close[i] != null)
         out.push({
-          t: t * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i],
+          t: Number(t) * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i],
           v: q.volume && q.volume[i] != null ? Number(q.volume[i]) : null
         });
     });
-    if (out.length < 20) throw new Error('Yeterli veri yok');
-    return out;
+    const mumlar = this.mumlariDogrula(out);
+    if (mumlar.length < 20) throw new Error('Yahoo Finance geçerli mum sayısı yetersiz');
+    return { mumlar, meta: r.meta || {}, sourceInfo };
   },
   async ara(girdi, zd, durum) {
     const l = this.coz(girdi);
@@ -228,10 +303,35 @@ const Veri = {
         }
         if (durum) durum(a.ad + ' aranıyor (' + (a.kaynak === 'b' ? 'Binance' : 'Yahoo Finance') + ')' +
           (hisse && istenenZd !== '1d' ? ' · Hisse verisi günlük periyoda sabitlendi' : '') + '...');
-        const mumlar = a.kaynak === 'b'
-          ? await this.binance(a.sembol, etkinZd)
+        const sonuc = a.kaynak === 'b'
+          ? { mumlar: await this.binance(a.sembol, etkinZd), meta: null,
+              sourceInfo: { stale: false, fetchedAt: new Date().toISOString(), route: 'Binance API' } }
           : await this.yahoo(a.sembol, etkinZd);
-        return Object.assign({}, a, { mumlar, zd: etkinZd, cekim: new Date() });
+        const mumlar = this.mumlariDogrula(sonuc.mumlar);
+        if (mumlar.length < 20) throw new Error('Veri doğrulamasından sonra yeterli mum kalmadı.');
+        const now = Date.now();
+        const sonMumAcik = this.sonMumAcikMi(mumlar, etkinZd, sonuc.meta, now, a.kaynak);
+        const kapanmis = a.kaynak === 'b'
+          ? this.kapanmisMumlar(mumlar, etkinZd, now)
+          : this.kapanmisYahooMumlar(mumlar, etkinZd, sonuc.meta, now);
+        if (kapanmis.length < 20) throw new Error('Güncel ve kapanmış mum sayısı analiz için yetersiz.');
+        if (a.kaynak === 'b') {
+          const sonKapali = kapanmis[kapanmis.length - 1];
+          const sure = this.aralikMs(etkinZd);
+          const kapanisZamani = sonKapali.closeTime != null
+            ? Number(sonKapali.closeTime) : Number(sonKapali.t) + sure - 1;
+          if (!Number.isFinite(kapanisZamani) || kapanisZamani >= now ||
+              now - kapanisZamani > 2 * sure) {
+            throw new Error('Binance son kapanmış mum verisi güncel değil; güvenli analiz için yeni veri bekleniyor.');
+          }
+        }
+        const fetchedAt = sonuc.sourceInfo && sonuc.sourceInfo.fetchedAt
+          ? new Date(sonuc.sourceInfo.fetchedAt) : new Date();
+        if (!Number.isFinite(fetchedAt.getTime())) throw new Error('Veri kaynağının alınma zamanı doğrulanamadı.');
+        return Object.assign({}, a, {
+          mumlar, zd: etkinZd, cekim: fetchedAt, sonMumAcik,
+          kaynakBilgi: sonuc.sourceInfo || null, kaynakMeta: sonuc.meta || null
+        });
       } catch (e) { hata = e; }
     }
     const finalError = new Error('Veri bulunamadı' + (hata ? ' (' + hata.message + ').' : '.'));
@@ -272,16 +372,18 @@ const Veri = {
   bilgi(v, d) {
     const gun = v.zd === '1d';
     const zdAd = { '15m': '15 dakika', '1h': '1 saat', '4h': '4 saat', '1d': '1 gün' }[v.zd];
+    const sonGrafikMumu = d[d.length - 1];
+    const sonKapaliMum = v.sonMumAcik && d.length > 1 ? d[d.length - 2] : sonGrafikMumu;
     const L = [
       'Varlık: ' + v.ad + ' (' + v.sembol + ') – ' + v.tur,
-      'Veri kaynağı: ' + (v.kaynak === 'b' ? 'Binance herkese açık piyasa verisi' : 'Yahoo Finance (gecikmeli olabilir)'),
+      'Veri kaynağı: ' + (v.kaynak === 'b' ? 'Binance herkese açık Spot piyasa verisi' : 'Yahoo Finance'),
       'Zaman dilimi: ' + zdAd + ', analiz edilen mum sayısı: ' + d.length,
-      'Grafikteki son mum: ' + this.tarih(d[d.length - 1].t, gun) + ' (Türkiye saati)',
-      'İlk mum: ' + this.tarih(d[0].t, gun) + ' (Türkiye saati)',
-      'Son kapanış fiyatı: ' + this.fmt(d[d.length - 1].c),
-      'Veri alınma zamanı: ' + this.tarih(v.cekim.getTime(), false)
+      'Grafikteki son mum: ' + this.tarih(sonGrafikMumu.t, gun) + ' (Türkiye saati)',
+      'Analizde kullanılan son kapanmış mum: ' + this.tarih(sonKapaliMum.t, gun) + ' (Türkiye saati)',
+      'Son kapanmış mumun kapanışı: ' + this.fmt(sonKapaliMum.c),
+      'Veri kaynağından alınma zamanı: ' + this.tarih(v.cekim.getTime(), false)
     ];
-    if (!gun) L.push('Son mum henüz kapanmamış olabilir. Borsa kapalıysa son seansın verisi görünür.');
+    if (v.sonMumAcik) L.push('Devam eden son mum grafikte gösteriliyor ancak analiz ve karar hesabına alınmadı.');
     return L;
   }
 };
