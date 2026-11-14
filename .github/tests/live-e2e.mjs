@@ -1273,6 +1273,8 @@ try {
       item.sourceTimestamps &&
       ['1h', '1d', '4h', '15m'].every(key => Object.prototype.hasOwnProperty.call(item.sourceTimestamps, key))
     );
+    const forecastItems = result && Array.isArray(result.priceForecasts) ? result.priceForecasts : [];
+    const forecastSummary = result && result.priceForecastSummary ? result.priceForecastSummary : {};
     return {
       total: window.CoinTahminAI.LISTE.length,
       scanned: result && result.adaylar ? result.adaylar.length : 0,
@@ -1280,20 +1282,25 @@ try {
       deepScanned: deep.length,
       deepTimeframeCoverage,
       deepVersion: result && result.ajanSurum,
+      forecastCount: forecastItems.length,
+      forecastReady: forecastSummary.ready || 0,
+      forecastUnavailable: forecastSummary.unavailable || 0,
+      forecastSaved: forecastSummary.saved || 0,
       errorDetails: result && result.hatalar ? result.hatalar.slice(0, 8) : [],
       status: document.querySelector('#coin-tahmin-durum')?.textContent || ''
     };
   });
   check(
-    'Coin toplu tarama akışı',
+    'Coin toplu tarama ve 216 coin 15 dk tahmin akışı',
     coinScan.scanned > 0 && coinScan.scanned + coinScan.errors === coinScan.total &&
-      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.2.0' &&
-      coinScan.status.startsWith('Tamamlandı'),
+      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.3.0' &&
+      coinScan.forecastCount === coinScan.total &&
+      coinScan.forecastReady + coinScan.forecastUnavailable === coinScan.total &&
+      coinScan.forecastReady > 0 && coinScan.status.startsWith('Tamamlandı'),
     JSON.stringify(coinScan)
   );
   check('İlk 20 coin derin kontrolünde 15m, 1h, 4h ve 1d zaman damgaları var',
     coinScan.deepTimeframeCoverage, JSON.stringify(coinScan));
-  const coinResultText = await page.locator('#coin-tahmin-alan').innerText();
   const coinReasonUI = await page.evaluate(() => {
     const node = window.CoinTahminAI.renderCoinList([{
       ad: 'Curve DAO', sembol: 'CRVUSDT', karar: 'BEKLE', skor: 41,
@@ -1321,7 +1328,9 @@ try {
       coinResultText.includes('Denetçi kontrolü') &&
       coinResultText.includes('Spot piyasada alım') &&
       coinResultText.includes('açığa satış') &&
-      coinResultText.includes('216 coin tarama özeti'),
+      coinResultText.includes('216 coin tarama özeti') &&
+      coinResultText.includes('Tüm coinlerin 15 dk') &&
+      coinResultText.includes('5 mum fiyat tahminleri'),
     coinResultText.slice(0, 1000)
   );
   await page.locator('nav button[data-git="strateji"]').click();
