@@ -307,6 +307,8 @@
       mtfAlignment: num(input.mtfAlignment) ? input.mtfAlignment : null,
       sourceTimestamps: input.sourceTimestamps && typeof input.sourceTimestamps === 'object'
         ? input.sourceTimestamps : null,
+      skillReadings: input.skillReadings && typeof input.skillReadings === 'object'
+        ? Object.assign({}, input.skillReadings) : null,
       deepScan: input.deepScan || null,
       deepVeto: Boolean(input.deepVeto),
       deepReasons: Array.isArray(input.deepReasons)
@@ -469,7 +471,9 @@
         signalAt: c.signalAt,
         price: c.fiyat,
         priceForecast: c.priceForecast || null,
-        directionStatus: c.priceForecast ? 'not-applicable' : 'pending',
+        directionStatus: c.directionStatus || 'pending',
+        horizon: num(c.horizon) ? c.horizon : (num(meta.horizon) ? meta.horizon : HORIZON),
+        skillReadings: c.skillReadings || null,
         stop: c.stopFiyat,
         target: c.hedefFiyat,
         rr: c.rr,
@@ -562,13 +566,21 @@
 
   function futureBars(record, bars) {
     var step = interval(record.timeframe);
-    return (Array.isArray(bars) ? bars : []).filter(function (bar) {
+    var rows = (Array.isArray(bars) ? bars : []).filter(function (bar) {
       return bar && num(bar.t) && num(bar.o) && num(bar.h) && num(bar.l) && num(bar.c) &&
         bar.t >= record.signalAt && bar.h >= Math.max(bar.o, bar.c) &&
-        bar.l <= Math.min(bar.o, bar.c);
-    }).sort(function (a, b) { return a.t - b.t; }).filter(function (bar) {
-      return bar.t + step <= Date.now();
-    });
+        bar.l <= Math.min(bar.o, bar.c) && bar.t + step <= Date.now();
+    }).sort(function (a, b) { return a.t - b.t; });
+    var strict15m = record.timeframe === '15m' &&
+      (record.market === 'Kripto' || /USDT$/i.test(String(record.symbol || '')));
+    if (!strict15m) return rows;
+    if (!rows.length || rows[0].t !== record.signalAt) return [];
+    var contiguous = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].t !== record.signalAt + contiguous.length * step) break;
+      contiguous.push(rows[i]);
+    }
+    return contiguous;
   }
 
   function directionResult(record, bars) {
@@ -1421,9 +1433,20 @@
     return patchRecord(id, patch);
   }
 
+  function fetchGroupHistory(group) {
+    if (group.market === 'Kripto' && typeof Veri.binance === 'function') {
+      return Veri.binance(group.symbol, group.timeframe, 1000).then(function (mumlar) {
+        return { mumlar: mumlar };
+      });
+    }
+    if (typeof Veri.yahoo === 'function') return Veri.yahoo(group.symbol, group.timeframe);
+    return Promise.reject(new Error('Bu piyasa için geçmiş veri sağlayıcısı bulunamadı.'));
+  }
+
   function updateResults() {
     if (updating) return Promise.resolve();
-    if (typeof Veri === 'undefined' || typeof Veri.gecmis !== 'function') {
+    if (typeof Veri === 'undefined' ||
+        (typeof Veri.binance !== 'function' && typeof Veri.yahoo !== 'function')) {
       setStatus('Ücretsiz geçmiş veri modülü bulunamadı.', true);
       return Promise.resolve();
     }
@@ -1457,7 +1480,7 @@
       function worker() {
         if (index >= list.length) return Promise.resolve();
         var group = list[index++];
-        return Veri.gecmis(group.symbol, group.timeframe).then(function (data) {
+        return fetchGroupHistory(group).then(function (data) {
           var step = interval(group.timeframe);
           var bars = (data.mumlar || []).filter(function (m) {
             return m && num(m.t) && m.t + step <= Date.now();
