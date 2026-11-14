@@ -1528,7 +1528,8 @@
           var pendingNow = fresh.filter(function (r) {
             return r.directionStatus === 'pending' ||
               (r.decision === 'AL' && r.tradeStatus === 'pending') ||
-              (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired');
+              (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired') ||
+              (r.timeframe === '15m' && r.priceForecast && r.priceForecast.status === 'pending');
           }).length;
           setStatus('Güncelleme tamamlandı · ' + completed + '/' + list.length + ' varlık · ' +
             pendingNow + ' sinyalin sonucu bekleniyor · ' + failures + ' veri hatası.');
