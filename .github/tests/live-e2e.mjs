@@ -1302,6 +1302,7 @@ try {
   );
   check('İlk 20 coin derin kontrolünde 15m, 1h, 4h ve 1d zaman damgaları var',
     coinScan.deepTimeframeCoverage, JSON.stringify(coinScan));
+  const coinResultText = await page.locator('#coin-tahmin-alan').innerText();
   const coinReasonUI = await page.evaluate(() => {
     const node = window.CoinTahminAI.renderCoinList([{
       ad: 'Curve DAO', sembol: 'CRVUSDT', karar: 'BEKLE', skor: 41,
