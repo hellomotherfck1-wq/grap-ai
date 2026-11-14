@@ -1391,7 +1391,7 @@
   }
 
   function exportCSV(records) {
-    var columns = ['signalAt', 'scanAt', 'symbol', 'name', 'market', 'timeframe', 'decision',
+    var columns = ['signalAt', 'scanAt', 'symbol', 'name', 'market', 'timeframe', 'horizon', 'decision',
       'generalDecision', 'generalAgentVersion', 'technicalDecision', 'technicalAgentVersion',
       'volumeDecision', 'volumeScore', 'volumeAvailable', 'volumeModelVersion',
       'auditorVersion', 'committeeVersion', 'flowDecision', 'flowScore', 'flowAvailable', 'marketRegime',
@@ -1403,13 +1403,13 @@
       'forecastStatus', 'forecastModelVersion', 'forecastBasePrice', 'forecastPredictedPrice',
       'forecastLow', 'forecastHigh', 'forecastActualPrice', 'forecastAbsErrorPct',
       'forecastSignedErrorPct', 'forecastActualChangePct', 'forecastPredictedChangePct',
-      'forecastActualAt', 'forecastSamples', 'source', 'deviceIds'];
+      'forecastActualAt', 'forecastSamples', 'source', 'deviceIds', 'skillReadings'];
     var rows = [columns.join(';')];
     records.slice().sort(function (a, b) { return a.signalAt - b.signalAt; }).forEach(function (r) {
       var deviceIds = Array.isArray(r.deviceIds) ? r.deviceIds : (r.deviceId ? [r.deviceId] : []);
       var values = [
         new Date(r.signalAt).toISOString(), r.scanAt ? new Date(r.scanAt).toISOString() : '',
-        r.symbol, r.name, r.market, r.timeframe, r.decision,
+        r.symbol, r.name, r.market, r.timeframe, r.horizon || '', r.decision,
         r.generalDecision, r.generalAgentVersion, r.technicalDecision, r.technicalAgentVersion,
         r.volumeDecision, r.volumeScore, r.volumeAvailable, r.volumeModelVersion,
         r.auditorVersion, r.committeeVersion, r.flowDecision, r.flowScore, r.flowAvailable,
@@ -1442,7 +1442,7 @@
         r.priceForecast ? r.priceForecast.actualAt : '',
         r.priceForecast ? r.priceForecast.historicalSampleCount : '',
         (r.sources || [r.source]).join('+'),
-        deviceIds.join('|')
+        deviceIds.join('|'), JSON.stringify(r.skillReadings || {})
       ];
       rows.push(values.map(function (v) {
         var value = v == null ? '' : String(v);
