@@ -1270,7 +1270,7 @@
 
     var grid = el('div', 'backtest-kpi-grid');
     [
-      ['Kayıtlı sinyal', String(all.length)],
+      ['Kayıtlı sinyal', String(testRecords.length)],
       ['Tamamlanan Spot AL', String(completedTrades.length)],
       ['Spot AL kazanma oranı', wr.rate === null ? '—' : '%' + wr.rate.toFixed(1).replace('.', ',')],
       ['Spot AL ort. net', pct(average)],
@@ -1316,14 +1316,14 @@
     detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · piyasa, periyot ve sürüm ayrımı'));
     detailPanel.appendChild(renderAgentTable(testRecords));
     detailPanel.appendChild(el('p', 'backtest-not',
-      'İsabet, sinyalden sonraki 10 kapanmış mumun fiyat yönüne göre hesaplanır; gerçek işlem kârı değildir. BEKLE oyları AL/SAT isabetine katılmaz, yatay sonuçlar ayrı gösterilir. Aynı sembol ve periyotta ölçüm penceresi bitmeden gelen tekrar sinyalleri bağımsız örnek sayılmaz. Eski kayıtlarda ileri dönem bitiş zamanı bulunmuyorsa bu kayıtlar bağımsız örnek hesabına alınmaz. 30’dan az bağımsız örnek kesin başarı göstergesi değildir.'));
+      'İsabet, 15 dk testinde sinyalden sonraki 5 kapanmış mumun fiyat yönüne göre hesaplanır; gerçek işlem kârı değildir. BEKLE oyları AL/SAT isabetine katılmaz, yatay sonuçlar ayrı gösterilir. Aynı sembol ve periyotta ölçüm penceresi bitmeden gelen tekrar sinyalleri bağımsız örnek sayılmaz. Eski kayıtlarda ileri dönem bitiş zamanı bulunmuyorsa bu kayıtlar bağımsız örnek hesabına alınmaz. 30’dan az bağımsız örnek kesin başarı göstergesi değildir.'));
     detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Hacim ajanı · model, piyasa ve periyot kırılımı'));
     detailPanel.appendChild(renderVolumeBreakdown(testRecords));
     detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Spot AL: piyasa ve zaman dilimi ayrımı'));
     detailPanel.appendChild(renderBreakdown(testRecords));
     detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Spot SAT: satmak mı, tutmak mı?'));
     detailPanel.appendChild(renderSpotSaleBreakdown(testRecords));
-    detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Denetçi risk seviyesi sonrası 10 mum sonucu'));
+    detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Denetçi risk seviyesi sonrası 5 mum sonucu'));
     detailPanel.appendChild(renderAuditorTable(testRecords));
 
     var fkRows = testRecords.filter(function (r) { return r.fkVeto && r.directionStatus === 'completed'; });
@@ -1370,7 +1370,7 @@
     table.appendChild(body); wrap.appendChild(table); detailPanel.appendChild(wrap);
 
     detailPanel.appendChild(el('p', 'backtest-not',
-      'Spot AL simülasyonu sonraki mum açılışından başlar; stop/hedef veya 10 mum çıkışı kullanılır. Varsayılan toplam maliyet %0,20 olup yeni sinyaller için değiştirilebilir. SAT için short açılmaz: eldeki coin sonraki mum açılışında satılmış varsayılır ve 10 mum tutmaya kıyasla fiyat farkı ölçülür. SAT karşılaştırması komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy kârı değildir. Ajanların AL/SAT yön isabeti bütün kaydedilen oyların sonraki 10 kapanmış mumdaki fiyat yönüyle karşılaştırılmasıdır. BEKLE kazanma oranına katılmaz. İşlemler bağımsız sinyal bazındadır; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar ortak havuzda yaklaşık 15 dakikada bir arka planda güncellenir; bu ekrandan elle de yenilenebilir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
+      'Spot AL simülasyonu sonraki mum açılışından başlar; stop/hedef veya 5 mum çıkışı kullanılır. Varsayılan toplam maliyet %0,20 olup yeni sinyaller için değiştirilebilir. SAT için short açılmaz: eldeki coin sonraki mum açılışında satılmış varsayılır ve 5 mum tutmaya kıyasla fiyat farkı ölçülür. SAT karşılaştırması komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy kârı değildir. Ajanların AL/SAT yön isabeti bütün kaydedilen oyların sonraki 5 kapanmış mumdaki fiyat yönüyle karşılaştırılmasıdır. BEKLE kazanma oranına katılmaz. İşlemler bağımsız sinyal bazındadır; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar ortak havuzda yaklaşık 15 dakikada bir arka planda güncellenir; bu ekrandan elle de yenilenebilir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
     card.appendChild(detailPanel);
 
     root.appendChild(card);
