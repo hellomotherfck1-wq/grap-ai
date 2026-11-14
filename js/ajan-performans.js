@@ -147,7 +147,7 @@
                 'deepScan', 'deepVeto', 'deepReasons', 'finalReason',
                 'spotStatus', 'spotResult',
                 'auditorError', 'auditorWarningCount', 'score', 'trend', 'rsi', 'fundamentalStatus',
-                'fkPE', 'fkValuation', 'fkVeto', 'costPct', 'horizon', 'agentVersion'
+                'fkPE', 'fkValuation', 'fkVeto', 'costPct', 'horizon', 'priceForecast', 'agentVersion'
               ].forEach(function (key) {
                 if (record[key] !== undefined) finalRecord[key] = record[key];
               });
@@ -208,6 +208,43 @@
     });
   }
 
+  function cleanPriceForecast(forecast, timeframe, signalAt) {
+    if (!forecast || typeof forecast !== 'object' || timeframe !== '15m' ||
+        forecast.status !== 'pending' || forecast.timeframe !== '15m' ||
+        Number(forecast.horizonBars) !== 5) return null;
+    var base = Number(forecast.basePrice);
+    var target = Number(forecast.predictedPrice);
+    var low = Number(forecast.predictedLow);
+    var high = Number(forecast.predictedHigh);
+    var forecastAt = Number(forecast.signalAt);
+    if (![base, target, low, high, forecastAt].every(Number.isFinite) ||
+        base <= 0 || target <= 0 || low <= 0 || high <= 0 || low > high ||
+        Math.abs(forecastAt - signalAt) > 1) return null;
+    return {
+      status: 'pending',
+      modelVersion: String(forecast.modelVersion || 'auditor-price-5bar-knn-v1').slice(0, 80),
+      method: String(forecast.method || '').slice(0, 240),
+      timeframe: '15m',
+      horizonBars: 5,
+      basePrice: base,
+      predictedPrice: target,
+      predictedLow: low,
+      predictedHigh: high,
+      predictedChangePct: Number(forecast.predictedChangePct),
+      historicalSampleCount: Math.max(0, Math.floor(Number(forecast.historicalSampleCount) || 0)),
+      historicalCandidateCount: Math.max(0, Math.floor(Number(forecast.historicalCandidateCount) || 0)),
+      nearestDistance: num(forecast.nearestDistance) ? forecast.nearestDistance : null,
+      volumeUsed: Boolean(forecast.volumeUsed),
+      source: String(forecast.source || '').slice(0, 60),
+      sourceRoute: String(forecast.sourceRoute || '').slice(0, 80),
+      sourceFetchedAt: num(forecast.sourceFetchedAt) ? forecast.sourceFetchedAt : null,
+      lastClosedCandleAt: num(forecast.lastClosedCandleAt) ? forecast.lastClosedCandleAt : null,
+      signalAt: forecastAt,
+      dueAt: num(forecast.dueAt) ? forecast.dueAt : null,
+      createdAt: num(forecast.createdAt) ? forecast.createdAt : Date.now()
+    };
+  }
+
   function safeRecord(input) {
     var versions = window.Ajan && window.Ajan.surumler ? window.Ajan.surumler : {};
     var symbol = norm(input.symbol);
@@ -220,6 +257,7 @@
         ['AL', 'SAT', 'BEKLE'].indexOf(decision) < 0) return null;
     var now = Date.now();
     var source = String(input.source || 'Grafik analizi');
+    var priceForecast = cleanPriceForecast(input.priceForecast, tf, at);
     return {
       id: idFor(symbol, tf, at),
       createdAt: now,
@@ -278,6 +316,7 @@
       spotResult: null,
       forwardPct: null,
       waitResult: null,
+      priceForecast: priceForecast || undefined,
       agentVersion: String(input.agentVersion || 'graph-ai-agent-v1')
     };
   }
@@ -371,6 +410,7 @@
       stop: input.stop,
       target: input.target,
       rr: input.rr,
+      priceForecast: y.priceForecast || null,
       decision: decisionFromResult(y, s),
       generalDecision: votes.generalDecision,
       technicalDecision: votes.technicalDecision,
@@ -627,10 +667,13 @@
   }
 
   function evaluateSignal(record, bars) {
+    var forecastModel = window.GrapAIDenetciFiyatTahmini;
     return {
       trade: tradeResult(record, bars),
       spotSale: spotSaleResult(record, bars),
-      direction: directionResult(record, bars)
+      direction: directionResult(record, bars),
+      priceForecast: forecastModel && typeof forecastModel.degerlendir === 'function'
+        ? forecastModel.degerlendir(record, bars, Date.now()) : null
     };
   }
 
@@ -989,6 +1032,86 @@
     return wrap;
   }
 
+  function renderFiveBarForecast(records) {
+    var forecasts = (Array.isArray(records) ? records : []).filter(function (record) {
+      return record && record.timeframe === '15m' && record.priceForecast;
+    }).sort(function (a, b) { return b.signalAt - a.signalAt; });
+    var completed = forecasts.filter(function (record) {
+      return record.priceForecast.status === 'completed' &&
+        num(record.priceForecast.absoluteErrorPct);
+    });
+    var pending = forecasts.filter(function (record) {
+      return record.priceForecast.status === 'pending';
+    }).length;
+    var expired = forecasts.filter(function (record) {
+      return record.priceForecast.status === 'expired';
+    }).length;
+    var averageError = completed.length
+      ? completed.reduce(function (sum, record) {
+          return sum + record.priceForecast.absoluteErrorPct;
+        }, 0) / completed.length : null;
+    var directionMatches = completed.filter(function (record) {
+      return record.priceForecast.directionCorrect === true;
+    }).length;
+    var wrap = el('div');
+    var metrics = el('div', 'backtest-kpi-grid');
+    [
+      ['15 dk tahmini', String(forecasts.length)],
+      ['Gerçekleşen', String(completed.length)],
+      ['Beş mum bekleyen', String(pending)],
+      ['Ort. mutlak fiyat hatası', averageError === null ? '—' : pct(averageError)],
+      ['Yönü aynı', completed.length ? directionMatches + '/' + completed.length : '—'],
+      ['Veri aralığı dışında', String(expired)]
+    ].forEach(function (item) { metrics.appendChild(kpi(item[0], item[1])); });
+    wrap.appendChild(metrics);
+
+    if (!forecasts.length) {
+      wrap.appendChild(el('p', 'backtest-not',
+        'Henüz 15 dakikalık fiyat tahmini kaydı yok. İlk tahmin, yeterli ve güncel kapanmış mum bulunduğunda oluşturulacak.'));
+      return wrap;
+    }
+
+    var tableWrap = el('div', 'backtest-table-wrap');
+    var table = el('table', 'backtest-trade-table');
+    var head = el('thead'), header = el('tr');
+    ['Tarih', 'Varlık', 'Başlangıç fiyatı', '5 mum tahmini', 'Gerçekleşen fiyat', 'Mutlak hata'].forEach(function (label) {
+      header.appendChild(el('th', '', label));
+    });
+    head.appendChild(header);
+    table.appendChild(head);
+    var body = el('tbody');
+    forecasts.slice(0, 30).forEach(function (record) {
+      var forecast = record.priceForecast;
+      var actual = forecast.status === 'completed' ? priceYazi(forecast.actualPrice)
+        : forecast.status === 'expired' ? 'Veri aralığı dışında' : '5 mum bekleniyor';
+      var error = forecast.status === 'completed' && num(forecast.absoluteErrorPct)
+        ? pct(forecast.absoluteErrorPct) : '—';
+      var range = priceYazi(forecast.predictedLow) + ' – ' + priceYazi(forecast.predictedHigh);
+      var row = el('tr');
+      [
+        new Date(record.signalAt).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }),
+        record.name || record.symbol,
+        priceYazi(forecast.basePrice),
+        priceYazi(forecast.predictedPrice) + ' (' + range + ')',
+        actual,
+        error
+      ].forEach(function (value) { row.appendChild(el('td', '', value)); });
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    tableWrap.appendChild(table);
+    wrap.appendChild(tableWrap);
+    wrap.appendChild(el('p', 'backtest-not',
+      'Tahmin yalnızca 15 dakikalık grafiklerde üretilir. Gerçekleşen fiyat, sonraki beş kapanmış mumun beşincisinin kapanışıdır. Mutlak hata = |tahmin − gerçekleşen| / gerçekleşen × 100. 1 saatlik, 4 saatlik ve günlük grafikler bu ölçüme dahil değildir.'));
+    return wrap;
+  }
+
+  function priceYazi(value) {
+    if (!num(value) || value <= 0) return '—';
+    var digits = value >= 1000 ? 2 : value >= 1 ? 4 : 8;
+    return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: digits }).format(value);
+  }
+
   function render(records) {
     var root = document.getElementById('ajan-performans-panel');
     if (!root) return;
@@ -1061,7 +1184,8 @@
     var pendingRecords = all.filter(function (r) {
       return r.directionStatus === 'pending' ||
         (r.decision === 'AL' && r.tradeStatus === 'pending') ||
-        (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired');
+        (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired') ||
+        (r.timeframe === '15m' && r.priceForecast && r.priceForecast.status === 'pending');
     });
     var pending = pendingRecords.length;
     var pendingDataErrors = pendingRecords.filter(function (r) { return !!r.lastError; }).length;
@@ -1069,7 +1193,8 @@
     var expired = all.filter(function (r) {
       return r.directionStatus === 'expired' ||
         (r.decision === 'AL' && r.tradeStatus === 'expired') ||
-        (r.decision === 'SAT' && r.spotStatus === 'expired');
+        (r.decision === 'SAT' && r.spotStatus === 'expired') ||
+        (r.timeframe === '15m' && r.priceForecast && r.priceForecast.status === 'expired');
     }).length;
     var observedWait = all.filter(function (r) { return r.decision === 'BEKLE' && r.directionStatus === 'completed'; });
     var avoided = observedWait.filter(function (r) { return r.waitResult === 'avoid-down'; }).length;
@@ -1107,6 +1232,9 @@
     var cihazSayisi = cihazKimlikleri.length;
     if (cihazSayisi) grid.appendChild(kpi('Ortak havuz cihazı', String(cihazSayisi)));
     card.appendChild(grid);
+
+    card.appendChild(el('h4', 'backtest-trades-title', 'Denetçi · 5 mum sonrası fiyat tahmini (15 dk)'));
+    card.appendChild(renderFiveBarForecast(all));
 
     var quality = completedTrades.length < 30
       ? 'Spot AL örneklemi yetersiz: 30 tamamlanmış işlemden önce kazanma oranı güvenilir kabul edilmemeli.'
@@ -1198,7 +1326,11 @@
       'auditorWarningCount', 'fundamentalStatus', 'price', 'stop', 'target', 'costPct',
       'tradeStatus', 'tradeOutcome', 'netPct', 'spotStatus', 'spotOutcome',
       'spotSaleAdvantagePct', 'spotHoldReturnPct', 'spotSellPrice', 'spotHoldPrice',
-      'directionStatus', 'forwardPct', 'waitResult', 'source', 'deviceIds'];
+      'directionStatus', 'forwardPct', 'waitResult',
+      'forecastStatus', 'forecastModelVersion', 'forecastBasePrice', 'forecastPredictedPrice',
+      'forecastLow', 'forecastHigh', 'forecastActualPrice', 'forecastAbsErrorPct',
+      'forecastSignedErrorPct', 'forecastActualChangePct', 'forecastPredictedChangePct',
+      'forecastActualAt', 'forecastSamples', 'source', 'deviceIds'];
     var rows = [columns.join(';')];
     records.slice().sort(function (a, b) { return a.signalAt - b.signalAt; }).forEach(function (r) {
       var deviceIds = Array.isArray(r.deviceIds) ? r.deviceIds : (r.deviceId ? [r.deviceId] : []);
@@ -1222,7 +1354,21 @@
         r.spotResult ? r.spotResult.sellPrice : '',
         r.spotResult ? r.spotResult.holdPrice : '',
         r.directionStatus, r.forwardPct == null ? '' : r.forwardPct,
-        r.waitResult || '', (r.sources || [r.source]).join('+'),
+        r.waitResult || '',
+        r.priceForecast ? r.priceForecast.status : '',
+        r.priceForecast ? r.priceForecast.modelVersion : '',
+        r.priceForecast ? r.priceForecast.basePrice : '',
+        r.priceForecast ? r.priceForecast.predictedPrice : '',
+        r.priceForecast ? r.priceForecast.predictedLow : '',
+        r.priceForecast ? r.priceForecast.predictedHigh : '',
+        r.priceForecast ? r.priceForecast.actualPrice : '',
+        r.priceForecast ? r.priceForecast.absoluteErrorPct : '',
+        r.priceForecast ? r.priceForecast.signedErrorPct : '',
+        r.priceForecast ? r.priceForecast.actualChangePct : '',
+        r.priceForecast ? r.priceForecast.predictedChangePct : '',
+        r.priceForecast ? r.priceForecast.actualAt : '',
+        r.priceForecast ? r.priceForecast.historicalSampleCount : '',
+        (r.sources || [r.source]).join('+'),
         deviceIds.join('|')
       ];
       rows.push(values.map(function (v) {
@@ -1262,7 +1408,8 @@
         var needsTrade = r.decision === 'AL' && r.tradeStatus === 'pending';
         var needsSpotSale = r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired';
         var needsDirection = r.directionStatus === 'pending';
-        if (!needsTrade && !needsSpotSale && !needsDirection) return;
+        var needsForecast = r.timeframe === '15m' && r.priceForecast && r.priceForecast.status === 'pending';
+        if (!needsTrade && !needsSpotSale && !needsDirection && !needsForecast) return;
         if (Date.now() < r.signalAt + interval(r.timeframe)) return;
         if (num(r.nextCheckAt) && Date.now() < r.nextCheckAt) return;
         var key = r.symbol + '|' + r.timeframe;
@@ -1296,6 +1443,11 @@
                 tradeResult: record.decision === 'SAT' ? null : record.tradeResult,
                 spotStatus: record.decision === 'SAT' && record.spotStatus !== 'completed' ? 'expired' : record.spotStatus,
                 directionStatus: record.directionStatus === 'pending' ? 'expired' : record.directionStatus,
+                priceForecast: record.priceForecast && record.priceForecast.status === 'pending'
+                  ? Object.assign({}, record.priceForecast, {
+                      status: 'expired',
+                      reason: 'Ücretsiz kaynağın geçmiş aralığı bu tahmini kapsamıyor.'
+                    }) : record.priceForecast,
                 lastError: 'Ücretsiz kaynağın geçmiş aralığı bu sinyali kapsamıyor.'
               };
               tasks.push(saveEvaluation(record.id, expiredPatch));
@@ -1331,6 +1483,7 @@
                   : evaluated.direction.classification === 'up' ? 'missed-up' : 'flat';
               }
             }
+            if (evaluated.priceForecast) patch.priceForecast = evaluated.priceForecast;
             tasks.push(saveEvaluation(record.id, patch));
             remotePatches.push({ id: record.id, patch: patch });
           });
