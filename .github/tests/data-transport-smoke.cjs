@@ -100,6 +100,24 @@ vm.runInNewContext(source, context);
     'The transport must expose when a stale cached response was used');
   assert.equal(failures.length, 0, 'Using a valid stale cache must not create a false API error');
 
+  mode = 'all-success';
+  const recoveryUrl = 'https://query1.finance.yahoo.com/v1/finance/search?q=RECOVER';
+  const callsBeforeRecovery = calls.length;
+  const recovered = await transport.json(recoveryUrl, {
+    cacheTtlMs: 0,
+    staleMaxAgeMs: 0,
+    timeoutMs: 1000,
+    retryBlockedRoutes: true,
+    validate: options.validate
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(recovered)), { news: [{ title: 'Fresh' }] },
+    'An optional news request must retry routes that were cooling down after a transient outage');
+  assert.equal(calls.length, callsBeforeRecovery + 1,
+    'The recovered request must retry the first cooling-down provider instead of failing fast');
+  assert.equal(transport.info(recoveryUrl, 'json').route, 'Cloudflare Worker',
+    'A successful retry must clear the provider cooldown');
+
+  mode = 'all-fail';
   await assert.rejects(
     transport.json('https://news.google.com/rss/search?q=NO-CACHE', {
       cacheTtlMs: 0, staleMaxAgeMs: 0, timeoutMs: 1000
