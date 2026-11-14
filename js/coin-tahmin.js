@@ -542,11 +542,7 @@
     };
   }
 
-  async function tumCoinTahminleriniUret(adaylar, onProgress) {
-    var validSymbols = Object.create(null);
-    (Array.isArray(adaylar) ? adaylar : []).forEach(function (item) {
-      if (item && item.sembol) validSymbols[String(item.sembol).toUpperCase()] = true;
-    });
+  async function tumCoinTahminleriniUret(onProgress) {
     var items = [];
     var candidates = [];
     for (var i = 0; i < LISTE.length; i++) {
@@ -555,17 +551,9 @@
       if (typeof onProgress === 'function') {
         onProgress(i + 1, LISTE.length, item.ad, '15 dk grafik tahmini');
       }
-      if (!validSymbols[symbol]) {
-        items.push({
-          name: item.ad,
-          symbol: symbol,
-          status: 'unavailable',
-          forecast: null,
-          reason: 'Ön taramada Binance USDT verisi doğrulanamadı; tahmin atlandı.'
-        });
-        continue;
-      }
       try {
+        // 15m verisini her coin için bağımsız al; 1h taramasında yaşanan
+        // geçici bir hata bu coin için 15m tahminini engellemesin.
         var result = await tahminBir(item);
         items.push(result);
         candidates.push({
@@ -608,7 +596,7 @@
     return {
       summary: {
         requested: LISTE.length,
-        checked: Object.keys(validSymbols).length,
+        checked: LISTE.length,
         ready: ready,
         unavailable: LISTE.length - ready,
         saved: saved,
@@ -660,7 +648,7 @@
 
     // 1 saatlik coin taramasından sonra uygulamadaki tüm 216 coin için
     // ayrı bir 15 dakikalık grafik okuması ve 5 mum fiyat tahmini üret.
-    var forecastBatch = await tumCoinTahminleriniUret(adaylar, onProgress);
+    var forecastBatch = await tumCoinTahminleriniUret(onProgress);
 
     var enIyi = adaylar.length ? adaylar[0] : null;
 
