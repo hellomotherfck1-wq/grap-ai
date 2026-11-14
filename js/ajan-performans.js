@@ -1064,7 +1064,7 @@
     var allForecasts = (Array.isArray(records) ? records : []).filter(function (record) {
       return record && record.timeframe === '15m' && record.priceForecast;
     }).sort(function (a, b) { return b.signalAt - a.signalAt; });
-    var currentModelVersion = 'auditor-price-5bar-chart-v2';
+    var currentModelVersion = 'auditor-price-5bar-chart-v3';
     var legacyForecastCount = allForecasts.filter(function (record) {
       return record.priceForecast.modelVersion !== currentModelVersion;
     }).length;
@@ -1082,10 +1082,23 @@
     var expired = forecasts.filter(function (record) {
       return record.priceForecast.status === 'expired';
     }).length;
-    var averageError = completed.length
-      ? completed.reduce(function (sum, record) {
-          return sum + record.priceForecast.absoluteErrorPct;
-        }, 0) / completed.length : null;
+    var windowStats = Object.create(null);
+    completed.forEach(function (record) {
+      var key = String(record.signalAt);
+      if (!windowStats[key]) windowStats[key] = { error: 0, count: 0, correct: 0 };
+      windowStats[key].error += record.priceForecast.absoluteErrorPct;
+      windowStats[key].count++;
+      if (record.priceForecast.directionCorrect === true) windowStats[key].correct++;
+    });
+    var windowKeys = Object.keys(windowStats);
+    var averageError = windowKeys.length
+      ? windowKeys.reduce(function (sum, key) {
+          return sum + windowStats[key].error / windowStats[key].count;
+        }, 0) / windowKeys.length : null;
+    var directionRate = windowKeys.length
+      ? windowKeys.reduce(function (sum, key) {
+          return sum + windowStats[key].correct / windowStats[key].count;
+        }, 0) / windowKeys.length : null;
     var directionMatches = completed.filter(function (record) {
       return record.priceForecast.directionCorrect === true;
     }).length;
@@ -1094,9 +1107,10 @@
     [
       ['15 dk tahmini', String(forecasts.length)],
       ['Gerçekleşen', String(completed.length)],
-      ['Beş mum bekleyen', String(pending)],
+      ['Bağımsız 15 dk penceresi', String(windowKeys.length)],
       ['Ort. mutlak fiyat hatası', averageError === null ? '—' : pct(averageError)],
-      ['Yönü aynı', completed.length ? directionMatches + '/' + completed.length : '—'],
+      ['Yön uyumu', directionRate === null ? '—' : '%' + (directionRate * 100).toFixed(1).replace('.', ',')],
+      ['5 mum bekleyen', String(pending)],
       ['Veri aralığı dışında', String(expired)]
     ].forEach(function (item) { metrics.appendChild(kpi(item[0], item[1])); });
     wrap.appendChild(metrics);
@@ -1107,6 +1121,8 @@
       return wrap;
     }
 
+    var latestSignalAt = forecasts.length ? forecasts[0].signalAt : null;
+    var latestBatch = forecasts.filter(function (record) { return record.signalAt === latestSignalAt; });
     var tableWrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), header = el('tr');
@@ -1116,7 +1132,7 @@
     head.appendChild(header);
     table.appendChild(head);
     var body = el('tbody');
-    forecasts.slice(0, 216).forEach(function (record) {
+    latestBatch.slice(0, 216).forEach(function (record) {
       var forecast = record.priceForecast;
       var actual = forecast.status === 'completed' ? priceYazi(forecast.actualPrice)
         : forecast.status === 'expired' ? 'Veri aralığı dışında' : '5 mum bekleniyor';
@@ -1142,9 +1158,16 @@
     });
     table.appendChild(body);
     tableWrap.appendChild(table);
-    wrap.appendChild(tableWrap);
+    var tableDetails = el('details', 'backtest-more');
+    tableDetails.appendChild(el('summary', '', 'Son testteki coin sonuçlarını göster (' + latestBatch.length + ')'));
+    tableDetails.appendChild(tableWrap);
+    wrap.appendChild(tableDetails);
     wrap.appendChild(el('p', 'backtest-not',
-      'Bu ayrı performans serisi grafik okuma modeline aittir. Mum gövde/fitilleri, EMA9/21 trendi, RSI14, 5 mum momentumu, destek/direnç ve hacim benzer geçmiş örüntü seçimine katılır. Gerçekleşen fiyat, sonraki beş kapanmış mumun beşincisinin kapanışıdır. Mutlak hata = |tahmin − gerçekleşen| / gerçekleşen × 100. Önceki model kayıtları bu ölçüme karıştırılmaz; 1 saatlik, 4 saatlik ve günlük grafikler dahil değildir.'));
+      'Hata ve yön uyumu, her 15 dakikalık tarama penceresinin ortalaması alınarak hesaplanır. ' +
+      (windowKeys.length < 20
+        ? 'Henüz ' + windowKeys.length + ' bağımsız pencere var; 20 farklı pencere oluşmadan performans güvenilir kabul edilmemeli. '
+        : windowKeys.length + ' farklı 15 dakikalık pencere ölçüldü. ') +
+      'Gerçekleşen fiyat, tahmin anından sonraki beş kesintisiz 15 dakikalık mumun beşincisinin kapanışıdır. Önceki model sürümleri bu ölçüme karıştırılmaz.'));
     return wrap;
   }
 
@@ -1160,15 +1183,18 @@
     var all = (Array.isArray(records) ? records : []).filter(function (record) {
       return !isTestRecord(record);
     });
+    var testRecords = all.filter(function (record) {
+      return record && record.market === 'Kripto' && record.timeframe === '15m';
+    });
     root.replaceChildren();
     var card = el('div', 'kart ajan-performans');
     var header = el('div', 'performans-baslik');
     var heading = el('div');
-    heading.appendChild(el('h3', '', '🏆 Ajanların ölçülen performansı'));
+    heading.appendChild(el('h3', '', '15 dk ajan test merkezi'));
     var ortakGorunum = all.some(function (record) { return record && record.sharedPool; });
     heading.appendChild(el('p', 'backtest-not', ortakGorunum
-      ? 'Ortak sonuç havuzu · Ortak kayıtları yalnızca yönetici hesabı görebilir · cihaz etiketleri anonim tarayıcı profili kimliğidir · sinyaller 365 gün saklanır · ham mumlar saklanmaz.'
-      : 'Sinyaller 365 gün saklanır · 216 coin taramasındaki geçerli adayların oyları tutulur · ham mumlar saklanmaz · bu cihazda.'));
+      ? 'Ortak sonuç havuzu · Bu görünüm yalnızca Kripto 15 dk testlerini gösterir · sinyaller 365 gün saklanır.'
+      : 'Bu görünüm yalnızca Kripto 15 dk testlerini gösterir · sonuçlar 365 gün saklanır.'));
     header.appendChild(heading);
 
     var actions = el('div', 'performans-eylemler');
@@ -1196,7 +1222,7 @@
     costField.appendChild(costLabel);
     costField.appendChild(costInput);
     costField.appendChild(costSave);
-    actions.appendChild(costField);
+    // Maliyet ayarı ayrıntı bölümünde gösterilir.
     header.appendChild(actions);
     card.appendChild(header);
 
@@ -1206,10 +1232,10 @@
     status.setAttribute('aria-live', 'polite');
     card.appendChild(status);
 
-    var completedTrades = all.filter(function (r) {
+    var completedTrades = testRecords.filter(function (r) {
       return r.decision === 'AL' && r.tradeStatus === 'completed' && r.tradeResult;
     });
-    var completedSales = all.filter(function (r) {
+    var completedSales = testRecords.filter(function (r) {
       return r.decision === 'SAT' && r.spotStatus === 'completed' && r.spotResult;
     });
     var salesBetter = completedSales.filter(function (r) { return r.spotResult.outcome === 'sell-better'; }).length;
@@ -1223,7 +1249,7 @@
     var average = completedTrades.length
       ? completedTrades.reduce(function (sum, r) { return sum + r.tradeResult.netPct; }, 0) / completedTrades.length : null;
     var wr = winRate(completedTrades);
-    var pendingRecords = all.filter(function (r) {
+    var pendingRecords = testRecords.filter(function (r) {
       return r.directionStatus === 'pending' ||
         (r.decision === 'AL' && r.tradeStatus === 'pending') ||
         (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired') ||
@@ -1232,13 +1258,13 @@
     var pending = pendingRecords.length;
     var pendingDataErrors = pendingRecords.filter(function (r) { return !!r.lastError; }).length;
     var pendingNormal = pending - pendingDataErrors;
-    var expired = all.filter(function (r) {
+    var expired = testRecords.filter(function (r) {
       return r.directionStatus === 'expired' ||
         (r.decision === 'AL' && r.tradeStatus === 'expired') ||
         (r.decision === 'SAT' && r.spotStatus === 'expired') ||
         (r.timeframe === '15m' && r.priceForecast && r.priceForecast.status === 'expired');
     }).length;
-    var observedWait = all.filter(function (r) { return r.decision === 'BEKLE' && r.directionStatus === 'completed'; });
+    var observedWait = testRecords.filter(function (r) { return r.decision === 'BEKLE' && r.directionStatus === 'completed'; });
     var avoided = observedWait.filter(function (r) { return r.waitResult === 'avoid-down'; }).length;
     var missed = observedWait.filter(function (r) { return r.waitResult === 'missed-up'; }).length;
 
@@ -1258,12 +1284,12 @@
       ['BEKLE değerlendirildi', String(observedWait.length)],
       ['Düşüşten kaçınma', String(avoided)],
       ['Yükseliş kaçırma', String(missed)],
-      ['Denetçi yüksek risk', String(all.filter(function (r) { return r.auditorError === 'Yüksek'; }).length)],
-      ['Denetçi bulgusu', String(all.reduce(function (sum, r) { return sum + (r.auditorWarningCount || 0); }, 0))],
+      ['Denetçi yüksek risk', String(testRecords.filter(function (r) { return r.auditorError === 'Yüksek'; }).length)],
+      ['Denetçi bulgusu', String(testRecords.reduce(function (sum, r) { return sum + (r.auditorWarningCount || 0); }, 0))],
       ['Veri aralığı dışında', String(expired)]
     ].forEach(function (x) { grid.appendChild(kpi(x[0], x[1])); });
     var cihazlar = Object.create(null);
-    all.forEach(function (record) {
+    testRecords.forEach(function (record) {
       (Array.isArray(record.deviceIds) ? record.deviceIds : (record.deviceId ? [record.deviceId] : []))
         .forEach(function (id) { if (id) cihazlar[id] = true; });
     });
@@ -1273,39 +1299,42 @@
     });
     var cihazSayisi = cihazKimlikleri.length;
     if (cihazSayisi) grid.appendChild(kpi('Ortak havuz cihazı', String(cihazSayisi)));
-    card.appendChild(grid);
 
-    card.appendChild(el('h4', 'backtest-trades-title', 'Denetçi · 5 mum sonrası fiyat tahmini (15 dk)'));
-    card.appendChild(renderFiveBarForecast(all));
+    card.appendChild(el('h4', 'backtest-trades-title', '15 dakikalık · 5 mum test özeti'));
+    card.appendChild(renderFiveBarForecast(testRecords));
+    var detailPanel = el('details', 'backtest-more');
+    detailPanel.appendChild(el('summary', '', 'Ayrıntılı ajan ve işlem raporları'));
+    detailPanel.appendChild(costField);
+    detailPanel.appendChild(grid);
 
     var quality = completedTrades.length < 30
       ? 'Spot AL örneklemi yetersiz: 30 tamamlanmış işlemden önce kazanma oranı güvenilir kabul edilmemeli.'
       : completedTrades.length < 100
         ? 'Spot AL ön sonucu: 30–99 işlem var. %95 Wilson aralığı yaklaşık %' + wr.low.toFixed(1) + '–%' + wr.high.toFixed(1) + '.'
         : 'Spot AL örneklemi genişliyor: %95 Wilson aralığı yaklaşık %' + wr.low.toFixed(1) + '–%' + wr.high.toFixed(1) + '. Bu yine de gelecekteki başarıyı garanti etmez.';
-    card.appendChild(el('p', 'backtest-not', quality));
-    card.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · piyasa, periyot ve sürüm ayrımı'));
-    card.appendChild(renderAgentTable(all));
-    card.appendChild(el('p', 'backtest-not',
+    detailPanel.appendChild(el('p', 'backtest-not', quality));
+    detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Ajan bazında yön isabeti · piyasa, periyot ve sürüm ayrımı'));
+    detailPanel.appendChild(renderAgentTable(testRecords));
+    detailPanel.appendChild(el('p', 'backtest-not',
       'İsabet, sinyalden sonraki 10 kapanmış mumun fiyat yönüne göre hesaplanır; gerçek işlem kârı değildir. BEKLE oyları AL/SAT isabetine katılmaz, yatay sonuçlar ayrı gösterilir. Aynı sembol ve periyotta ölçüm penceresi bitmeden gelen tekrar sinyalleri bağımsız örnek sayılmaz. Eski kayıtlarda ileri dönem bitiş zamanı bulunmuyorsa bu kayıtlar bağımsız örnek hesabına alınmaz. 30’dan az bağımsız örnek kesin başarı göstergesi değildir.'));
-    card.appendChild(el('h4', 'backtest-trades-title', 'Hacim ajanı · model, piyasa ve periyot kırılımı'));
-    card.appendChild(renderVolumeBreakdown(all));
-    card.appendChild(el('h4', 'backtest-trades-title', 'Spot AL: piyasa ve zaman dilimi ayrımı'));
-    card.appendChild(renderBreakdown(all));
-    card.appendChild(el('h4', 'backtest-trades-title', 'Spot SAT: satmak mı, tutmak mı?'));
-    card.appendChild(renderSpotSaleBreakdown(all));
-    card.appendChild(el('h4', 'backtest-trades-title', 'Denetçi risk seviyesi sonrası 10 mum sonucu'));
-    card.appendChild(renderAuditorTable(all));
+    detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Hacim ajanı · model, piyasa ve periyot kırılımı'));
+    detailPanel.appendChild(renderVolumeBreakdown(testRecords));
+    detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Spot AL: piyasa ve zaman dilimi ayrımı'));
+    detailPanel.appendChild(renderBreakdown(testRecords));
+    detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Spot SAT: satmak mı, tutmak mı?'));
+    detailPanel.appendChild(renderSpotSaleBreakdown(testRecords));
+    detailPanel.appendChild(el('h4', 'backtest-trades-title', 'Denetçi risk seviyesi sonrası 10 mum sonucu'));
+    detailPanel.appendChild(renderAuditorTable(testRecords));
 
-    var fkRows = all.filter(function (r) { return r.fkVeto && r.directionStatus === 'completed'; });
+    var fkRows = testRecords.filter(function (r) { return r.fkVeto && r.directionStatus === 'completed'; });
     if (fkRows.length) {
       var fkAvoid = fkRows.filter(function (r) { return r.forwardPct < -r.costPct; }).length;
       var fkMiss = fkRows.filter(function (r) { return r.forwardPct > r.costPct; }).length;
-      card.appendChild(el('p', 'backtest-not', 'F/K ajanının AL → BEKLE veto sayısı: ' + fkRows.length +
+      detailPanel.appendChild(el('p', 'backtest-not', 'F/K ajanının AL → BEKLE veto sayısı: ' + fkRows.length +
         ' · sonrasında düşüş: ' + fkAvoid + ' · yükseliş: ' + fkMiss + '.'));
     }
 
-    card.appendChild(el('h4', 'backtest-trades-title', ortakGorunum ? 'Son sinyaller · cihazlar arası' : 'Son sinyaller'));
+    detailPanel.appendChild(el('h4', 'backtest-trades-title', ortakGorunum ? 'Son sinyaller · cihazlar arası' : 'Son sinyaller'));
     var wrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), row = el('tr');
@@ -1315,7 +1344,7 @@
     resultHeaders.forEach(function (x) { row.appendChild(el('th', '', x)); });
     head.appendChild(row); table.appendChild(head);
     var body = el('tbody');
-    all.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 50).forEach(function (r) {
+    testRecords.slice().sort(function (a, b) { return b.signalAt - a.signalAt; }).slice(0, 50).forEach(function (r) {
       var tr = el('tr');
       var net = r.decision === 'SAT' && r.spotResult && num(r.spotResult.saleAdvantagePct)
         ? pct(r.spotResult.saleAdvantagePct) + ' (satış/tutma)'
@@ -1338,10 +1367,12 @@
       values.forEach(function (x) { tr.appendChild(el('td', '', x)); });
       body.appendChild(tr);
     });
-    table.appendChild(body); wrap.appendChild(table); card.appendChild(wrap);
+    table.appendChild(body); wrap.appendChild(table); detailPanel.appendChild(wrap);
 
-    card.appendChild(el('p', 'backtest-not',
+    detailPanel.appendChild(el('p', 'backtest-not',
       'Spot AL simülasyonu sonraki mum açılışından başlar; stop/hedef veya 10 mum çıkışı kullanılır. Varsayılan toplam maliyet %0,20 olup yeni sinyaller için değiştirilebilir. SAT için short açılmaz: eldeki coin sonraki mum açılışında satılmış varsayılır ve 10 mum tutmaya kıyasla fiyat farkı ölçülür. SAT karşılaştırması komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy kârı değildir. Ajanların AL/SAT yön isabeti bütün kaydedilen oyların sonraki 10 kapanmış mumdaki fiyat yönüyle karşılaştırılmasıdır. BEKLE kazanma oranına katılmaz. İşlemler bağımsız sinyal bazındadır; portföy ve eş zamanlı pozisyon simülasyonu değildir. Sonuçlar ortak havuzda yaklaşık 15 dakikada bir arka planda güncellenir; bu ekrandan elle de yenilenebilir. Ücretsiz 15 dakikalık/saatlik geçmiş daha kısa olduğundan uzun süre güncellenmeyen bazı kayıtlar veri aralığı dışında kalabilir. Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu açıkça işaretlenir. Tarayıcı verisi temizlenirse bu yerel kayıtlar da silinebilir.'));
+    card.appendChild(detailPanel);
+
     root.appendChild(card);
 
     refresh.addEventListener('click', function () { updateResults(); });
