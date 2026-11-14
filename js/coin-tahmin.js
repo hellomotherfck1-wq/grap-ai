@@ -615,6 +615,7 @@
           ad: result.name,
           sembol: result.symbol,
           zd: '15m',
+          horizon: 5,
           karar: 'BEKLE',
           genelKarar: 'BEKLE',
           teknikVar: false,
@@ -643,6 +644,7 @@
         source: 'Tüm coinler · 15 dk grafik tahmini',
         market: 'Kripto',
         timeframe: '15m',
+        horizon: 5,
         agentVersion: window.GrapAIDenetciFiyatTahmini.modelVersion
       });
     }
