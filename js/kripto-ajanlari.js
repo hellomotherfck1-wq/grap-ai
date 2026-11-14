@@ -239,7 +239,8 @@
     var eth1d = map['ETHUSDT|1d'] || null;
     var eth4h = map['ETHUSDT|4h'] || null;
     var changes = (Array.isArray(quickResults) ? quickResults : []).map(function (item) {
-      return item ? item.sonMumDegisim : null;
+      if (!item) return null;
+      return sayi(Number(item.momentum4BarsPct)) ? Number(item.momentum4BarsPct) : item.sonMumDegisim;
     }).filter(function (value) {
       return value !== null && value !== undefined && isFinite(Number(value));
     }).map(Number);
@@ -291,7 +292,7 @@
     var entryConflict = baseDirection !== 0 && hourly && hourly.direction === -baseDirection;
     return {
       available: !!(daily || fourHour || hourly || fifteen),
-      highTimeframeReady: !!(daily && fourHour),
+      highTimeframeReady: !!(daily && fourHour && hourly),
       daily: daily, fourHour: fourHour,
       hourly: hourly || { trend: 'Belirsiz', direction: 0 },
       fifteenMinute: fifteen,
@@ -349,7 +350,7 @@
           var reasons = [], veto = false;
           if (baseDirection !== 0 && !mtf.highTimeframeReady) {
             veto = true;
-            reasons.push('1G ve 4S verilerinin ikisi de doğrulanamadı; sinyal güvenli biçimde BEKLE’ye indirildi.');
+            reasons.push('1G, 4S ve 1S doğrulama verilerinin tamamı alınamadı; sinyal güvenli biçimde BEKLE’ye indirildi.');
           }
           if (baseDirection !== 0 && mtf.highTimeframeConflict) {
             veto = true;
