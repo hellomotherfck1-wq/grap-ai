@@ -8,9 +8,9 @@
 
   var KEY = 'graphai_coin_tahmin_v1';
   var BUGUN_KEY = 'graphai_coin_tahmin_bugun';
-  var CACHE_VERSION = 'crypto-intelligence-2.3.0';
+  var CACHE_VERSION = 'crypto-intelligence-2.4.0';
   function cacheKey(zd) {
-    return BUGUN_KEY + ':' + CACHE_VERSION + ':' + (zd || '1h');
+    return BUGUN_KEY + ':' + CACHE_VERSION + ':' + (zd || '15m');
   }
 
   /** Binance'te kesin USDT çifti olan ~200 coin */
@@ -264,10 +264,10 @@
 
   function okuBugunCache() {
     try {
-      var raw = localStorage.getItem(cacheKey('1h'));
+      var raw = localStorage.getItem(cacheKey('15m'));
       if (!raw) return null;
       var o = JSON.parse(raw);
-      if (o && o.tarih === bugunStr() && o.ajanSurum === CACHE_VERSION && o.zd === '1h') return o;
+      if (o && o.ajanSurum === CACHE_VERSION && o.zd === '15m') return o;
       return null;
     } catch (e) {
       return null;
@@ -321,7 +321,8 @@
       deepVeto: !!s.deepVeto,
       deepReasons: Array.isArray(s.deepReasons) ? s.deepReasons.slice(0, 8) : [],
       sourceTimestamps: s.sourceTimestamps || null,
-      agentVersion: s.agentVersion || CACHE_VERSION
+      agentVersion: s.agentVersion || CACHE_VERSION,
+      skillReadings: s.skillReadings || null
     };
   }
 
@@ -410,6 +411,34 @@
     var signalAt = sonMum
       ? (sonMum.closeTime != null ? Number(sonMum.closeTime) + 1 : Number(sonMum.t) + aralikMs)
       : null;
+    var priceForecast = null;
+    var priceForecastReason = null;
+    if (zd === '15m' && window.GrapAIDenetciFiyatTahmini &&
+        typeof window.GrapAIDenetciFiyatTahmini.olustur === 'function') {
+      var forecastFetchedAt = Date.now();
+      var lastClosed = kapanmisHam[kapanmisHam.length - 1];
+      var model = window.GrapAIDenetciFiyatTahmini;
+      var forecastResult = model.olustur(kapanmisHam, {
+        timeframe: '15m',
+        source: 'Binance Spot',
+        sourceInfo: {
+          stale: false, failed: false, route: 'Binance Spot API',
+          fetchedAt: new Date(forecastFetchedAt).toISOString()
+        },
+        fetchedAt: forecastFetchedAt,
+        lastClosedAt: Number(lastClosed.t),
+        intervalMs: model.intervalMs()
+      }, forecastFetchedAt);
+      if (forecastResult && forecastResult.status === 'pending') priceForecast = forecastResult;
+      else priceForecastReason = forecastResult && forecastResult.reason
+        ? forecastResult.reason : '5 mum tahmini için doğrulanmış örnek bulunamadı.';
+    } else if (zd === '15m') {
+      priceForecastReason = 'Denetçi 5 mum modeli yüklenemedi.';
+    }
+    var momentum4BarsPct = dn.d.length >= 5
+      ? (dn.d[dn.d.length - 1].c / dn.d[dn.d.length - 5].c - 1) * 100 : null;
+    var momentum15BarsPct = dn.d.length >= 16
+      ? (dn.d[dn.d.length - 1].c / dn.d[dn.d.length - 16].c - 1) * 100 : null;
 
     return {
       q: item.q,
@@ -445,6 +474,11 @@
       } : null,
       fiyat: sonFiyat,
       signalAt: signalAt,
+      horizon: zd === '15m' ? 5 : 10,
+      priceForecast: priceForecast,
+      priceForecastReason: priceForecastReason,
+      momentum4BarsPct: momentum4BarsPct,
+      momentum15BarsPct: momentum15BarsPct,
       stopFiyat: s.plan ? dn.kal.lo + s.plan.stop * (dn.kal.hi - dn.kal.lo) : null,
       hedefFiyat: s.plan ? dn.kal.lo + s.plan.t1 * (dn.kal.hi - dn.kal.lo) : null,
       rr: s.plan && isFinite(s.plan.rr) ? s.plan.rr : null,
@@ -493,6 +527,9 @@
       deepVeto: !!r.deepVeto,
       deepReasons: Array.isArray(r.deepReasons) ? r.deepReasons.slice(0, 8) : [],
       sourceTimestamps: r.sourceTimestamps || null,
+      skillReadings: r.skillReadings || null,
+      priceForecastReason: r.priceForecastReason || null,
+      horizon: r.horizon || 5,
       agentVersion: r.agentVersion || CACHE_VERSION
     };
   }
@@ -626,17 +663,17 @@
   }
 
   async function bugunUret(zd, onProgress) {
-    // 216 coin için yalnızca 1 saatlik hızlı tarama; derin analiz ilk 20 adayda çalışır.
-    zd = '1h';
+    // İlk test aşaması yalnızca 15 dakikalık Binance Spot verisidir.
+    // 1s/4s/1g yalnızca ilk 20 güçlü aday için bağlam olarak kullanılır.
+    zd = '15m';
     var adaylar = [];
     var hatalar = [];
 
     for (var i = 0; i < LISTE.length; i++) {
       var item = LISTE[i];
-      if (typeof onProgress === 'function') onProgress(i + 1, LISTE.length, item.ad, 'Hızlı tarama');
+      if (typeof onProgress === 'function') onProgress(i + 1, LISTE.length, item.ad, '15 dk ajan testi');
       try {
-        var r = await taraBir(item, zd);
-        adaylar.push(r);
+        adaylar.push(await taraBir(item, zd));
       } catch (e) {
         hatalar.push(item.ad + ': ' + (e && e.message ? e.message : String(e)));
       }
@@ -654,48 +691,61 @@
       return (b.skor + bNet) - (a.skor + aNet);
     });
 
+    var saved = 0;
     if (window.AjanPerformans && typeof window.AjanPerformans.kaydetTarama === 'function') {
-      window.AjanPerformans.kaydetTarama(adaylar, {
-        source: 'Coin tarama',
+      saved = window.AjanPerformans.kaydetTarama(adaylar, {
+        source: 'Kripto ajanları · 15 dk test',
         market: 'Kripto',
-        timeframe: zd,
+        timeframe: '15m',
+        horizon: 5,
         agentVersion: CACHE_VERSION
       });
     }
 
-    // 1 saatlik coin taramasından sonra uygulamadaki tüm 216 coin için
-    // ayrı bir 15 dakikalık grafik okuması ve 5 mum fiyat tahmini üret.
-    var forecastBatch = await tumCoinTahminleriniUret(onProgress);
-
     var enIyi = adaylar.length ? adaylar[0] : null;
-
     if (enIyi && enIyi.skor < 35) {
       enIyi = {
-        karar: 'BEKLE',
-        skor: enIyi.skor,
-        ad: '—',
-        sembol: '—',
+        karar: 'BEKLE', skor: enIyi.skor, ad: '—', sembol: '—',
         ozet: 'Bugün listede yeterince güçlü ve ajanların uyumlu olduğu bir coin kurulumu bulunamadı. Temkinli kalın.',
-        tartisma: enIyi.tartisma || [],
-        netYok: true,
-        zd: zd
+        tartisma: enIyi.tartisma || [], netYok: true, zd: zd
       };
     }
-
     if (!enIyi) {
       enIyi = {
-        karar: 'BEKLE',
-        skor: 0,
-        ad: '—',
-        sembol: '—',
+        karar: 'BEKLE', skor: 0, ad: '—', sembol: '—',
         ozet: 'Hiçbir coin taranamadı. İnternet veya veri kaynağını kontrol et.',
-        tartisma: [],
-        netYok: true,
-        zd: zd
+        tartisma: [], netYok: true, zd: zd
       };
     }
 
     var secim = secimSade(enIyi);
+    var bySymbol = Object.create(null);
+    adaylar.forEach(function (item) { bySymbol[item.sembol] = item; });
+    var forecastItems = LISTE.map(function (item) {
+      var code = String(item.q || '').toUpperCase().replace(/USDT$/, '');
+      var symbol = code + 'USDT';
+      var found = bySymbol[symbol];
+      return {
+        name: item.ad,
+        symbol: symbol,
+        status: found && found.priceForecast ? 'pending' : 'unavailable',
+        forecast: found && found.priceForecast ? found.priceForecast : null,
+        reason: found && found.priceForecastReason ? found.priceForecastReason
+          : found ? '5 mum tahmini için yeterli ve kesintisiz geçmiş veri yok.'
+            : 'Bu coin için 15 dakikalık Binance verisi alınamadı.'
+      };
+    });
+    var readyForecasts = forecastItems.filter(function (item) { return !!item.forecast; }).length;
+    var forecastSummary = {
+      requested: LISTE.length,
+      checked: adaylar.length + hatalar.length,
+      ready: readyForecasts,
+      unavailable: LISTE.length - readyForecasts,
+      saved: saved,
+      modelVersion: window.GrapAIDenetciFiyatTahmini
+        ? window.GrapAIDenetciFiyatTahmini.modelVersion : null,
+      completedAt: Date.now()
+    };
 
     var kayit = {
       tarih: bugunStr(),
@@ -704,8 +754,8 @@
       secim: secim,
       adaylar: adaylar.map(kisaOzet),
       hatalar: hatalar,
-      priceForecastSummary: forecastBatch.summary,
-      priceForecasts: forecastBatch.items,
+      priceForecastSummary: forecastSummary,
+      priceForecasts: forecastItems,
       ajanSurum: CACHE_VERSION
     };
 
@@ -730,10 +780,9 @@
       window.CoinTahminAI.paylasilan = {
         bugun: kayit.tarih,
         secim: secim,
-        mesaj: secim.ad + ' → ' + secim.karar + ' (skor ' + secim.skor + ')'
+        mesaj: '15 dk test → ' + secim.ad + ' → ' + secim.karar
       };
     }
-
     return kayit;
   }
 
@@ -859,15 +908,16 @@
     });
     var deepCount = adaylar.filter(function (item) { return item && item.deepScan === 'tamamlandı'; }).length;
     var forecastSummary = kayit.priceForecastSummary || {};
-    return kart('216 coin tarama özeti', [
-      'Toplam ' + (adaylar.length + hatalar.length) + ' coin listelendi: ' + adaylar.length +
-        ' coin verisi incelendi, ' + hatalar.length + ' coin için veri alınamadı.',
+    return kart('15 dakikalık test özeti', [
+      '216 coin 15 dakikalık Binance Spot verisiyle tarandı: ' + adaylar.length +
+        ' coin analiz edildi, ' + hatalar.length + ' coin için veri alınamadı.',
+      'Ajan kararları 5 kapanmış mum sonra ölçülecek; sonuçlar gerçek fiyatla karşılaştırılacak.',
       'Son karar dağılımı: ' + counts.AL + ' AL · ' + counts.SAT + ' SAT · ' + counts.BEKLE + ' BEKLE.',
-      deepCount + ' coin 15 dakika, 1 saat, 4 saat ve günlük verilerle Spot hacim kontrolünden geçti.',
-      '15 dk · 5 mum fiyat tahmini: ' + (forecastSummary.ready || 0) + '/' +
-        (forecastSummary.requested || LISTE.length) + ' coin için hazır; ' +
+      deepCount + ' güçlü adayda 1 saat, 4 saat ve günlük grafikler ek doğrulama bağlamı olarak kullanıldı.',
+      '5 mum fiyat tahmini: ' + (forecastSummary.ready || 0) + '/' +
+        (forecastSummary.requested || LISTE.length) + ' hazır; ' +
         (forecastSummary.unavailable || 0) + ' coin için doğrulanmış tahmin üretilemedi.',
-      'Derin doğrulama almayan coinlerde AL/SAT sinyali gösterilmez; güvenlik için BEKLE yazılır.'
+      'ADX, volatilite, kırılım ve BTC’ye göre göreli güç ilk testte gölge beceridir; ölçülmeden kararı değiştirmez.'
     ], '#2f81f7');
   }
 
@@ -925,6 +975,16 @@
       meta.textContent = deepText + (item.skor != null ? ' · analiz puanı ' + item.skor + '/100' : '');
       meta.style.cssText = 'font-size:11px;color:#8b98a5;margin:0';
       row.appendChild(meta);
+      if (item.skillReadings) {
+        var skill = item.skillReadings;
+        var skillLine = document.createElement('p');
+        skillLine.textContent = 'Gölge beceriler: ADX ' +
+          (Number.isFinite(skill.adx14) ? skill.adx14.toFixed(1) : '—') +
+          ' · ATR ' + (skill.volatilityRegime || '—') +
+          ' · kırılım ' + (skill.breakout || '—');
+        skillLine.style.cssText = 'font-size:11px;color:#8b98a5;margin:4px 0 0';
+        row.appendChild(skillLine);
+      }
       var reasonText = kararNedeniYazi(item);
       if (reasonText) {
         var reason = document.createElement('p');
@@ -946,6 +1006,16 @@
       s.tartisma.forEach(function (line) { lines.push(line); });
     }
     if (s.deepScan) lines.push('Derin tarama: ' + s.deepScan);
+    if (s.skillReadings) {
+      var skill = s.skillReadings;
+      lines.push('Gölge beceriler (kararı değiştirmez): ADX14 ' +
+        (Number.isFinite(skill.adx14) ? skill.adx14.toFixed(1) : '—') +
+        ' · trend gücü ' + (skill.trendStrength || 'Belirsiz') +
+        ' · ATR rejimi ' + (skill.volatilityRegime || 'Belirsiz') +
+        ' · 20 mum kırılımı ' + (skill.breakout || 'Belirsiz') +
+        ' · BTC’ye göre güç ' + (Number.isFinite(skill.relativeStrengthVsBtcPct)
+          ? (skill.relativeStrengthVsBtcPct >= 0 ? '+' : '') + skill.relativeStrengthVsBtcPct.toFixed(2) + '%' : '—'));
+    }
     if (s.flow) lines.push('Spot alım/satım hacmi: ' + (s.flow.reason || 'Veri yok'));
     if (s.marketRegime) lines.push('BTC/ETH piyasa durumu: ' + (s.marketRegime.reason || s.marketRegime.regime || 'Belirsiz'));
     if (s.mtf) {
@@ -1094,15 +1164,16 @@
     if (kayit.hatalar && kayit.hatalar.length) {
       alan.appendChild(kart('Veri alınamayan coinler', kayit.hatalar.slice(0, 8), '#f0b429'));
     }
-    alan.appendChild(kart('Kararları nasıl okuyacaksın?', [
-      'AL: Spot piyasada alım yönünde sinyal.',
-      'SAT: Elindeki coini satma veya azaltma yönünde sinyal; açığa satış ve kaldıraç değildir.',
-      'BEKLE: Botlar yeterli teyitte birleşmedi; net sinyal oluşmadı.'
-    ]));
-    alan.appendChild(kart('Uyarı', [
-      'Bu otomatik bir tarama sonucudur; yatırım tavsiyesi değildir.',
-      'Kripto piyasası yüksek volatilite içerir. Kendi araştırmanızı yapın.'
-    ]));
+    var help = document.createElement('details');
+    help.className = 'kart';
+    var helpTitle = document.createElement('summary');
+    helpTitle.textContent = 'Karar açıklamaları ve uyarılar';
+    help.appendChild(helpTitle);
+    var helpText = document.createElement('p');
+    helpText.textContent = 'AL: Spot alım yönü. SAT: Eldeki coini azaltma/satma yönü. BEKLE: Yeterli teyit yok. Bu otomatik analiz yatırım tavsiyesi veya emir değildir; kaldıraç kullanılmaz.';
+    helpText.style.cssText = 'font-size:13px;line-height:1.5;color:#c8d1da;margin-top:9px';
+    help.appendChild(helpText);
+    alan.appendChild(help);
   }
 
   function renderGecmis(alan) {
@@ -1126,8 +1197,8 @@
 
     sec.innerHTML =
       '<h2>Coin Tahmin AI</h2>' +
-      '<p class="alt">Uygulamadaki 216 coin önce 1 saatlik hızlı taramadan geçer. Ardından geçerli Binance USDT verisi bulunan coinlerin tamamı 15 dakikalık grafikle okunur ve 5 mum sonrası fiyat tahmini üretilir. En güçlü 20 aday ayrıca çoklu zaman dilimi ve hacim kontrolünden geçer.</p>' +
-      '<button type="button" id="coin-tahmin-btn" class="buton">TÜM COİNLERİ TARA + 5 MUM TAHMİNİ</button>' +
+      '<p class="alt">216 coin önce 15 dakikalık Binance Spot grafiğinde analiz edilir. Ajan kararları ve Denetçi fiyat tahmini 5 mum sonra gerçek fiyatla ölçülür. En güçlü 20 adayda 1 saat, 4 saat ve günlük grafikler ek bağlamdır.</p>' +
+      '<button type="button" id="coin-tahmin-btn" class="buton">216 COİNİ 15 DK TEST ET</button>' +
       '<p id="coin-tahmin-durum" class="alt"></p>' +
       '<div id="coin-tahmin-alan"></div>' +
       '<div id="coin-tahmin-hafiza"></div>' +
@@ -1142,7 +1213,7 @@
       var c = okuBugunCache();
       if (c) {
         renderKayit(c, alan);
-        if (durum) durum.textContent = 'Bugünün coin taraması kayıtlı. Yenilemek için tekrar başlat.';
+        if (durum) durum.textContent = 'Son 15 dk test sonucu yüklendi. Yeni mumları test etmek için yeniden çalıştır.';
       }
       renderGecmis(hafizaEl);
     }
@@ -1152,10 +1223,10 @@
         if (btn.disabled) return;
         btn.disabled = true;
         if (alan) alan.innerHTML = '';
-        bugunUret('1h', function (i, n, ad, phase) {
+        bugunUret('15m', function (i, n, ad, phase) {
           if (durum) durum.textContent = (phase || 'Taranıyor') + ' ' + i + '/' + n + ': ' + ad + '…';
         }).then(function (kayit) {
-          if (durum) durum.textContent = 'Tamamlandı · ' + kayit.tarih;
+          if (durum) durum.textContent = '15 dk test tamamlandı · ' + kayit.tarih + ' ' + new Date(kayit.saat).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
           renderKayit(kayit, alan);
           renderGecmis(hafizaEl);
         }).catch(function (e) {
