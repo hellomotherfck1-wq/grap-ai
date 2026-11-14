@@ -1319,7 +1319,7 @@ try {
     coinReasonUI);
   check(
     'Coin veri hataları kullanıcıya gösteriliyor',
-    coinScan.errors === 0 || coinResultText.includes('Veri alınamayanlar'),
+    coinScan.errors === 0 || coinResultText.includes('Veri alınamayan coinler'),
     coinResultText.slice(-350)
   );
   check(
