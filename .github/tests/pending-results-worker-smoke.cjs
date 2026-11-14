@@ -16,8 +16,9 @@ assert.equal(worker.intervalMs('15m'), 900000);
 assert.equal(worker.intervalMs('1h'), 3600000);
 assert.equal(worker.intervalMs('4h'), 14400000);
 assert.equal(worker.intervalMs('1d'), 86400000);
+const strictNow = 2000000000000;
 const fifteenStep = worker.intervalMs('15m');
-const fifteenSignalAt = now - 5 * fifteenStep;
+const fifteenSignalAt = strictNow - 5 * fifteenStep;
 const fifteenBars = Array.from({ length: 5 }, function (_, index) {
   const open = 100 + index;
   return {
@@ -30,11 +31,11 @@ const fifteenRecord = {
   timeframe: '15m', decision: 'BEKLE', signalAt: fifteenSignalAt,
   price: 100, horizon: 5, directionStatus: 'pending'
 };
-assert.equal(worker.futureBars(fifteenRecord, fifteenBars, now).length, 5);
+assert.equal(worker.futureBars(fifteenRecord, fifteenBars, strictNow).length, 5);
 const fifteenGapBars = fifteenBars.filter((_, index) => index !== 2);
-assert.equal(worker.futureBars(fifteenRecord, fifteenGapBars, now).length, 2,
+assert.equal(worker.futureBars(fifteenRecord, fifteenGapBars, strictNow).length, 2,
   'The worker must stop at the first missing 15m candle instead of shifting the horizon');
-assert.equal(worker.directionResult(fifteenRecord, fifteenGapBars, now), null);
+assert.equal(worker.directionResult(fifteenRecord, fifteenGapBars, strictNow), null);
 const fakeTestSignal = {
   symbol: 'E2EALL0USDT', source: 'E2E tam tarama',
   decision: 'BEKLE', directionStatus: 'pending'
