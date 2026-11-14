@@ -1490,7 +1490,7 @@
       var groups = Object.create(null);
       records.forEach(function (r) {
         var needsTrade = r.decision === 'AL' && r.tradeStatus === 'pending';
-        var needsSpotSale = r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired';
+        var needsSpotSale = r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired' && r.spotStatus !== 'not-applicable';
         var needsDirection = r.directionStatus === 'pending';
         var needsForecast = r.timeframe === '15m' && r.priceForecast && r.priceForecast.status === 'pending';
         if (!needsTrade && !needsSpotSale && !needsDirection && !needsForecast) return;
