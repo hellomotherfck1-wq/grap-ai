@@ -1014,10 +1014,6 @@
           (Number.isFinite(chart.rsi) ? chart.rsi : '—') + ' · ' +
           (chart.lastCandle || 'Mum yapısı yok');
         chartLine.style.cssText = 'display:block;color:#8b98a5;margin-top:3px';
-        detail.appendChild(document.createTextNode(detail.textContent));
-        detail.textContent = 'Tahmin: ' + priceText(f.predictedPrice) +
-          ' · aralık ' + priceText(f.predictedLow) + '–' + priceText(f.predictedHigh) +
-          ' · ' + (f.predictedChangePct > 0 ? '+' : '') + Number(f.predictedChangePct).toFixed(2) + '%';
         detail.appendChild(chartLine);
       } else {
         detail.textContent = 'Tahmin yok: ' + (item.reason || 'Doğrulanmış veri yetersiz.');
