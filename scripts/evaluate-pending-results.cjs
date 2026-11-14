@@ -49,7 +49,7 @@ function isPending(record) {
   if (isTestSignal(record)) return false;
   return record.directionStatus === 'pending' ||
     (record.decision === 'AL' && record.tradeStatus === 'pending') ||
-    (record.decision === 'SAT' && record.spotStatus !== 'completed' && record.spotStatus !== 'expired') ||
+    (record.decision === 'SAT' && record.spotStatus !== 'completed' && record.spotStatus !== 'expired' && record.spotStatus !== 'not-applicable') ||
     (record.timeframe === '15m' && record.priceForecast && record.priceForecast.status === 'pending');
 }
 
