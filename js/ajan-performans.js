@@ -1252,7 +1252,7 @@
     var pendingRecords = testRecords.filter(function (r) {
       return r.directionStatus === 'pending' ||
         (r.decision === 'AL' && r.tradeStatus === 'pending') ||
-        (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired') ||
+        (r.decision === 'SAT' && r.spotStatus !== 'completed' && r.spotStatus !== 'expired' && r.spotStatus !== 'not-applicable') ||
         (r.timeframe === '15m' && r.priceForecast && r.priceForecast.status === 'pending');
     });
     var pending = pendingRecords.length;
@@ -1533,7 +1533,7 @@
                 tradeStatus: record.decision === 'SAT' ? 'not-applicable'
                   : record.decision === 'AL' && record.tradeStatus === 'pending' ? 'expired' : record.tradeStatus,
                 tradeResult: record.decision === 'SAT' ? null : record.tradeResult,
-                spotStatus: record.decision === 'SAT' && record.spotStatus !== 'completed' ? 'expired' : record.spotStatus,
+                spotStatus: record.decision === 'SAT' && record.spotStatus !== 'completed' && record.spotStatus !== 'not-applicable' ? 'expired' : record.spotStatus,
                 directionStatus: record.directionStatus === 'pending' ? 'expired' : record.directionStatus,
                 priceForecast: record.priceForecast && record.priceForecast.status === 'pending'
                   ? Object.assign({}, record.priceForecast, {
