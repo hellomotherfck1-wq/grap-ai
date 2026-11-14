@@ -356,6 +356,7 @@ function grafikAra(ayar) {
       const trendMumlari = sonMumAcik ? dn.m.slice(0, -1) : dn.m;
       const t = Goruntu.trend(trendMumlari);
       const sinyalMumu = dn.d[dn.d.length - (sonMumAcik ? 2 : 1)] || null;
+      const kapaliMumlar = sonMumAcik ? dn.d.slice(0, -1) : dn.d;
       const meta = {
         ad: v.ad, sembol: v.sembol, tur: v.tur, zd: v.zd, kaynak: v.kaynak,
         sonMumZamani: sonMum ? sonMum.t : null,
@@ -363,6 +364,8 @@ function grafikAra(ayar) {
         sinyalMumuZamani: sinyalMumu ? sinyalMumu.t : null,
         sinyalFiyati: sinyalMumu ? sinyalMumu.c : null,
         sinyalAralikMs: aralikMs,
+        kaynakBilgi: v.kaynakBilgi || null,
+        kapaliMumlar: kapaliMumlar,
         market: ayar.market === 'BIST' ? 'BIST'
           : ayar.market === 'Kripto' ? 'Kripto'
             : (String(v.sembol || '').toUpperCase().endsWith('.IS') ? 'BIST' : 'Diğer'),
