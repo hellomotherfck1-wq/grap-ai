@@ -743,7 +743,8 @@
       checked: adaylar.length + hatalar.length,
       ready: readyForecasts,
       unavailable: LISTE.length - readyForecasts,
-      saved: saved,
+      saved: readyForecasts,
+      recordsSaved: saved,
       modelVersion: window.GrapAIDenetciFiyatTahmini
         ? window.GrapAIDenetciFiyatTahmini.modelVersion : null,
       completedAt: Date.now()
@@ -1184,7 +1185,7 @@
     helpTitle.textContent = 'Karar açıklamaları ve uyarılar';
     help.appendChild(helpTitle);
     var helpText = document.createElement('p');
-    helpText.textContent = 'AL: Spot alım yönü. SAT: Eldeki coini azaltma/satma yönü. BEKLE: Yeterli teyit yok. Bu otomatik analiz yatırım tavsiyesi veya emir değildir; kaldıraç kullanılmaz.';
+    helpText.textContent = 'AL: Spot piyasada alım yönünde sinyal. SAT: Eldeki coini azaltma/satma yönünde sinyal; açığa satış veya kaldıraç değildir. BEKLE: Yeterli teyit yok. Bu otomatik analiz yatırım tavsiyesi veya emir değildir.';
     helpText.style.cssText = 'font-size:13px;line-height:1.5;color:#c8d1da;margin-top:9px';
     help.appendChild(helpText);
     alan.appendChild(help);
@@ -1240,7 +1241,7 @@
         bugunUret('15m', function (i, n, ad, phase) {
           if (durum) durum.textContent = (phase || 'Taranıyor') + ' ' + i + '/' + n + ': ' + ad + '…';
         }).then(function (kayit) {
-          if (durum) durum.textContent = '15 dk test tamamlandı · ' + kayit.tarih + ' ' + new Date(kayit.saat).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+          if (durum) durum.textContent = 'Tamamlandı · 15 dk test · ' + kayit.tarih + ' ' + new Date(kayit.saat).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
           renderKayit(kayit, alan);
           renderGecmis(hafizaEl);
         }).catch(function (e) {
