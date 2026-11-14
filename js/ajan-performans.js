@@ -1494,7 +1494,15 @@
         var needsDirection = r.directionStatus === 'pending';
         var needsForecast = r.timeframe === '15m' && r.priceForecast && r.priceForecast.status === 'pending';
         if (!needsTrade && !needsSpotSale && !needsDirection && !needsForecast) return;
-        if (Date.now() < r.signalAt + interval(r.timeframe)) return;
+        var step = interval(r.timeframe);
+        var dueTimes = [];
+        if (needsTrade || needsSpotSale || needsDirection) {
+          dueTimes.push(r.signalAt + (num(r.horizon) ? r.horizon : HORIZON) * step);
+        }
+        if (needsForecast) {
+          dueTimes.push(num(r.priceForecast.dueAt) ? r.priceForecast.dueAt : r.signalAt + 5 * step);
+        }
+        if (!dueTimes.length || Date.now() < Math.min.apply(null, dueTimes)) return;
         if (num(r.nextCheckAt) && Date.now() < r.nextCheckAt) return;
         var key = r.symbol + '|' + r.timeframe;
         if (!groups[key]) groups[key] = { symbol: r.symbol, timeframe: r.timeframe, records: [] };
