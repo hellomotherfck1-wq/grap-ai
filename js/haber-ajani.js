@@ -49,6 +49,7 @@
       cacheTtlMs: 10 * 60 * 1000,
       staleMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
       timeoutMs: 6500,
+      retryBlockedRoutes: true,
       validate: function (value) {
         return typeof value === 'string' && /<rss\b|<feed\b/i.test(value);
       }
@@ -61,6 +62,7 @@
       cacheTtlMs: 10 * 60 * 1000,
       staleMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
       timeoutMs: 6500,
+      retryBlockedRoutes: true,
       validate: function (value) {
         return value !== null && typeof value === 'object';
       }
