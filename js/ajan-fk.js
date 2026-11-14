@@ -80,12 +80,19 @@
     if (!window.GrapAIDataTransport) throw new Error('Ortak veri aktarım katmanı yüklenmedi.');
     return window.GrapAIDataTransport.json(url, {
       cacheTtlMs: 15 * 60 * 1000,
-      staleMaxAgeMs: 24 * 60 * 60 * 1000,
+      staleMaxAgeMs: 0,
       timeoutMs: 6500,
       validate: function (value) {
         return !!(value && value.quoteSummary &&
           Array.isArray(value.quoteSummary.result) && value.quoteSummary.result.length > 0);
       }
+    }).then(function (value) {
+      var info = typeof window.GrapAIDataTransport.info === 'function'
+        ? window.GrapAIDataTransport.info(url, 'json') : null;
+      if (!info || info.failed || info.stale) {
+        throw new Error('F/K verisinin güncelliği doğrulanamadı; eski önbellek verisi kullanılmadı.');
+      }
+      return value;
     });
   }
 

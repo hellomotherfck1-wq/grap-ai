@@ -302,6 +302,29 @@
         (T.kategoriler || []).map(function (g) { return g.ad + ': ' + (g.yon > 0 ? 'yukarı' : g.yon < 0 ? 'aşağı' : 'nötr'); }).join(' / '),
       'Hata payı: ' + D.hata + '. Hata payı sıfır değildir; bu bir yatırım tavsiyesi değildir.'
     ];
+    if (N.son === 'BEKLE') {
+      var supports = s.sv && Array.isArray(s.sv.destekler) ? s.sv.destekler : [];
+      var resistances = s.sv && Array.isArray(s.sv.direncler) ? s.sv.direncler : [];
+      var priceText = function (level) {
+        if (!sayi(level)) return null;
+        try { return typeof Analiz !== 'undefined' && Analiz.fiyat ? Analiz.fiyat(level, kal) : null; }
+        catch (e) { return null; }
+      };
+      var resistanceText = resistances.length ? priceText(resistances[0].seviye) : null;
+      var supportText = supports.length ? priceText(supports[0].seviye) : null;
+      if (resistanceText) {
+        nh.push('AL için izlenecek koşul: ' + resistanceText +
+          ' üzerinde kapanmış mum ve yeniden hacim/teknik kurul teyidi. Tek başına kırılım AL sinyali değildir.');
+      }
+      if (supportText) {
+        nh.push('SAT için izlenecek koşul: ' + supportText +
+          ' altında kapanmış mum ve yeniden hacim/teknik kurul teyidi. Tek başına kırılım SAT sinyali değildir.');
+      }
+      if (!resistanceText && !supportText) {
+        nh.push('Güvenilir sayısal destek/direnç seviyesi bulunmadı; bu nedenle tetik seviyesi üretilmedi.');
+      }
+      nh.push('Bu seviyeler otomatik emir oluşturmaz. Yeni kapanmış mumda tüm ajanlar ve risk/kazanç koşulları yeniden değerlendirilmelidir.');
+    }
     if (s.meta && s.meta.sonMumAcik) nh.push('Devam eden son mum analize alınmadı; yalnızca kapanmış mumlar kullanıldı.');
 
     var dn = [];
@@ -353,6 +376,15 @@
       try {
         var yeni = kartlar3(s, kal, uy);
         if (yeni && y && Array.isArray(y.kartlar)) {
+          var kararEslesmesi = String(yeni[0] && yeni[0].baslik || '').match(/:\s*(AL|SAT|BEKLE)\s*$/i);
+          if (kararEslesmesi) {
+            y.karar = kararEslesmesi[1].toUpperCase();
+            y.renk = y.karar === 'AL' ? '#26a69a' : y.karar === 'SAT' ? '#ef5350' : '#f0b429';
+            var kurulNedeni = yeni[0].satirlar && yeni[0].satirlar[1]
+              ? String(yeni[0].satirlar[1]) : '';
+            y.ozet = ['Ajan kurulunun nihai kararı: ' + y.karar + '. ' + kurulNedeni]
+              .concat(Array.isArray(y.ozet) ? y.ozet : []).slice(0, 3);
+          }
           var eskiBaslik = ['🤝 Ortak Sonuç', '🤝 Ajanlar', '🟦 Hacim Ajanı', '🟧 Denetçi Ajan', '💬 Ajanların'];
           y.kartlar = y.kartlar.filter(function (k) {
             return !(k && typeof k.baslik === 'string' && eskiBaslik.some(function (p) { return k.baslik.indexOf(p) === 0; }));

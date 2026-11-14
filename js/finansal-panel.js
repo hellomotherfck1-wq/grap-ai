@@ -561,8 +561,12 @@
       var market = await Veri.ara(code + '.IS', '1d', function (message) {
         status.textContent = message || 'Piyasa verisi alınıyor…';
       });
-      var converted = Veri.donustur(market, 220);
-      if (!converted || !converted.d || converted.d.length < 30) throw new Error('Teknik analiz için yeterli günlük veri alınamadı.');
+      var closedMarket = Object.assign({}, market, {
+        mumlar: market.sonMumAcik && market.mumlar.length > 1
+          ? market.mumlar.slice(0, -1) : market.mumlar
+      });
+      var converted = Veri.donustur(closedMarket, 220);
+      if (!converted || !converted.d || converted.d.length < 30) throw new Error('Teknik analiz için yeterli kapanmış günlük veri alınamadı.');
 
       var trend = Goruntu.trend(converted.m);
       var technical = Analiz.yap(converted.m, trend);
