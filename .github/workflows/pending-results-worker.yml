@@ -5,8 +5,10 @@ on:
     branches: [main]
     paths:
       - "scripts/evaluate-pending-results.cjs"
+      - "js/denetci-fiyat-tahmini.js"
       - ".github/workflows/pending-results-worker.yml"
       - ".github/tests/pending-results-worker-smoke.cjs"
+      - ".github/tests/five-candle-forecast-smoke.cjs"
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
@@ -37,6 +39,9 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
+
+      - name: Smoke test auditor five-candle forecast
+        run: node .github/tests/five-candle-forecast-smoke.cjs
 
       - name: Smoke test pending-result worker
         run: node .github/tests/pending-results-worker-smoke.cjs
