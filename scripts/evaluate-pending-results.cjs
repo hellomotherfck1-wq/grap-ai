@@ -74,7 +74,20 @@ function summarizePending(records) {
 function shouldEvaluate(record, now, options) {
   const step = intervalMs(record.timeframe);
   if (!isPending(record) || !step || !isNumber(record.signalAt) || record.signalAt <= 0) return false;
-  if (now < record.signalAt + step) return false;
+  const needsAgentResult = record.directionStatus === 'pending' ||
+    (record.decision === 'AL' && record.tradeStatus === 'pending') ||
+    (record.decision === 'SAT' && record.spotStatus !== 'completed' && record.spotStatus !== 'expired');
+  const needsForecast = record.timeframe === '15m' && record.priceForecast &&
+    record.priceForecast.status === 'pending';
+  const horizon = Math.max(1, Math.min(30, Number(record.horizon) || 10));
+  const dueTimes = [];
+  if (needsAgentResult) dueTimes.push(record.signalAt + horizon * step);
+  if (needsForecast) {
+    const forecastDueAt = Number(record.priceForecast.dueAt);
+    dueTimes.push(isNumber(forecastDueAt) && forecastDueAt > 0
+      ? forecastDueAt : record.signalAt + 5 * step);
+  }
+  if (!dueTimes.length || now < Math.min.apply(null, dueTimes)) return false;
   const forceRetryError = !!(options && options.forceRetryErrors && record.lastError);
   if (isNumber(record.nextCheckAt) && now < record.nextCheckAt && !forceRetryError) return false;
   return true;
