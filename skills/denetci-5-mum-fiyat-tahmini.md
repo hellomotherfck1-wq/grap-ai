@@ -4,8 +4,8 @@
 Yalnızca 15 dakikalık (15m) grafiklerde, son kapanmış mumun kapanış fiyatından başlayarak beş yeni kapanmış mumun beşincisinin kapanış fiyatını tahmin et. Tahmini ve gerçekleşen fiyatı Sonuçlar bölümünde ayrı bir ölçüm olarak takip et.
 
 ## Kesin kapsam
-- Aktif zaman dilimi yalnızca \`15m\` olmalıdır.
-- \`1h\`, \`4h\` ve \`1d\` grafiklerde bu beceriyi çalıştırma; tahmin veya tahmin kaydı üretme.
+- Aktif zaman dilimi yalnızca `15m` olmalıdır.
+- `1h`, `4h` ve `1d` grafiklerde bu beceriyi çalıştırma; tahmin veya tahmin kaydı üretme.
 - Yalnızca gerçek piyasa sağlayıcısından alınmış OHLCV mumlarını kullan.
 - Açık/devam eden mumu, ekran görüntüsünden çıkarılmış yaklaşık fiyatı, eksik fiyatı veya eski önbelleği kullanma.
 - En az 60 geçerli ve kapanmış 15m mum yoksa tahmin üretme. Eksik veri durumunu açıkça bildir.
@@ -21,9 +21,9 @@ Yalnızca 15 dakikalık (15m) grafiklerde, son kapanmış mumun kapanış fiyat�
 7. Geçmiş örüntü sayısı veya veri kalitesi yeterli değilse sayı uydurma; tahmin oluşturma.
 
 ## Sonuç değerlendirmesi
-- Tahmin oluşturulurken kayıt \`pending\` olarak saklanır; tahmin sonradan değiştirilmez.
+- Tahmin oluşturulurken kayıt `pending` olarak saklanır; tahmin sonradan değiştirilmez.
 - Beş yeni kapanmış 15m mum oluştuğunda, beşinci mumun gerçek kapanışını gerçekleşen fiyat olarak kaydet.
-- Mutlak fiyat hatasını \`abs(tahmin - gerçekleşen) / gerçekleşen × 100\` formülüyle hesapla.
+- Mutlak fiyat hatasını `abs(tahmin - gerçekleşen) / gerçekleşen × 100` formülüyle hesapla.
 - Tahmin yönünü (yukarı/aşağı/yatay) gerçekleşen yönle ayrı kaydet.
 - Sonuçlar ekranında tahmin sayısı, tamamlanan/bekleyen kayıtlar, ortalama mutlak fiyat hatası ve her tahminin başlangıç/tahmin/gerçekleşen fiyatlarını göster.
 - Bu ölçümü mevcut 10 mumluk AL/SAT performansıyla birleştirme. Ayrı bir beceri ve ayrı bir performans serisi olarak tut.
