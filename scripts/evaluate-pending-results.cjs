@@ -82,13 +82,22 @@ function shouldEvaluate(record, now, options) {
 
 function futureBars(record, bars, now) {
   const step = intervalMs(record.timeframe);
-  return (Array.isArray(bars) ? bars : []).filter(function (bar) {
+  const rows = (Array.isArray(bars) ? bars : []).filter(function (bar) {
     return bar && isNumber(bar.t) && isNumber(bar.o) && isNumber(bar.h) &&
       isNumber(bar.l) && isNumber(bar.c) && bar.t >= record.signalAt &&
-      bar.h >= Math.max(bar.o, bar.c) && bar.l <= Math.min(bar.o, bar.c);
-  }).sort(function (a, b) { return a.t - b.t; }).filter(function (bar) {
-    return bar.t + step <= now;
-  });
+      bar.h >= Math.max(bar.o, bar.c) && bar.l <= Math.min(bar.o, bar.c) &&
+      bar.t + step <= now;
+  }).sort(function (a, b) { return a.t - b.t; });
+  const strict15m = record.timeframe === '15m' &&
+    (record.market === 'Kripto' || /USDT$/i.test(String(record.symbol || '')));
+  if (!strict15m) return rows;
+  if (!rows.length || rows[0].t !== record.signalAt) return [];
+  const contiguous = [];
+  for (const bar of rows) {
+    if (bar.t !== record.signalAt + contiguous.length * step) break;
+    contiguous.push(bar);
+  }
+  return contiguous;
 }
 
 function directionResult(record, bars, now) {
@@ -365,6 +374,45 @@ function normalizeBybitBars(rows) {
   }).sort(function (a, b) { return a.t - b.t; });
 }
 
+function normalizeBinanceBars(rows) {
+  return (Array.isArray(rows) ? rows : []).map(function (row) {
+    return {
+      t: Number(row[0]), o: Number(row[1]), h: Number(row[2]),
+      l: Number(row[3]), c: Number(row[4]), v: Number(row[5]),
+      closeTime: Number(row[6]), quoteVolume: Number(row[7]),
+      trades: Number(row[8]), takerBuyBaseVolume: Number(row[9]),
+      takerBuyQuoteVolume: Number(row[10])
+    };
+  }).filter(function (bar) {
+    return isNumber(bar.t) && isNumber(bar.o) && isNumber(bar.h) &&
+      isNumber(bar.l) && isNumber(bar.c) && bar.o > 0 && bar.h > 0 &&
+      bar.l > 0 && bar.c > 0 && bar.h >= Math.max(bar.o, bar.c) &&
+      bar.l <= Math.min(bar.o, bar.c) && bar.h >= bar.l;
+  }).sort(function (a, b) { return a.t - b.t; });
+}
+
+async function fetchBinanceBars(symbol, timeframe) {
+  const intervals = { '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d' };
+  const interval = intervals[timeframe];
+  if (!interval) throw new Error('Binance bu zaman dilimini desteklemiyor: ' + timeframe);
+  const hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
+  const errors = [];
+  for (const host of hosts) {
+    try {
+      const url = host + '/api/v3/klines?symbol=' + encodeURIComponent(symbol) +
+        '&interval=' + interval + '&limit=1000';
+      const result = await fetchJson(url, { Accept: 'application/json' }, 18000);
+      if (!Array.isArray(result.data)) throw new Error('Binance mum yanıtı geçersiz.');
+      const bars = normalizeBinanceBars(result.data);
+      if (bars.length < 80) throw new Error('Yeterli Binance Spot geçmiş verisi yok.');
+      return bars;
+    } catch (error) {
+      errors.push(host + ': ' + safeError(error));
+    }
+  }
+  throw new Error('Binance Spot veri kaynakları yanıt vermedi. ' + errors.join(' | '));
+}
+
 function normalizeGateBars(rows) {
   return (Array.isArray(rows) ? rows : []).map(function (row) {
     return {
@@ -413,6 +461,9 @@ async function fetchGateBars(symbol, timeframe) {
 }
 
 async function fetchCryptoBars(symbol, timeframe) {
+  // 15 dakikalık Denetçi tahmini Binance Spot ile üretildi; sonucu başka borsadan
+  // ölçmek fiyat farkını modele hata olarak yazar. Bu periyotta kaynak değiştirme.
+  if (timeframe === '15m') return fetchBinanceBars(symbol, timeframe);
   const errors = [];
   try {
     return await fetchGateBars(symbol, timeframe);
@@ -635,7 +686,9 @@ module.exports = {
   priceForecastResult: priceForecastModel.degerlendir,
   groupPending: groupPending,
   normalizeBybitBars: normalizeBybitBars,
+  normalizeBinanceBars: normalizeBinanceBars,
   normalizeGateBars: normalizeGateBars,
+  fetchBinanceBars: fetchBinanceBars,
   fetchBybitBars: fetchBybitBars,
   fetchGateBars: fetchGateBars,
   safeError: safeError
