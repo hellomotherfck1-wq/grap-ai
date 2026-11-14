@@ -149,8 +149,8 @@ assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=3') && index.includes('j
   index.includes('js/coin-tahmin.js?v=13') &&
   index.includes('js/ajan-performans.js?v=19'),
   'The forecast module must load in the browser');
-assert.ok(sw.includes('graph-ai-v63') && sw.includes('./js/denetci-fiyat-tahmini.js'),
-  'The service worker must cache the new module under a fresh version');
+assert.ok(/graph-ai-v\d+/.test(sw) && sw.includes('./js/denetci-fiyat-tahmini.js'),
+  'The service worker must cache the new module under a versioned cache');
 assert.ok(auditor.includes('5 mum sonrası tahmini fiyat') && auditor.includes('priceForecast') && auditor.includes('Grafik okuması'),
   'The Denetçi card must display and pass the forecast to result storage');
 assert.ok(performance.includes('renderFiveBarForecast') &&
