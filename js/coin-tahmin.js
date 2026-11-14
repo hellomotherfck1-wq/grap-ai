@@ -837,12 +837,11 @@
   }
 
   function renderBotOylari(s) {
-    var box = document.createElement('div');
+    var box = document.createElement('details');
     box.className = 'kart';
     box.style.borderLeft = '4px solid #2f81f7';
-    var h = document.createElement('h3');
-    h.textContent = 'Botların oyları';
-    h.style.cssText = 'font-size:16px;margin-bottom:10px';
+    var h = document.createElement('summary');
+    h.textContent = 'Ajan oyları ve denetçi kontrolü';
     box.appendChild(h);
 
     var rows = [
@@ -863,7 +862,7 @@
 
     if (s.netYok) {
       var noSignal = document.createElement('p');
-      noSignal.textContent = 'Bugün yeterince güçlü bir coin adayı çıkmadı. Bu nedenle tek bir coin için AL/SAT sinyali vermiyoruz.';
+      noSignal.textContent = 'Bu 15 dakikalık testte yeterince güçlü aday çıkmadı. Bu nedenle AL/SAT sinyali vermiyoruz.';
       noSignal.style.cssText = 'font-size:13px;line-height:1.5;color:#c8d1da;margin-top:10px';
       box.appendChild(noSignal);
     } else {
@@ -1162,7 +1161,20 @@
     var technicalDetails = renderTeknikDetay(s);
     if (technicalDetails) alan.appendChild(technicalDetails);
     if (kayit.hatalar && kayit.hatalar.length) {
-      alan.appendChild(kart('Veri alınamayan coinler', kayit.hatalar.slice(0, 8), '#f0b429'));
+      var errorDetails = document.createElement('details');
+      errorDetails.className = 'kart';
+      var errorTitle = document.createElement('summary');
+      errorTitle.textContent = 'Veri alınamayan coinler (' + kayit.hatalar.length + ')';
+      errorDetails.appendChild(errorTitle);
+      var errorBody = document.createElement('div');
+      errorBody.style.cssText = 'margin-top:9px;font-size:12px;line-height:1.5;color:#f0b429';
+      kayit.hatalar.slice(0, 12).forEach(function (message) {
+        var p = document.createElement('p');
+        p.textContent = message;
+        errorBody.appendChild(p);
+      });
+      errorDetails.appendChild(errorBody);
+      alan.appendChild(errorDetails);
     }
     var help = document.createElement('details');
     help.className = 'kart';
