@@ -7,7 +7,7 @@
     '4h': 4 * 60 * 60 * 1000,
     '1d': 24 * 60 * 60 * 1000
   };
-  var SURUM = 'crypto-intelligence-2.1.0';
+  var SURUM = 'crypto-intelligence-2.2.0';
   var candleCache = Object.create(null);
 
   function sayi(x) { return typeof x === 'number' && isFinite(x); }
@@ -20,6 +20,88 @@
   function ortalama(values) {
     return values.length ? values.reduce(function (sum, x) { return sum + x; }, 0) / values.length : null;
   }
+  function medyan(values) {
+    if (!values.length) return null;
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+  function trueRange(bars, index) {
+    var current = bars[index], previous = bars[index - 1];
+    return Math.max(current.h - current.l, Math.abs(current.h - previous.c), Math.abs(current.l - previous.c));
+  }
+  function atrSeries(bars) {
+    var values = new Array(bars.length);
+    if (bars.length < 15) return values;
+    var total = 0;
+    for (var i = 1; i <= 14; i++) total += trueRange(bars, i);
+    var atr = total / 14;
+    values[14] = atr;
+    for (var j = 15; j < bars.length; j++) {
+      atr = (atr * 13 + trueRange(bars, j)) / 14;
+      values[j] = atr;
+    }
+    return values;
+  }
+  function adx14(bars) {
+    if (!Array.isArray(bars) || bars.length < 29) return null;
+    var tr = 0, plus = 0, minus = 0, dx = [];
+    function movement(index) {
+      var current = bars[index], previous = bars[index - 1];
+      var up = current.h - previous.h;
+      var down = previous.l - current.l;
+      return {
+        tr: trueRange(bars, index),
+        plus: up > down && up > 0 ? up : 0,
+        minus: down > up && down > 0 ? down : 0
+      };
+    }
+    for (var i = 1; i <= 14; i++) {
+      var initial = movement(i);
+      tr += initial.tr; plus += initial.plus; minus += initial.minus;
+    }
+    for (var j = 14; j < bars.length; j++) {
+      if (j > 14) {
+        var next = movement(j);
+        tr = tr - tr / 14 + next.tr;
+        plus = plus - plus / 14 + next.plus;
+        minus = minus - minus / 14 + next.minus;
+      }
+      var plusDi = tr > 0 ? 100 * plus / tr : 0;
+      var minusDi = tr > 0 ? 100 * minus / tr : 0;
+      var totalDi = plusDi + minusDi;
+      dx.push(totalDi > 0 ? 100 * Math.abs(plusDi - minusDi) / totalDi : 0);
+    }
+    if (dx.length < 14) return null;
+    var result = ortalama(dx.slice(0, 14));
+    for (var k = 14; k < dx.length; k++) result = (result * 13 + dx[k]) / 14;
+    return result;
+  }
+  function hacimDegeri(bar) {
+    var quote = Number(bar && bar.quoteVolume);
+    if (sayi(quote) && quote > 0) return quote;
+    var volume = Number(bar && bar.v);
+    return sayi(volume) && volume > 0 ? volume : null;
+  }
+  function breakoutRead(bars) {
+    if (!Array.isArray(bars) || bars.length < 26) {
+      return { direction: 'Yok', volumeRatio: null, confirmed: false };
+    }
+    var last = bars[bars.length - 1];
+    var prior = bars.slice(-21, -1);
+    var high = Math.max.apply(null, prior.map(function (bar) { return Number(bar.h); }));
+    var low = Math.min.apply(null, prior.map(function (bar) { return Number(bar.l); }));
+    var direction = last.c > high ? 'Yukarı' : last.c < low ? 'Aşağı' : 'Yok';
+    var recent = bars.slice(-5).map(hacimDegeri).filter(sayi);
+    var baseline = bars.slice(-25, -5).map(hacimDegeri).filter(sayi);
+    var recentAverage = ortalama(recent), baselineAverage = ortalama(baseline);
+    var volumeRatio = recentAverage > 0 && baselineAverage > 0 ? recentAverage / baselineAverage : null;
+    return {
+      direction: direction,
+      volumeRatio: volumeRatio,
+      confirmed: direction !== 'Yok' && sayi(volumeRatio) && volumeRatio >= 1.2
+    };
+  }
   function kapanmis(mumlar, tf) {
     if (window.Veri && typeof Veri.kapanmisMumlar === 'function') return Veri.kapanmisMumlar(mumlar, tf);
     var step = TF_MS[tf] || 0;
@@ -31,7 +113,8 @@
     }).sort(function (a, b) { return Number(a.t) - Number(b.t); });
   }
   /* Binance Kline taker alım/satım hacmi; balina tespiti değildir. */
-  function orderFlow(mumlar) {
+  function orderFlow(mumlar, timeframe) {
+    var step = TF_MS[timeframe] || TF_MS['1h'];
     var rows = (Array.isArray(mumlar) ? mumlar : []).filter(function (m) {
       var quote = Number(m && m.quoteVolume);
       var buy = Number(m && m.takerBuyQuoteVolume);
@@ -41,8 +124,8 @@
       return { available: false, decision: 'BEKLE', score: 0, reason: 'Order Flow için yeterli Binance alım/satım hacmi yok.' };
     }
     var latest = rows[rows.length - 1];
-    var latestAt = latest.closeTime != null ? Number(latest.closeTime) : Number(latest.t) + TF_MS['1h'];
-    if (!sayi(latestAt) || latestAt > Date.now() || Date.now() - latestAt > 2 * TF_MS['1h']) {
+    var latestAt = latest.closeTime != null ? Number(latest.closeTime) : Number(latest.t) + step - 1;
+    if (!sayi(latestAt) || latestAt > Date.now() || Date.now() - latestAt > 2 * step) {
       return { available: false, decision: 'BEKLE', score: 0, reason: 'Order Flow verisi eski; ajan oy kullanmadı.' };
     }
     var recent = rows.slice(-5);
@@ -108,11 +191,31 @@
         var direction = 0;
         if (lastClose > fastNow && fastNow > slowNow && slope > 0.001) direction = 1;
         else if (lastClose < fastNow && fastNow < slowNow && slope < -0.001) direction = -1;
+
+        var atrs = atrSeries(bars);
+        var atrNow = atrs[atrs.length - 1];
+        var previousAtrs = atrs.slice(Math.max(14, atrs.length - 21), -1).filter(sayi);
+        var baselineAtr = medyan(previousAtrs);
+        var volatilityRatio = sayi(atrNow) && baselineAtr > 0 ? atrNow / baselineAtr : null;
+        var volatilityRegime = !sayi(volatilityRatio) ? 'Belirsiz'
+          : volatilityRatio >= 1.8 ? 'Yüksek' : volatilityRatio <= 0.65 ? 'Düşük' : 'Normal';
+        var breakout = breakoutRead(bars);
+        var momentum15BarsPct = closes.length > 15
+          ? (lastClose / closes[closes.length - 16] - 1) * 100 : null;
+
         return {
           symbol: symbol, timeframe: tf,
           trend: direction > 0 ? 'Yükseliş' : direction < 0 ? 'Düşüş' : 'Yatay/Karışık',
           direction: direction,
           changePct: closes.length > 1 ? ((lastClose / closes[closes.length - 2]) - 1) * 100 : null,
+          momentum15BarsPct: momentum15BarsPct,
+          adx14: adx14(bars),
+          atrPct: sayi(atrNow) && lastClose > 0 ? atrNow / lastClose * 100 : null,
+          volatilityRatio: volatilityRatio,
+          volatilityRegime: volatilityRegime,
+          breakout: breakout.direction,
+          breakoutVolumeRatio: breakout.volumeRatio,
+          breakoutConfirmed: breakout.confirmed,
           lastCandleAt: lastAt
         };
       });
@@ -122,7 +225,7 @@
 
   async function piyasaRejimiOku(quickResults) {
     var requests = [
-      ['BTCUSDT', '1d'], ['BTCUSDT', '4h'],
+      ['BTCUSDT', '1d'], ['BTCUSDT', '4h'], ['BTCUSDT', '15m'],
       ['ETHUSDT', '1d'], ['ETHUSDT', '4h']
     ];
     var readings = await Promise.all(requests.map(function (item) {
@@ -132,6 +235,7 @@
     readings.forEach(function (row) { if (row) map[row.symbol + '|' + row.timeframe] = row; });
     var btc1d = map['BTCUSDT|1d'] || null;
     var btc4h = map['BTCUSDT|4h'] || null;
+    var btc15m = map['BTCUSDT|15m'] || null;
     var eth1d = map['ETHUSDT|1d'] || null;
     var eth4h = map['ETHUSDT|4h'] || null;
     var changes = (Array.isArray(quickResults) ? quickResults : []).map(function (item) {
@@ -156,7 +260,7 @@
       regime: bullish ? 'Yükseliş' : bearish ? 'Düşüş' : 'Karışık',
       bullish: bullish, bearish: bearish,
       breadth: { total: changes.length, up: up, down: down, upShare: upShare, downShare: downShare },
-      btc: { daily: btc1d, fourHour: btc4h },
+      btc: { daily: btc1d, fourHour: btc4h, fifteenMinute: btc15m },
       eth: { daily: eth1d, fourHour: eth4h },
       ethRelativeStrength: eth1d && btc1d && sayi(eth1d.changePct) && sayi(btc1d.changePct)
         ? eth1d.changePct - btc1d.changePct : null,
@@ -176,23 +280,24 @@
     var results = await Promise.all([
       trendOku(symbol, '1d').catch(function () { return null; }),
       trendOku(symbol, '4h').catch(function () { return null; }),
+      trendOku(symbol, '1h').catch(function () { return null; }),
       trendOku(symbol, '15m').catch(function () { return null; })
     ]);
-    var daily = results[0], fourHour = results[1], fifteen = results[2];
+    var daily = results[0], fourHour = results[1], hourly = results[2], fifteen = results[3];
     var baseDirection = yon(base.karar);
-    var highTimeframeConflict = baseDirection !== 0 && daily && fourHour &&
-      (daily.direction !== baseDirection || fourHour.direction !== baseDirection);
-    var entryConflict = baseDirection !== 0 && fifteen && fifteen.direction === -baseDirection;
-    var hourlyDirection = yon(base.trend);
+    var highTimeframeConflict = baseDirection !== 0 &&
+      ((daily && daily.direction === -baseDirection) ||
+       (fourHour && fourHour.direction === -baseDirection));
+    var entryConflict = baseDirection !== 0 && hourly && hourly.direction === -baseDirection;
     return {
-      available: !!(daily || fourHour || fifteen),
+      available: !!(daily || fourHour || hourly || fifteen),
       highTimeframeReady: !!(daily && fourHour),
       daily: daily, fourHour: fourHour,
-      hourly: { trend: base.trend || 'Belirsiz', direction: hourlyDirection },
+      hourly: hourly || { trend: 'Belirsiz', direction: 0 },
       fifteenMinute: fifteen,
       highTimeframeConflict: !!highTimeframeConflict,
       entryConflict: !!entryConflict,
-      score: baseDirection === 0 ? 0 : [daily, fourHour, { direction: hourlyDirection }, fifteen]
+      score: baseDirection === 0 ? 0 : [daily, fourHour, hourly, fifteen]
         .filter(function (item) { return item && item.direction; })
         .reduce(function (sum, item) { return sum + (item.direction === baseDirection ? 1 : -1); }, 0)
     };
@@ -201,6 +306,11 @@
   async function derinAnaliz(adaylar, onProgress) {
     var all = Array.isArray(adaylar) ? adaylar : [];
     candleCache = Object.create(null);
+    all.forEach(function (item) {
+      if (item && item.zd === '15m' && item.sembol && Array.isArray(item._mumlar) && item._mumlar.length >= 55) {
+        candleCache[item.sembol + '|15m'] = Promise.resolve(item._mumlar);
+      }
+    });
     var top = all.filter(function (item) {
       return item && item.sembol && item.sembol !== '—';
     }).slice().sort(function (a, b) {
@@ -217,8 +327,25 @@
         if (typeof onProgress === 'function') onProgress(done + 1, top.length, item.ad, 'Derin analiz');
         var baseDirection = yon(item.karar);
         try {
-          var flow = orderFlow(item._mumlar || []);
+          var flow = orderFlow(item._mumlar || [], item.zd || '1h');
           var mtf = await mtfOku(item);
+          var btc15 = market.btc && market.btc.fifteenMinute;
+          var coin15 = mtf.fifteenMinute;
+          var relativeStrength = coin15 && btc15 && sayi(coin15.momentum15BarsPct) && sayi(btc15.momentum15BarsPct)
+            ? coin15.momentum15BarsPct - btc15.momentum15BarsPct : null;
+          var skills = {
+            mode: 'shadow',
+            adx14: coin15 && sayi(coin15.adx14) ? coin15.adx14 : null,
+            trendStrength: coin15 && sayi(coin15.adx14)
+              ? (coin15.adx14 >= 25 ? 'Güçlü' : coin15.adx14 >= 20 ? 'Gelişiyor' : 'Zayıf') : 'Belirsiz',
+            atrPct: coin15 && sayi(coin15.atrPct) ? coin15.atrPct : null,
+            volatilityRatio: coin15 && sayi(coin15.volatilityRatio) ? coin15.volatilityRatio : null,
+            volatilityRegime: coin15 ? coin15.volatilityRegime : 'Belirsiz',
+            breakout: coin15 ? coin15.breakout : 'Belirsiz',
+            breakoutVolumeRatio: coin15 && sayi(coin15.breakoutVolumeRatio) ? coin15.breakoutVolumeRatio : null,
+            breakoutConfirmed: !!(coin15 && coin15.breakoutConfirmed),
+            relativeStrengthVsBtcPct: relativeStrength
+          };
           var reasons = [], veto = false;
           if (baseDirection !== 0 && !mtf.highTimeframeReady) {
             veto = true;
@@ -230,7 +357,7 @@
           }
           if (baseDirection !== 0 && mtf.entryConflict) {
             veto = true;
-            reasons.push('15D giriş zamanlaması ana sinyalin tersinde.');
+            reasons.push('1S ana zaman dilimi ana sinyalin tersinde.');
           }
           if (baseDirection !== 0 && flow.available && flow.score * baseDirection <= -2) {
             veto = true;
@@ -243,6 +370,7 @@
 
           item.flow = flow;
           item.mtf = mtf;
+          item.skillReadings = skills;
           item.marketRegime = {
             regime: market.regime, breadth: market.breadth,
             reason: market.reason, ethRelativeStrength: market.ethRelativeStrength
@@ -252,7 +380,7 @@
           item.deepVeto = veto;
           item.deepReasons = reasons;
           item.sourceTimestamps = {
-            '1h': item.signalAt || null,
+            '1h': mtf.hourly ? mtf.hourly.lastCandleAt : null,
             '1d': mtf.daily ? mtf.daily.lastCandleAt : null,
             '4h': mtf.fourHour ? mtf.fourHour.lastCandleAt : null,
             '15m': mtf.fifteenMinute ? mtf.fifteenMinute.lastCandleAt : null
@@ -269,7 +397,10 @@
               ' · 4S ' + (mtf.fourHour ? mtf.fourHour.trend : 'veri yok') +
               ' · 1S ' + (mtf.hourly.trend || 'veri yok') +
               ' · 15D ' + (mtf.fifteenMinute ? mtf.fifteenMinute.trend : 'veri yok'),
-            '🌐 BTC piyasa ajanı: ' + market.reason
+            '🌐 BTC piyasa ajanı: ' + market.reason,
+            '🧪 Ek beceriler (gölge test, kararı değiştirmez): ADX14 ' + (sayi(skills.adx14) ? skills.adx14.toFixed(1) : '—') +
+              ' · ATR rejimi ' + skills.volatilityRegime + ' · 20 mum kırılımı ' + skills.breakout +
+              ' · BTC’ye göre güç ' + (sayi(relativeStrength) ? (relativeStrength >= 0 ? '+' : '') + relativeStrength.toFixed(2) + '%' : '—')
           ]);
           if (reasons.length) item.tartisma.push('⛔ Güvenlik filtresi: ' + reasons.join(' '));
         } catch (error) {
