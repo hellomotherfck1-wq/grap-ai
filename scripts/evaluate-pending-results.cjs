@@ -400,7 +400,7 @@ async function fetchBinanceBars(symbol, timeframe) {
   for (const host of hosts) {
     try {
       const url = host + '/api/v3/klines?symbol=' + encodeURIComponent(symbol) +
-        '&interval=' + interval + '&limit=1000';
+        '&interval=' + interval + '&limit=200';
       const result = await fetchJson(url, { Accept: 'application/json' }, 18000);
       if (!Array.isArray(result.data)) throw new Error('Binance mum yanıtı geçersiz.');
       const bars = normalizeBinanceBars(result.data);
