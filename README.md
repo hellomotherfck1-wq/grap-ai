@@ -49,18 +49,18 @@ Ajan haberleri tarih ve kaynak bağlantısıyla gösterir; tekrar eden başlıkl
 
 ## Ajan performans karnesi
 
-**Sonuç** ekranındaki ajan performans paneli, gerçek analiz ve BIST/coin taramalarından gelen sinyalleri tarayıcının IndexedDB alanında 365 gün saklar.
+**Sonuçlar** ekranındaki test paneli şu aşamada yalnızca Kripto · 15 dakika kayıtlarını gösterir. Eski kayıtlar ve diğer zaman dilimleri silinmez; CSV dışa aktarımında korunur. Sinyaller IndexedDB'de 365 gün saklanır.
 
 - Ham fiyat mumları depolanmaz; sonuç kontrol edilirken ücretsiz Yahoo Finance / Binance herkese açık geçmiş verisi yeniden çekilir. Geçmiş fiyatlar yalnızca gerçek analiz ve tarama sinyallerinin performansını ölçmek için kullanılır; ayrı bir manuel geçmiş sinyal simülasyonu bulunmaz.
 - Aynı sembol, zaman dilimi ve kapanmış mum için tekrar eden sinyaller tek kayıtta birleştirilir.
-- Coin taramasında verisi alınan tüm adaylar (tam listede 216 coin); nihai karar, genel/teknik/hacim/Order Flow oyları, piyasa rejimi, MTF ve ilk 20 derin tarama bilgisiyle kaydedilir. Ham mumlar saklanmaz.
-- Spot AL işlemi sonraki mum açılışından simüle edilir; varsayılan toplam maliyet %0,20, hedef/stop aynı mumda görülürse stop önceliklidir.
-- Spot SAT için short açılmaz. Elde coin olduğu varsayımıyla sonraki mum açılışındaki satış fiyatı, 10 kapanmış mum tutmaya kıyaslanır. Bu fiyat farkı komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy PnL'si değildir.
-- Genel analiz, teknik, hacim ve nihai kurulun yön isabeti kaydedilen tüm AL/SAT oyları için 10 kapanmış mum sonraki fiyat yönüyle ölçülür. BEKLE kararları kazanma oranına eklenmez; düşüşten kaçınma / yükseliş kaçırma olarak raporlanır.
-- Denetçi ajanının Düşük/Orta/Yüksek risk seviyesi ve bulgu sayısı saklanır; her risk seviyesinden sonra 10 mumdaki düşüş/yükseliş dağılımı ayrı gösterilir. F/K ajanının AL → BEKLE veto kararları da sonraki fiyat hareketiyle karşılaştırılır.
+- Coin taraması 216 coin için 15 dakikalık Binance Spot mumlarını tek seferde kullanır; genel/teknik/hacim/Order Flow kararları ve 5 mumluk Denetçi tahmini aynı mum verisinden üretilir. İlk 20 aday ayrıca 1 saat, 4 saat ve günlük bağlamla doğrulanır. Ham mumlar saklanmaz.
+- 15 dakikalık Spot AL işlemi sonraki mum açılışından başlar ve 5 mumluk test ufkuyla ölçülür; varsayılan toplam maliyet %0,20, hedef/stop aynı mumda görülürse stop önceliklidir. Eski kayıtlar kendi saklanan ufuklarıyla değerlendirilir.
+- Spot SAT için short açılmaz. Elde coin olduğu varsayımıyla sonraki mum açılışındaki satış fiyatı, 15 dakikalık testte 5 kapanmış mum tutmaya kıyaslanır. Bu fiyat farkı komisyonu, önceki alış maliyetini ve gerçek pozisyon miktarını içermez; gerçek portföy PnL'si değildir.
+- Genel analiz, teknik, hacim ve nihai kurulun yön isabeti 15 dakikalık testte sonraki 5 kapanmış mumun fiyat yönüyle ölçülür. BEKLE kararları kazanma oranına eklenmez; düşüşten kaçınma / yükseliş kaçırma olarak raporlanır.
+- Denetçi ajanının Düşük/Orta/Yüksek risk seviyesi ve bulgu sayısı saklanır; 15 dakikalık testte her risk seviyesinin ardından 5 mumluk sonuçlar ayrı incelenir. F/K ajanının AL → BEKLE veto kararları da sonraki fiyat hareketiyle karşılaştırılır.
 - Tarama kayıtlarında F/K ajanı çalıştırılmadıysa bu eksik açıkça belirtilir. Grafik analizinde F/K sonucu sonradan kararı değiştirirse aynı sinyal kaydı güncellenir.
-- Ajan yön isabeti piyasa, zaman dilimi ve her ajanın kendi sürümüne göre ayrı gösterilir. AL/SAT oyları, 10 kapanmış mum sonrası fiyat yönüyle ölçülür; BEKLE oyları ayrı sayılır.
-- Aynı sembol/periyotta ileriye dönük 10 mum pencereleri çakışan sinyaller bağımsız örnek sayılmaz. İleri dönem bitiş zamanı eksik eski kayıtlar bağımsız örnek hesabına katılmaz; 30'dan az bağımsız örnek güvenilir başarı oranı sayılmaz.
+- Ajan yön isabeti bu aşamada 15 dakikalık kripto kayıtları için gösterilir. AL/SAT oyları, 5 kapanmış mum sonrası fiyat yönüyle ölçülür; BEKLE oyları ayrı sayılır.
+- Aynı sembol/periyotta ileriye dönük 5 mum pencereleri çakışan sinyaller bağımsız örnek sayılmaz. İleri dönem bitiş zamanı eksik eski kayıtlar bağımsız örnek hesabına katılmaz; 30'dan az bağımsız örnek güvenilir başarı oranı sayılmaz.
 - Spot AL işlem kazanma oranında 30 işlemden önce örneklem yetersiz olarak işaretlenir; Wilson güven aralığı gösterilir.
 - Her cihaz kendi sinyallerini IndexedDB'de tutar ve ortak sonuç havuzuyla Supabase'e eşitler; ortak kayıtları yalnızca admin yetkili hesap okuyabilir. Tarayıcı verisi temizlenirse henüz eşitlenmemiş yerel kayıtlar kaybolabilir; CSV dışa aktarımı vardır. 365 günden eski kayıtlar otomatik silinir.
 - Ücretsiz Yahoo geçmiş sınırları yaklaşık 15 dakika için 30 gün, 1 saat için 3 ay, günlük için 2 yıldır; Binance geçmişi en fazla 1.000 mumdur. Kayıtlar 365 gün saklansa da sonuçları geciktirmeden güncellemek gerekir; kaynak geçmişi dışına çıkan sonuçlar "veri aralığı dışında" olarak işaretlenir.
@@ -87,7 +87,7 @@ Admin kontrol merkezinde günlük ziyaret/analiz özeti, son analizler ve elle y
 ## Kontrol listesi
 
 - Varlık araması: `BTCUSDT`, `Bitcoin`, `PGSUS.IS`, `Pegasus`
-- Zaman aralığı: kriptoda 15 dakika, 1 saat, 4 saat ve günlük; BIST 100'de yalnızca günlük
+- Zaman aralığı: kripto ana testinde 15 dakika; ilk 20 aday için 1 saat, 4 saat ve günlük bağlam; genel grafik aramasında desteklenen periyotlar; BIST 100'de yalnızca günlük
 - Görüntü analizi: mum okuma, isteğe bağlı yüksek/düşük fiyat kalibrasyonu
 - Sonuç ve geçmiş: tarayıcının yerel depolaması
 - Çevrimdışı: daha önce önbelleğe alınmış uygulama dosyaları
@@ -95,16 +95,18 @@ Admin kontrol merkezinde günlük ziyaret/analiz özeti, son analizler ve elle y
 Piyasa verisi sağlayıcıları, internet erişimi ve üçüncü taraf servislerin kullanılabilirliğine bağlıdır. Otomatik teknik analiz yatırım tavsiyesi değildir.
 
 
-## Kripto Intelligence 2.0 — Faz 1
+## Kripto Intelligence 2.2 — 15 dakika test aşaması
 
 `js/kripto-ajanlari.js` adds a crypto-only deep-analysis layer without changing the existing BIST council:
 
-- All listed coins are first scanned on the 1-hour timeframe. The top 20 candidates are then checked on 1D, 4H and 15M; the 1H result is reused.
+- All 216 listed coins are scanned on Binance Spot 15M candles. Agent decisions and the auditor's five-candle price forecast are evaluated after five consecutive closed 15M candles. The top 20 candidates additionally use 1H, 4H and 1D context.
 - Order Flow uses Binance Kline quote volume and taker-buy quote volume. It measures executed aggressive flow, not whale identity or hidden orders.
 - Kripto taraması yalnızca Binance Spot mum ve hacim verilerini kullanır; kaldıraç, vadeli işlem, fonlama ve açık pozisyon verisi kullanılmaz.
-- BTC/ETH trend and the breadth of the scanned coin universe provide a market-regime veto.
+- BTC/ETH trend and 15M market breadth (four-candle movement) provide a market-regime veto.
 - New agents can only downgrade a conflicting or unverified AL/SAT to WAIT. They cannot create an AL/SAT decision or override the existing technical, volume, auditor and risk/reward gates.
 - Only the top 20 receive deep confirmation. An actionable signal outside that shortlist is downgraded to WAIT until it is confirmed.
+- ADX14 trend strength, ATR volatility regime, 20-candle breakout/volume confirmation and relative strength versus BTC are recorded in shadow mode. They do not change decisions until their contribution is measured in out-of-sample tests.
+- 15M forecasts are evaluated against Binance Spot candles only; missing or non-contiguous candles are not silently replaced with later candles.
 - Spot mum ve Order Flow hesapları otomatik testlerde örnek verilerle doğrulanır; canlı API testleri ayrıca gerçek Spot erişimini kontrol eder.
 
 The Spot-only phase does not use derivatives endpoints, API keys, paid feeds, order-book claims or automatic weight learning. Order Flow, BTC/ETH market regime and closed-candle multi-timeframe confirmation are contextual checks, not standalone trading signals.

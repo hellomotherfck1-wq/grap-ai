@@ -54,7 +54,7 @@ const prediction = forecast.olustur(bars, meta, now);
 assert.equal(prediction.status, 'pending', 'A fresh 15m chart with enough closed OHLCV must produce a pending forecast');
 assert.equal(prediction.horizonBars, 5);
 assert.equal(prediction.timeframe, '15m');
-assert.equal(prediction.modelVersion, 'auditor-price-5bar-chart-v2');
+assert.equal(prediction.modelVersion, 'auditor-price-5bar-chart-v3');
 assert.ok(prediction.chartRead && ['Yükseliş', 'Düşüş', 'Yatay'].includes(prediction.chartRead.trend),
   'The forecast must include a chart-derived EMA trend reading');
 assert.ok(Number.isFinite(prediction.chartRead.rsi),
@@ -83,6 +83,14 @@ assert.equal(forecast.olustur(bars, Object.assign({}, meta, {
   sourceInfo: { stale: true, failed: false, route: 'stale-cache' }
 }), now).status, 'unavailable',
   'Stale market data must not produce a forecast');
+const brokenHistory = bars.slice();
+brokenHistory.splice(42, 1);
+assert.equal(forecast.olustur(brokenHistory, meta, now).status, 'unavailable',
+  'A gap in the recent 60 candles must prevent a forecast');
+assert.equal(forecast.olustur(bars, Object.assign({}, meta, {
+  lastClosedAt: bars[bars.length - 1].t - step
+}), now).status, 'unavailable',
+  'A source timestamp mismatch must prevent a forecast');
 
 const futureBars = [];
 let previousClose = bars[bars.length - 1].c;
@@ -113,6 +121,11 @@ const forecastRecord = {
   priceForecast: prediction
 };
 const evaluated = forecast.degerlendir(forecastRecord, bars.concat(futureBars), evaluationTime);
+const brokenFuture = futureBars.filter((_, index) => index !== 2);
+assert.equal(forecast.degerlendir(forecastRecord, bars.concat(brokenFuture), evaluationTime), null,
+  'A missing future 15m candle must not be silently replaced by a later candle');
+assert.equal(worker.futureBars(forecastRecord, bars.concat(brokenFuture), evaluationTime).length, 2,
+  'The background worker must stop at the first missing 15m candle');
 assert.equal(evaluated.status, 'completed');
 assert.equal(evaluated.evaluatedBars, 5);
 assert.equal(evaluated.actualPrice, futureBars[4].c);
@@ -132,18 +145,18 @@ const expired = worker.expiredPatch({
 });
 assert.equal(expired.priceForecast.status, 'expired');
 
-assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=2') && index.includes('js/ajan2.js?v=6') &&
-  index.includes('js/coin-tahmin.js?v=12') &&
-  index.includes('js/ajan-performans.js?v=18'),
+assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=3') && index.includes('js/ajan2.js?v=6') &&
+  index.includes('js/coin-tahmin.js?v=13') &&
+  index.includes('js/ajan-performans.js?v=19'),
   'The forecast module must load in the browser');
-assert.ok(sw.includes('graph-ai-v62') && sw.includes('./js/denetci-fiyat-tahmini.js'),
+assert.ok(sw.includes('graph-ai-v63') && sw.includes('./js/denetci-fiyat-tahmini.js'),
   'The service worker must cache the new module under a fresh version');
 assert.ok(auditor.includes('5 mum sonrası tahmini fiyat') && auditor.includes('priceForecast') && auditor.includes('Grafik okuması'),
   'The Denetçi card must display and pass the forecast to result storage');
 assert.ok(performance.includes('renderFiveBarForecast') &&
   performance.includes('absoluteErrorPct') && performance.includes('priceForecast') &&
   performance.includes('priceForecast: c.priceForecast') && performance.includes('chartRead') &&
-  performance.includes("directionStatus: c.priceForecast ? 'not-applicable' : 'pending'"),
+  performance.includes("directionStatus: c.directionStatus || 'pending'") && performance.includes('horizon: num(c.horizon)'),
   'The Results section must display forecasts and measured price errors');
 assert.ok(shared.includes("'fkVeto', 'priceForecast'"),
   'Admin shared-result patches must allow the forecast payload');
@@ -160,6 +173,8 @@ const listedCoins = listStart >= 0 && listEnd > listStart
   ? (coinScan.slice(listStart, listEnd).match(/{ q: '/g) || []).length : 0;
 assert.equal(listedCoins, 216, 'The forecast sweep must cover all 216 coins in the app list');
 assert.ok(coinScan.includes("Veri.binance(symbol, '15m', 120)") &&
+  coinScan.includes("zd = '15m'") && coinScan.includes('horizon: 5') &&
+  coinScan.includes('priceForecast: priceForecast') &&
   coinScan.includes('tumCoinTahminleriniUret') &&
   coinScan.includes('priceForecastSummary') &&
   coinScan.includes('renderTopluTahminList') &&
@@ -170,4 +185,4 @@ assert.ok(workerWorkflow.includes('five-candle-forecast-smoke.cjs') &&
   browserWorkflow.includes('five-candle-forecast-smoke.cjs'),
   'Both worker and browser CI must run the forecast smoke test');
 
-console.log('PASS auditor five-candle forecast: 15m-only, real closed OHLCV, stale-data rejection, 5-bar evaluation, and Results persistence');
+console.log('PASS auditor five-candle forecast: 15m-only, contiguous OHLCV, Binance source alignment, strict 5-bar evaluation, and simplified Results persistence');

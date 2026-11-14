@@ -1293,7 +1293,7 @@ try {
   check(
     'Coin toplu tarama ve 216 coin 15 dk tahmin akışı',
     coinScan.scanned > 0 && coinScan.scanned + coinScan.errors === coinScan.total &&
-      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.3.0' &&
+      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.4.0' &&
       coinScan.forecastCount === coinScan.total &&
       coinScan.forecastReady + coinScan.forecastUnavailable === coinScan.total &&
       coinScan.forecastReady > 0 && coinScan.forecastSaved === coinScan.forecastReady &&
@@ -1302,6 +1302,8 @@ try {
   );
   check('İlk 20 coin derin kontrolünde 15m, 1h, 4h ve 1d zaman damgaları var',
     coinScan.deepTimeframeCoverage, JSON.stringify(coinScan));
+  await page.locator('#coin-tahmin-alan details summary').first().click();
+  await page.locator('#coin-tahmin-alan details summary').last().click();
   const coinResultText = await page.locator('#coin-tahmin-alan').innerText();
   const coinReasonUI = await page.evaluate(() => {
     const node = window.CoinTahminAI.renderCoinList([{
@@ -1317,20 +1319,20 @@ try {
     coinReasonUI);
   check(
     'Coin veri hataları kullanıcıya gösteriliyor',
-    coinScan.errors === 0 || coinResultText.includes('Veri alınamayanlar'),
+    coinScan.errors === 0 || coinResultText.includes('Veri alınamayan coinler'),
     coinResultText.slice(-350)
   );
   check(
     'Coin sonuç ekranı AL/SAT/BEKLE kararlarını sade anlatıyor',
     coinResultText.includes('SİSTEMİN SON KARARI') &&
-      coinResultText.includes('Botların oyları') &&
+      coinResultText.includes('Ajan oyları ve Denetçi kontrolü') &&
       coinResultText.includes('Genel analiz') &&
       coinResultText.includes('Teknik bot') &&
       coinResultText.includes('Hacim botu') &&
       coinResultText.includes('Denetçi kontrolü') &&
       coinResultText.includes('Spot piyasada alım') &&
       coinResultText.includes('açığa satış') &&
-      coinResultText.includes('216 coin tarama özeti') &&
+      coinResultText.includes('15 dakikalık test özeti') &&
       coinResultText.includes('Tüm coinlerin 15 dk') &&
       coinResultText.includes('5 mum fiyat tahminleri'),
     coinResultText.slice(0, 1000)
@@ -1427,7 +1429,7 @@ try {
     const initiallyCollapsed = !!notes && !notes.open;
     if (notes) notes.open = true;
     const expands = !!notes && notes.open;
-    const hasPerformance = (notes?.textContent || '').includes('30\'dan az bağımsız örnek');
+    const hasPerformance = (notes?.textContent || '').includes('En az 20 farklı 15 dakikalık zaman penceresi');
     const hasSecurity = (notes?.textContent || '').includes('service_role');
     if (notes) notes.open = false;
     return {

@@ -56,6 +56,11 @@ assert.equal(typeof agents.futuresOku, 'undefined', 'Futures ajanı dışa aktar
 (async () => {
   const rising = await agents.trendOku('BTCUSDT', '4h');
   assert.equal(rising.direction, 1);
+  assert.equal(Number.isFinite(rising.adx14), true);
+  assert.equal(Number.isFinite(rising.atrPct), true);
+  assert.equal(typeof rising.volatilityRegime, 'string');
+  assert.equal(typeof rising.breakout, 'string');
+  assert.equal(Number.isFinite(rising.momentum15BarsPct), true);
 
   const candidates = Array.from({ length: 22 }, (_, i) => ({
     ad: 'Coin ' + i, sembol: 'COIN' + i + 'USDT',
@@ -65,10 +70,12 @@ assert.equal(typeof agents.futuresOku, 'undefined', 'Futures ajanı dışa aktar
   const result = await agents.derinAnaliz(candidates, null);
   assert.equal(result.derinTaranan, 20);
   assert.equal(result.adaylar.filter(item => item.deepScan === 'tamamlandı').length, 20);
+  assert.equal(result.adaylar.slice(0, 20).every(item => item.skillReadings && item.skillReadings.mode === 'shadow'), true);
+  assert.equal(result.adaylar.slice(0, 20).every(item => typeof item.skillReadings.volatilityRegime === 'string'), true);
   assert.equal(result.adaylar.slice(20).every(item => item.karar === 'BEKLE'), true);
   assert.equal(result.adaylar.slice(0, 20).every(item => item.futures === undefined), true);
 
-  console.log('PASS crypto-agent smoke: Spot order flow, stale data, MTF, market regime and top-20 gate; no derivatives calls');
+  console.log('PASS crypto-agent smoke: Spot order flow, ADX, ATR volatility, breakout, relative strength, MTF and top-20 gate; no derivatives calls');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

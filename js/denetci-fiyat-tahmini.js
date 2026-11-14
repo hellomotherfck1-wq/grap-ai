@@ -11,7 +11,7 @@
   var PATTERN_LENGTH = 10;
   var MIN_BARS = 60;
   var NEIGHBORS = 7;
-  var MODEL_VERSION = 'auditor-price-5bar-chart-v2';
+  var MODEL_VERSION = 'auditor-price-5bar-chart-v3';
 
   function finite(value) {
     return typeof value === 'number' && Number.isFinite(value);
@@ -60,6 +60,14 @@
       byTime.set(t, { t: t, o: o, h: h, l: l, c: c, v: volume });
     });
     return Array.from(byTime.values()).sort(function (a, b) { return a.t - b.t; });
+  }
+
+  function isContiguous(bars, start, end) {
+    if (!Array.isArray(bars) || start < 0 || end >= bars.length || end < start) return false;
+    for (var i = start + 1; i <= end; i++) {
+      if (bars[i].t - bars[i - 1].t !== STEP_MS) return false;
+    }
+    return true;
   }
 
   function volumePressure(bars, start, end) {
@@ -319,12 +327,14 @@
     if (bars.length < MIN_BARS) {
       return unavailable('En az ' + MIN_BARS + ' kapanmış 15 dakikalık mum gerekli; bulunan: ' + bars.length + '.');
     }
+    if (!isContiguous(bars, bars.length - MIN_BARS, bars.length - 1)) {
+      return unavailable('Son 60 kapanmış mumda 15 dakikalık veri boşluğu var; eksik mumlarla tahmin üretilmedi.');
+    }
     var last = bars[bars.length - 1];
     if (currentTime - (last.t + STEP_MS) > 3 * STEP_MS) {
       return unavailable('Son kapanmış 15 dakikalık mum eski; yeni ve doğrulanmış veri bekleniyor.');
     }
-    if (finite(Number(meta.lastClosedAt)) &&
-        Math.abs(Number(meta.lastClosedAt) - last.t) > STEP_MS) {
+    if (finite(Number(meta.lastClosedAt)) && Number(meta.lastClosedAt) !== last.t) {
       return unavailable('Analiz mumu ile tahmin verisinin son mum zamanı eşleşmiyor.');
     }
 
@@ -336,6 +346,7 @@
     // önce bitmelidir. Böylece tahmin anından sonraki hiçbir veri örnek olarak sızmaz.
     var lastCandidateEnd = bars.length - PATTERN_LENGTH - HORIZON - 2;
     for (var endIndex = Math.max(PATTERN_LENGTH, 20); endIndex <= lastCandidateEnd; endIndex++) {
+      if (!isContiguous(bars, endIndex - PATTERN_LENGTH, endIndex + HORIZON)) continue;
       var features = patternFeatures(bars, endIndex);
       if (!features) continue;
       var futureClose = bars[endIndex + HORIZON].c;
@@ -419,6 +430,9 @@
     }).sort(function (a, b) { return a.t - b.t; });
     if (future.length < HORIZON) return null;
     var sample = future.slice(0, HORIZON);
+    for (var i = 0; i < sample.length; i++) {
+      if (sample[i].t !== signalAt + i * STEP_MS) return null;
+    }
     var actualBar = sample[HORIZON - 1];
     var actualPrice = actualBar.c;
     if (!(actualPrice > 0)) return null;
@@ -453,6 +467,7 @@
   return {
     intervalMs: function () { return STEP_MS; },
     normalizeBars: normalizeBars,
+    isContiguous: isContiguous,
     olustur: olustur,
     degerlendir: degerlendir,
     modelVersion: MODEL_VERSION

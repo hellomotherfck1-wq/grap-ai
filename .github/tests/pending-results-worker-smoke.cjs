@@ -16,6 +16,30 @@ assert.equal(worker.intervalMs('15m'), 900000);
 assert.equal(worker.intervalMs('1h'), 3600000);
 assert.equal(worker.intervalMs('4h'), 14400000);
 assert.equal(worker.intervalMs('1d'), 86400000);
+const strictNow = 2000000000000;
+const fifteenStep = worker.intervalMs('15m');
+const fifteenSignalAt = strictNow - 5 * fifteenStep;
+const fifteenBars = Array.from({ length: 5 }, function (_, index) {
+  const open = 100 + index;
+  return {
+    t: fifteenSignalAt + index * fifteenStep,
+    o: open, h: open + 2, l: open - 1, c: open + 1
+  };
+});
+const fifteenRecord = {
+  id: 'TEST15|15m|1', symbol: 'TEST15USDT', market: 'Kripto',
+  timeframe: '15m', decision: 'BEKLE', signalAt: fifteenSignalAt,
+  price: 100, horizon: 5, directionStatus: 'pending'
+};
+assert.equal(worker.futureBars(fifteenRecord, fifteenBars, strictNow).length, 5);
+assert.equal(worker.shouldEvaluate(fifteenRecord, strictNow - fifteenStep), false,
+  'The worker must wait for all five 15m candles before fetching evaluation data');
+assert.equal(worker.shouldEvaluate(fifteenRecord, strictNow), true,
+  'The worker should evaluate once the five-candle horizon has closed');
+const fifteenGapBars = fifteenBars.filter((_, index) => index !== 2);
+assert.equal(worker.futureBars(fifteenRecord, fifteenGapBars, strictNow).length, 2,
+  'The worker must stop at the first missing 15m candle instead of shifting the horizon');
+assert.equal(worker.directionResult(fifteenRecord, fifteenGapBars, strictNow), null);
 const fakeTestSignal = {
   symbol: 'E2EALL0USDT', source: 'E2E tam tarama',
   decision: 'BEKLE', directionStatus: 'pending'
@@ -39,9 +63,20 @@ const gateBars = worker.normalizeGateBars([
 assert.deepEqual(gateBars, [
   { t: 2000000000000, o: 100, h: 110, l: 90, c: 105 }
 ]);
-assert.ok(workerSource.includes('api.bybit.com/v5/market/kline') &&
+const binanceBars = worker.normalizeBinanceBars([[
+  2000000000000, '100', '110', '90', '105', '12',
+  2000000899999, '1200', 500, '7', '700'
+]]);
+assert.deepEqual(binanceBars, [{
+  t: 2000000000000, o: 100, h: 110, l: 90, c: 105, v: 12,
+  closeTime: 2000000899999, quoteVolume: 1200, trades: 500,
+  takerBuyBaseVolume: 7, takerBuyQuoteVolume: 700
+}]);
+assert.ok(workerSource.includes('data-api.binance.vision') &&
+  workerSource.includes("if (timeframe === '15m') return fetchBinanceBars(symbol, timeframe)") &&
+  workerSource.includes('api.bybit.com/v5/market/kline') &&
   workerSource.includes('api.gateio.ws/api/v4/spot/candlesticks'),
-  'Crypto data evaluation must use the Bybit and Gate public candle APIs');
+  '15m crypto forecasts must be evaluated on Binance Spot; higher-timeframe checks may use Gate/Bybit');
 assert.ok(workerSource.includes("url.searchParams.set('symbol', 'not.like.E2E*')"),
   'The worker must exclude synthetic E2E symbols at the database query');
 
@@ -74,6 +109,8 @@ const pendingRows = [
   { decision: 'AL', directionStatus: 'completed', tradeStatus: 'pending', lastError: 'HTTP 429' },
   { decision: 'SAT', directionStatus: 'expired', spotStatus: 'expired' }
 ];
+assert.equal(worker.isPending({ decision: 'SAT', spotStatus: 'not-applicable', directionStatus: 'completed' }), false,
+  'A non-applicable Spot sale must not remain in the pending queue');
 assert.deepEqual(worker.summarizePending(pendingRows), {
   total: 2, normal: 1, dataErrors: 1, expired: 1
 });
