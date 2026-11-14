@@ -48,6 +48,15 @@ try {
     { timeout: 45000 }
   );
   check('Uygulama modülleri yüklendi', true, 'Veri / Analiz / Grafik / BIST araştırma / Haber / Kripto ajanları');
+  const bulkCryptoForecast = await page.evaluate(() => ({
+    count: window.CoinTahminAI && Array.isArray(window.CoinTahminAI.LISTE)
+      ? window.CoinTahminAI.LISTE.length : 0,
+    run: typeof window.CoinTahminAI?.tumCoinTahminleriniUret,
+    single: typeof window.CoinTahminAI?.tahminBir
+  }));
+  check('Uygulama listesindeki 216 coin için toplu 15 dk tahmin motoru hazır',
+    bulkCryptoForecast.count === 216 && bulkCryptoForecast.run === 'function' &&
+    bulkCryptoForecast.single === 'function', JSON.stringify(bulkCryptoForecast));
   const dataTransportModule = await page.evaluate(() => ({
     json: typeof window.GrapAIDataTransport?.json,
     text: typeof window.GrapAIDataTransport?.text
