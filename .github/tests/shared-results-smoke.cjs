@@ -17,9 +17,13 @@ new Function(admin);
 const supabaseScript = html.indexOf('supabase-js@2');
 const sharedScript = html.indexOf('js/ortak-sonuc-havuzu.js');
 const performanceScript = html.indexOf('js/ajan-performans.js');
+const forecastScript = html.indexOf('js/denetci-fiyat-tahmini.js');
+const auditorScript = html.indexOf('js/ajan.js');
 const adminScript = html.indexOf('js/admin.js');
 assert.ok(supabaseScript >= 0 && supabaseScript < sharedScript, 'Supabase SDK must load before shared pool');
 assert.ok(sharedScript < performanceScript && performanceScript < adminScript, 'Shared pool must load before performance/admin modules');
+assert.ok(forecastScript >= 0 && forecastScript < auditorScript,
+  'The forecast skill must load before the auditor agent uses it');
 
 assert.ok(helper.includes("rpc('grap_ai_shared_signals_upsert'"), 'Devices must send records through the insert RPC');
 assert.ok(helper.includes("rpc('grap_ai_shared_signals_patch'"), 'Admin must sync evaluation patches through RPC');
@@ -41,6 +45,8 @@ assert.ok(helper.includes('offset < 50000'), 'Admin browser history keeps a 50,0
 assert.ok(admin.includes('window.GrapAISharedResults.client'), 'Admin login must reuse the shared Supabase session');
 assert.ok(performance.includes('shared.syncLocal(local)'), 'Existing local records must be backfilled');
 assert.ok(performance.includes('shared.patchMany(remotePatches)'), 'Evaluation outcomes must sync in batches');
+assert.ok(performance.includes('priceForecast') && helper.includes("'fkVeto', 'priceForecast'"),
+  'Five-candle forecast outcomes must be persisted and patchable in the admin shared pool');
 assert.ok(performance.includes('Object.assign({}, record, shared'), 'The central shared record must remain the admin view source of truth');
 assert.ok(performance.includes('shared.kaydet([updated])'), 'A device must sync its own revised pending analysis');
 assert.ok(performance.includes('remote.then(function (result)'), 'Shared sync must not block local decision updates');
@@ -81,7 +87,7 @@ assert.ok(/grap_ai_shared_signals_prune[\s\S]*admin_required/i.test(sql), 'Reten
 assert.ok(/grant execute on function public\.grap_ai_shared_signals_upsert\(jsonb\) to anon, authenticated/i.test(sql), 'Anonymous devices must be able to submit records');
 assert.ok(!/service_role\s*[:=]\s*['"][^'"]+/i.test(helper + admin + sql), 'No service_role secret may be shipped to browsers');
 assert.ok(!/SUPABASE_SERVICE_ROLE_KEY/i.test(helper + admin + sql), 'No service_role environment key may be referenced by browser code');
-assert.ok(worker.includes('graph-ai-v59') && worker.includes('./js/ortak-sonuc-havuzu.js') && worker.includes('./js/system-monitor.js'), 'Service worker cache must include the new module');
+assert.ok(worker.includes('graph-ai-v60') && worker.includes('./js/ortak-sonuc-havuzu.js') && worker.includes('./js/system-monitor.js'), 'Service worker cache must include the new module');
 assert.ok(workflow.includes('shared-results-smoke.cjs') && workflow.includes('supabase/**'), 'CI must run shared-pool smoke checks and watch migrations');
 
 console.log('PASS shared admin-only results pool static security, loading, sync, and cache checks');
