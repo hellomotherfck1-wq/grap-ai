@@ -132,7 +132,8 @@ const expired = worker.expiredPatch({
 });
 assert.equal(expired.priceForecast.status, 'expired');
 
-assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=2') && index.includes('js/ajan2.js?v=6'),
+assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=2') && index.includes('js/ajan2.js?v=6') &&
+  index.includes('js/coin-tahmin.js?v=12'),
   'The forecast module must load in the browser');
 assert.ok(sw.includes('graph-ai-v62') && sw.includes('./js/denetci-fiyat-tahmini.js'),
   'The service worker must cache the new module under a fresh version');
@@ -140,7 +141,8 @@ assert.ok(auditor.includes('5 mum sonrası tahmini fiyat') && auditor.includes('
   'The Denetçi card must display and pass the forecast to result storage');
 assert.ok(performance.includes('renderFiveBarForecast') &&
   performance.includes('absoluteErrorPct') && performance.includes('priceForecast') &&
-  performance.includes('priceForecast: c.priceForecast') && performance.includes('chartRead'),
+  performance.includes('priceForecast: c.priceForecast') && performance.includes('chartRead') &&
+  performance.includes("directionStatus: c.priceForecast ? 'not-applicable' : 'pending'"),
   'The Results section must display forecasts and measured price errors');
 assert.ok(shared.includes("'fkVeto', 'priceForecast'"),
   'Admin shared-result patches must allow the forecast payload');
