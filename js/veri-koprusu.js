@@ -148,7 +148,8 @@
     for (var i = 0; i < routes.length; i++) {
       var route = routes[i];
       var state = routeState(route, url);
-      if (state.blockedUntil > Date.now()) {
+      // Optional news lookups may retry a cooling-down route once after a transient outage.
+      if (state.blockedUntil > Date.now() && options.retryBlockedRoutes !== true) {
         failures.push(route.name + ': geçici olarak beklemede');
         continue;
       }
