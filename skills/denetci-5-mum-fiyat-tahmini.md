@@ -11,14 +11,19 @@ Yalnızca 15 dakikalık (15m) grafiklerde, son kapanmış mumun kapanış fiyat�
 - En az 60 geçerli ve kapanmış 15m mum yoksa tahmin üretme. Eksik veri durumunu açıkça bildir.
 - Kaynak güncelliği doğrulanamıyorsa veya son kapanmış mum 45 dakikadan eskiyse tahmin üretme.
 
-## Tahmin yöntemi
-1. Son 10 kapanmış mumun log-getiri dizisini çıkar.
-2. Geçmişteki 10 mumluk örüntülerle karşılaştır. Her tarihsel örüntünün sonraki 5 mumluk fiyat sonucu, tahmin anından önce tamamen gerçekleşmiş olmalıdır.
-3. Örüntü benzerliğinde normalize edilmiş fiyat getirilerini; veri varsa hacim baskısını da yardımcı özellik olarak kullan.
-4. Birbirine çok yakın/örtüşen örneklerin aynı sonucu tekrar tekrar ağırlıklandırmasını azaltmak için seçilen örnek uçları arasında en az 5 mum bırak.
-5. En yakın en fazla 7 geçmiş örneğin sonraki 5 mumluk log-getirilerinin medyanını beklenen hareket olarak kullan. Aynı örneklerin yüzde 20 ve yüzde 80 kantillerini tahmini aralık olarak göster.
-6. Tahmini fiyatı son kapanmış mumun gerçek kapanış fiyatına uygula. Başlangıç fiyatı, hedef fiyat, tahmini aralık, kaynak, veri zamanı, model sürümü ve kullanılan geçmiş örnek sayısını kaydet.
-7. Geçmiş örüntü sayısı veya veri kalitesi yeterli değilse sayı uydurma; tahmin oluşturma.
+## Tahmin yöntemi: grafiği teknik olarak okuma
+1. Tahmin öncesinde yalnızca gerçek sağlayıcıdan gelen, en az 60 geçerli ve kapanmış 15m OHLCV mumunu kullan.
+2. Son 5 mumun gövde yönü, gövde/range oranı, üst-alt fitilleri ve kapanışın mum içindeki konumunu çıkar. Doji, çekiç, kayan yıldız ve yutan mum gibi formasyonları yalnızca kuralları gerçekten karşılanıyorsa etiketle.
+3. EMA9 ve EMA21 ile kısa trendi; RSI14 ile momentumu; ATR14 ile oynaklığı hesapla. Son 5 mumun fiyat momentumunu ATR'ye göre normalize et.
+4. Son 40 kapanmış mum içindeki gerçek pivot tepe/diplerden en yakın destek ve direnci bul. Bulunamazsa yalnızca geçmiş aralıktaki gerçek yüksek/düşükleri kullan; seviye uydurma.
+5. Hacim verisi varsa son 10 mumdaki hacim ağırlıklı alıcı/satıcı baskısını hesapla. Hacim yoksa hacim teyidi varmış gibi davranma.
+6. Bu grafik özelliklerini son 10 mumun normalize getiri örüntüsüyle birlikte kullanarak geçmişteki benzer örüntüleri seç. Aday örneğin sonraki 5 mumluk sonucu, bugünkü örüntünün başlangıcından önce tamamen gerçekleşmiş olmalıdır.
+7. Birbirine çok yakın/örtüşen örneklerin aynı sonucu tekrar tekrar ağırlıklandırmasını azaltmak için seçilen örnek uçları arasında en az 5 mum bırak.
+8. En yakın en fazla 7 geçmiş örneğin sonraki 5 mumluk log-getirilerinin medyanını beklenen hareket olarak kullan. Aynı örneklerin yüzde 20 ve yüzde 80 kantillerini tahmini aralık olarak göster.
+9. Tahmini fiyatı son kapanmış mumun gerçek kapanış fiyatına uygula. Grafik okumasını (trend, RSI, son mum formasyonu, 5 mum momentumu, destek/direnç ve varsa hacim baskısı), yöntem sürümünü, kaynak ve veri zamanını, örnek sayısını kaydet.
+10. Grafik özellikleri veya geçmiş örnek sayısı yeterli değilse tahmin üretme. Göstergeler bir yönü zorla dayatmasın; grafik özellikleri benzer geçmiş örnekleri seçmeye yardım etsin.
+
+Not: “Grafiği okuma”, grafiği oluşturan doğrulanmış OHLCV mumlarını teknik olarak yorumlamaktır; ekran görüntüsünden yaklaşık fiyat çıkarılmaz. Bu yöntem görsel sezgi veya kesin gelecek bilgisi değildir.
 
 ## Sonuç değerlendirmesi
 - Tahmin oluşturulurken kayıt `pending` olarak saklanır; tahmin sonradan değiştirilmez.

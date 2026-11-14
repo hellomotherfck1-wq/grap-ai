@@ -16,6 +16,7 @@ const sql = fs.readFileSync(
 );
 const workerWorkflow = fs.readFileSync('.github/workflows/pending-results-worker.yml', 'utf8');
 const browserWorkflow = fs.readFileSync('.github/workflows/live-e2e.yml', 'utf8');
+const coinScan = fs.readFileSync('js/coin-tahmin.js', 'utf8');
 
 new Function(workerSource);
 new Function(auditor);
@@ -53,6 +54,17 @@ const prediction = forecast.olustur(bars, meta, now);
 assert.equal(prediction.status, 'pending', 'A fresh 15m chart with enough closed OHLCV must produce a pending forecast');
 assert.equal(prediction.horizonBars, 5);
 assert.equal(prediction.timeframe, '15m');
+assert.equal(prediction.modelVersion, 'auditor-price-5bar-chart-v2');
+assert.ok(prediction.chartRead && ['Yükseliş', 'Düşüş', 'Yatay'].includes(prediction.chartRead.trend),
+  'The forecast must include a chart-derived EMA trend reading');
+assert.ok(Number.isFinite(prediction.chartRead.rsi),
+  'The forecast must include an RSI14 reading');
+assert.ok(Number.isFinite(prediction.chartRead.momentum5BarsPct),
+  'The forecast must include the last five-candle momentum');
+assert.ok(typeof prediction.chartRead.lastCandle === 'string' && prediction.chartRead.lastCandle.length > 0,
+  'The forecast must identify or explicitly reject the last candle pattern');
+assert.ok(prediction.method.includes('EMA9-EMA21') && prediction.method.includes('destek/direnç'),
+  'The forecast method must disclose its chart-reading features');
 assert.ok(Number.isFinite(prediction.basePrice) && prediction.basePrice > 0);
 assert.ok(Number.isFinite(prediction.predictedPrice) && prediction.predictedPrice > 0);
 assert.ok(prediction.predictedLow <= prediction.predictedHigh);
@@ -120,14 +132,18 @@ const expired = worker.expiredPatch({
 });
 assert.equal(expired.priceForecast.status, 'expired');
 
-assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=1'),
+assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=2') && index.includes('js/ajan2.js?v=6') &&
+  index.includes('js/coin-tahmin.js?v=12') &&
+  index.includes('js/ajan-performans.js?v=18'),
   'The forecast module must load in the browser');
-assert.ok(sw.includes('graph-ai-v60') && sw.includes('./js/denetci-fiyat-tahmini.js'),
+assert.ok(sw.includes('graph-ai-v62') && sw.includes('./js/denetci-fiyat-tahmini.js'),
   'The service worker must cache the new module under a fresh version');
-assert.ok(auditor.includes('5 mum sonrası tahmini fiyat') && auditor.includes('priceForecast'),
+assert.ok(auditor.includes('5 mum sonrası tahmini fiyat') && auditor.includes('priceForecast') && auditor.includes('Grafik okuması'),
   'The Denetçi card must display and pass the forecast to result storage');
 assert.ok(performance.includes('renderFiveBarForecast') &&
-  performance.includes('absoluteErrorPct') && performance.includes('priceForecast'),
+  performance.includes('absoluteErrorPct') && performance.includes('priceForecast') &&
+  performance.includes('priceForecast: c.priceForecast') && performance.includes('chartRead') &&
+  performance.includes("directionStatus: c.priceForecast ? 'not-applicable' : 'pending'"),
   'The Results section must display forecasts and measured price errors');
 assert.ok(shared.includes("'fkVeto', 'priceForecast'"),
   'Admin shared-result patches must allow the forecast payload');
@@ -138,6 +154,18 @@ assert.ok(sql.includes("'fkVeto', 'priceForecast'") &&
   sql.includes('service_role_required') &&
   sql.includes("notify pgrst, 'reload schema'"),
   'Both secured Supabase patch RPCs must accept forecast outcomes');
+const listStart = coinScan.indexOf('var LISTE = [');
+const listEnd = coinScan.indexOf('  ];', listStart);
+const listedCoins = listStart >= 0 && listEnd > listStart
+  ? (coinScan.slice(listStart, listEnd).match(/{ q: '/g) || []).length : 0;
+assert.equal(listedCoins, 216, 'The forecast sweep must cover all 216 coins in the app list');
+assert.ok(coinScan.includes("Veri.binance(symbol, '15m', 120)") &&
+  coinScan.includes('tumCoinTahminleriniUret') &&
+  coinScan.includes('priceForecastSummary') &&
+  coinScan.includes('renderTopluTahminList') &&
+  coinScan.includes('tahminHatasiOzetle') &&
+  coinScan.includes('Binance 15 dakikalık veri alınamadı.'),
+  'The Coin Tahmin scan must produce and show 15m five-candle forecasts for the entire app list');
 assert.ok(workerWorkflow.includes('five-candle-forecast-smoke.cjs') &&
   browserWorkflow.includes('five-candle-forecast-smoke.cjs'),
   'Both worker and browser CI must run the forecast smoke test');

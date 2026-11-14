@@ -11,7 +11,7 @@
   var PATTERN_LENGTH = 10;
   var MIN_BARS = 60;
   var NEIGHBORS = 7;
-  var MODEL_VERSION = 'auditor-price-5bar-knn-v1';
+  var MODEL_VERSION = 'auditor-price-5bar-chart-v2';
 
   function finite(value) {
     return typeof value === 'number' && Number.isFinite(value);
@@ -76,6 +76,146 @@
     return total > 0 ? weighted / total : null;
   }
 
+  function ema(values, period) {
+    if (!Array.isArray(values) || !values.length) return null;
+    var alpha = 2 / (period + 1);
+    var value = values[0];
+    for (var i = 1; i < values.length; i++) {
+      value = values[i] * alpha + value * (1 - alpha);
+    }
+    return value;
+  }
+
+  function rsi(values, period) {
+    if (!Array.isArray(values) || values.length < period + 1) return null;
+    var gains = 0, losses = 0;
+    for (var i = 1; i <= period; i++) {
+      var change = values[i] - values[i - 1];
+      if (change > 0) gains += change;
+      else losses -= change;
+    }
+    gains /= period;
+    losses /= period;
+    for (var j = period + 1; j < values.length; j++) {
+      var delta = values[j] - values[j - 1];
+      gains = (gains * (period - 1) + (delta > 0 ? delta : 0)) / period;
+      losses = (losses * (period - 1) + (delta < 0 ? -delta : 0)) / period;
+    }
+    if (gains + losses === 0) return 50;
+    if (losses === 0) return 100;
+    if (gains === 0) return 0;
+    return 100 * gains / (gains + losses);
+  }
+
+  function averageTrueRange(bars, endIndex, period) {
+    var start = Math.max(1, endIndex - period + 1);
+    var total = 0, count = 0;
+    for (var i = start; i <= endIndex; i++) {
+      var current = bars[i], previous = bars[i - 1];
+      var tr = Math.max(
+        current.h - current.l,
+        Math.abs(current.h - previous.c),
+        Math.abs(current.l - previous.c)
+      );
+      if (finite(tr) && tr >= 0) { total += tr; count++; }
+    }
+    return count ? total / count : null;
+  }
+
+  function supportResistance(bars, endIndex, close) {
+    var support = null, resistance = null;
+    var start = Math.max(2, endIndex - 39);
+    // Yalnızca endIndex'e kadar tamamlanmış mumlarla iki taraflı pivot ara.
+    for (var i = start; i <= endIndex - 2; i++) {
+      var bar = bars[i];
+      var pivotHigh = bar.h >= bars[i - 2].h && bar.h >= bars[i - 1].h &&
+        bar.h >= bars[i + 1].h && bar.h >= bars[i + 2].h;
+      var pivotLow = bar.l <= bars[i - 2].l && bar.l <= bars[i - 1].l &&
+        bar.l <= bars[i + 1].l && bar.l <= bars[i + 2].l;
+      if (pivotLow && bar.l < close) support = support === null ? bar.l : Math.max(support, bar.l);
+      if (pivotHigh && bar.h > close) resistance = resistance === null ? bar.h : Math.min(resistance, bar.h);
+    }
+    // Pivot bulunamazsa, son 40 kapanmış mumdaki en yakın gerçek aralığı kullan.
+    if (support === null || resistance === null) {
+      for (var j = Math.max(0, endIndex - 39); j < endIndex; j++) {
+        if (support === null && bars[j].l < close) {
+          support = support === null ? bars[j].l : Math.max(support, bars[j].l);
+        } else if (support !== null && bars[j].l < close && bars[j].l > support) {
+          support = bars[j].l;
+        }
+        if (resistance === null && bars[j].h > close) {
+          resistance = resistance === null ? bars[j].h : Math.min(resistance, bars[j].h);
+        } else if (resistance !== null && bars[j].h > close && bars[j].h < resistance) {
+          resistance = bars[j].h;
+        }
+      }
+    }
+    return { support: support, resistance: resistance };
+  }
+
+  function lastCandlePattern(bars, endIndex) {
+    var current = bars[endIndex];
+    var previous = bars[endIndex - 1];
+    var range = current.h - current.l;
+    if (!(range > 0)) return 'Belirsiz mum';
+    var body = Math.abs(current.c - current.o);
+    var upper = current.h - Math.max(current.o, current.c);
+    var lower = Math.min(current.o, current.c) - current.l;
+    if (body <= range * 0.10) return 'Doji (kararsızlık)';
+    if (lower >= body * 2 && upper <= body) return 'Çekiç benzeri mum';
+    if (upper >= body * 2 && lower <= body) return 'Kayan yıldız benzeri mum';
+    if (previous) {
+      var previousBody = Math.abs(previous.c - previous.o);
+      var currentBull = current.c > current.o;
+      var previousBull = previous.c > previous.o;
+      if (currentBull && !previousBull && body > previousBody &&
+          current.o <= previous.c && current.c >= previous.o) return 'Yutan boğa mumu';
+      if (!currentBull && previousBull && body > previousBody &&
+          current.o >= previous.c && current.c <= previous.o) return 'Yutan ayı mumu';
+    }
+    return 'Belirgin formasyon yok';
+  }
+
+  function chartFeatures(bars, endIndex) {
+    var closes = bars.slice(0, endIndex + 1).map(function (bar) { return bar.c; });
+    var last = bars[endIndex];
+    var atrValue = averageTrueRange(bars, endIndex, 14);
+    var ema9 = ema(closes.slice(-Math.min(closes.length, 60)), 9);
+    var ema21 = ema(closes.slice(-Math.min(closes.length, 60)), 21);
+    var safeAtr = finite(atrValue) && atrValue > 0 ? atrValue : Math.max(last.c * 1e-8, 1e-8);
+    var trend = (ema9 - ema21) / safeAtr;
+    var momentumBase = bars[Math.max(0, endIndex - 5)].c;
+    var momentumLog = Math.log(last.c / momentumBase);
+    var atrPct = safeAtr / last.c;
+    var momentum = momentumLog / Math.max(atrPct * Math.sqrt(5), 1e-8);
+    var momentumPct = (Math.exp(momentumLog) - 1) * 100;
+    var levels = supportResistance(bars, endIndex, last.c);
+    var candleShapes = [];
+    for (var i = Math.max(0, endIndex - 4); i <= endIndex; i++) {
+      var bar = bars[i];
+      var range = Math.max(bar.h - bar.l, 1e-12);
+      candleShapes.push([
+        (bar.c - bar.o) / range,
+        (bar.h - Math.max(bar.o, bar.c)) / range,
+        (Math.min(bar.o, bar.c) - bar.l) / range,
+        (bar.c - bar.l) / range
+      ]);
+    }
+    return {
+      candles: candleShapes,
+      trend: trend,
+      momentum: momentum,
+      momentumPct: momentumPct,
+      rsi: rsi(closes, 14),
+      support: levels.support,
+      resistance: levels.resistance,
+      supportDistance: levels.support === null ? 5 : Math.min((last.c - levels.support) / safeAtr, 5),
+      resistanceDistance: levels.resistance === null ? 5 : Math.min((levels.resistance - last.c) / safeAtr, 5),
+      pressure: volumePressure(bars, Math.max(0, endIndex - PATTERN_LENGTH + 1), endIndex),
+      lastCandle: lastCandlePattern(bars, endIndex)
+    };
+  }
+
   function patternFeatures(bars, endIndex) {
     var returns = [];
     for (var i = endIndex - PATTERN_LENGTH + 1; i <= endIndex; i++) {
@@ -89,10 +229,18 @@
     }, 0);
     var scale = Math.sqrt(squareTotal / returns.length);
     var divisor = Math.max(scale, 1e-8);
+    var chart = chartFeatures(bars, endIndex);
     return {
       shape: returns.map(function (value) { return value / divisor; }),
       scale: divisor,
-      pressure: volumePressure(bars, endIndex - PATTERN_LENGTH + 1, endIndex)
+      pressure: chart.pressure,
+      candles: chart.candles,
+      trend: chart.trend,
+      momentum: chart.momentum,
+      rsi: chart.rsi,
+      supportDistance: chart.supportDistance,
+      resistanceDistance: chart.resistanceDistance,
+      chart: chart
     };
   }
 
@@ -106,7 +254,41 @@
     var scaleDistance = Math.abs(Math.log(a.scale / b.scale));
     var volumeDistance = a.pressure === null || b.pressure === null
       ? 0 : Math.abs(a.pressure - b.pressure);
-    return shapeDistance + 0.20 * scaleDistance + 0.10 * volumeDistance;
+    var candleTotal = 0, candleCount = 0;
+    for (var j = 0; j < Math.min(a.candles.length, b.candles.length); j++) {
+      for (var k = 0; k < Math.min(a.candles[j].length, b.candles[j].length); k++) {
+        var candleDelta = a.candles[j][k] - b.candles[j][k];
+        candleTotal += candleDelta * candleDelta;
+        candleCount++;
+      }
+    }
+    var candleDistance = candleCount ? Math.sqrt(candleTotal / candleCount) : 0;
+    var bounded = function (x, y, divisor) {
+      if (!finite(x) || !finite(y)) return 0;
+      return Math.min(Math.abs(x - y) / divisor, 1);
+    };
+    var trendDistance = bounded(a.trend, b.trend, 4);
+    var momentumDistance = bounded(a.momentum, b.momentum, 4);
+    var rsiDistance = bounded(a.rsi, b.rsi, 50);
+    var levelDistance = (bounded(a.supportDistance, b.supportDistance, 5) +
+      bounded(a.resistanceDistance, b.resistanceDistance, 5)) / 2;
+    return shapeDistance + 0.20 * scaleDistance + 0.10 * volumeDistance +
+      0.16 * candleDistance + 0.14 * trendDistance + 0.10 * momentumDistance +
+      0.08 * rsiDistance + 0.06 * levelDistance;
+  }
+
+  function chartRead(features) {
+    var chart = features && features.chart ? features.chart : {};
+    var trend = chart.trend > 0.20 ? 'Yükseliş' : chart.trend < -0.20 ? 'Düşüş' : 'Yatay';
+    return {
+      trend: trend,
+      rsi: finite(chart.rsi) ? Math.round(chart.rsi * 10) / 10 : null,
+      momentum5BarsPct: finite(chart.momentumPct) ? chart.momentumPct : null,
+      lastCandle: String(chart.lastCandle || 'Belirsiz'),
+      support: finite(chart.support) ? chart.support : null,
+      resistance: finite(chart.resistance) ? chart.resistance : null,
+      volumePressure: finite(chart.pressure) ? chart.pressure : null
+    };
   }
 
   function unavailable(reason) {
@@ -153,7 +335,7 @@
     // Adayların beş mumluk sonucu, bugünkü 10 mumluk örüntünün başlangıcından
     // önce bitmelidir. Böylece tahmin anından sonraki hiçbir veri örnek olarak sızmaz.
     var lastCandidateEnd = bars.length - PATTERN_LENGTH - HORIZON - 2;
-    for (var endIndex = PATTERN_LENGTH; endIndex <= lastCandidateEnd; endIndex++) {
+    for (var endIndex = Math.max(PATTERN_LENGTH, 20); endIndex <= lastCandidateEnd; endIndex++) {
       var features = patternFeatures(bars, endIndex);
       if (!features) continue;
       var futureClose = bars[endIndex + HORIZON].c;
@@ -196,7 +378,8 @@
     return {
       status: 'pending',
       modelVersion: MODEL_VERSION,
-      method: '10 mumluk geçmiş örüntü benzerliği; en yakın 7 geçmiş örneğin sonraki 5 mum getirisi medyanı',
+      method: 'Grafik okuması (mum gövdeleri/fitilleri, EMA9-EMA21 trendi, RSI14, 5 mum momentumu, destek/direnç ve hacim) ile eşleştirilen geçmiş örüntülerin sonraki 5 mum getirisi',
+      chartRead: chartRead(currentFeatures),
       timeframe: '15m',
       horizonBars: HORIZON,
       basePrice: basePrice,

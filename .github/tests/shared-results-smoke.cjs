@@ -87,7 +87,7 @@ assert.ok(/grap_ai_shared_signals_prune[\s\S]*admin_required/i.test(sql), 'Reten
 assert.ok(/grant execute on function public\.grap_ai_shared_signals_upsert\(jsonb\) to anon, authenticated/i.test(sql), 'Anonymous devices must be able to submit records');
 assert.ok(!/service_role\s*[:=]\s*['"][^'"]+/i.test(helper + admin + sql), 'No service_role secret may be shipped to browsers');
 assert.ok(!/SUPABASE_SERVICE_ROLE_KEY/i.test(helper + admin + sql), 'No service_role environment key may be referenced by browser code');
-assert.ok(worker.includes('graph-ai-v60') && worker.includes('./js/ortak-sonuc-havuzu.js') && worker.includes('./js/system-monitor.js'), 'Service worker cache must include the new module');
+assert.ok(worker.includes('graph-ai-v62') && worker.includes('./js/ortak-sonuc-havuzu.js') && worker.includes('./js/system-monitor.js'), 'Service worker cache must include the new module');
 assert.ok(workflow.includes('shared-results-smoke.cjs') && workflow.includes('supabase/**'), 'CI must run shared-pool smoke checks and watch migrations');
 
 console.log('PASS shared admin-only results pool static security, loading, sync, and cache checks');
