@@ -1038,9 +1038,17 @@
   }
 
   function renderFiveBarForecast(records) {
-    var forecasts = (Array.isArray(records) ? records : []).filter(function (record) {
+    var allForecasts = (Array.isArray(records) ? records : []).filter(function (record) {
       return record && record.timeframe === '15m' && record.priceForecast;
     }).sort(function (a, b) { return b.signalAt - a.signalAt; });
+    var currentModelVersion = 'auditor-price-5bar-chart-v2';
+    var legacyForecastCount = allForecasts.filter(function (record) {
+      return record.priceForecast.modelVersion !== currentModelVersion;
+    }).length;
+    var forecasts = allForecasts.filter(function (record) {
+      return record.priceForecast.modelVersion === currentModelVersion;
+    });
+
     var completed = forecasts.filter(function (record) {
       return record.priceForecast.status === 'completed' &&
         num(record.priceForecast.absoluteErrorPct);
@@ -1072,7 +1080,7 @@
 
     if (!forecasts.length) {
       wrap.appendChild(el('p', 'backtest-not',
-        'Henüz 15 dakikalık fiyat tahmini kaydı yok. İlk tahmin, yeterli ve güncel kapanmış mum bulunduğunda oluşturulacak.'));
+        'Grafik okuma modelinin henüz 15 dakikalık tahmin kaydı yok. İlk tahmin, yeterli ve güncel kapanmış mum bulunduğunda oluşturulacak.' + (legacyForecastCount ? ' Önceki modelden ' + legacyForecastCount + ' kayıt ayrı tutuluyor.' : '')));
       return wrap;
     }
 
@@ -1107,7 +1115,7 @@
     tableWrap.appendChild(table);
     wrap.appendChild(tableWrap);
     wrap.appendChild(el('p', 'backtest-not',
-      'Tahmin yalnızca 15 dakikalık grafiklerde üretilir. Gerçekleşen fiyat, sonraki beş kapanmış mumun beşincisinin kapanışıdır. Mutlak hata = |tahmin − gerçekleşen| / gerçekleşen × 100. 1 saatlik, 4 saatlik ve günlük grafikler bu ölçüme dahil değildir.'));
+      'Bu ayrı performans serisi grafik okuma modeline aittir. Mum gövde/fitilleri, EMA9/21 trendi, RSI14, 5 mum momentumu, destek/direnç ve hacim benzer geçmiş örüntü seçimine katılır. Gerçekleşen fiyat, sonraki beş kapanmış mumun beşincisinin kapanışıdır. Mutlak hata = |tahmin − gerçekleşen| / gerçekleşen × 100. Önceki model kayıtları bu ölçüme karıştırılmaz; 1 saatlik, 4 saatlik ve günlük grafikler dahil değildir.'));
     return wrap;
   }
 
