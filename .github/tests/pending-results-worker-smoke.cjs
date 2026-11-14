@@ -32,6 +32,10 @@ const fifteenRecord = {
   price: 100, horizon: 5, directionStatus: 'pending'
 };
 assert.equal(worker.futureBars(fifteenRecord, fifteenBars, strictNow).length, 5);
+assert.equal(worker.shouldEvaluate(fifteenRecord, strictNow - fifteenStep), false,
+  'The worker must wait for all five 15m candles before fetching evaluation data');
+assert.equal(worker.shouldEvaluate(fifteenRecord, strictNow), true,
+  'The worker should evaluate once the five-candle horizon has closed');
 const fifteenGapBars = fifteenBars.filter((_, index) => index !== 2);
 assert.equal(worker.futureBars(fifteenRecord, fifteenGapBars, strictNow).length, 2,
   'The worker must stop at the first missing 15m candle instead of shifting the horizon');
@@ -105,6 +109,8 @@ const pendingRows = [
   { decision: 'AL', directionStatus: 'completed', tradeStatus: 'pending', lastError: 'HTTP 429' },
   { decision: 'SAT', directionStatus: 'expired', spotStatus: 'expired' }
 ];
+assert.equal(worker.isPending({ decision: 'SAT', spotStatus: 'not-applicable', directionStatus: 'completed' }), false,
+  'A non-applicable Spot sale must not remain in the pending queue');
 assert.deepEqual(worker.summarizePending(pendingRows), {
   total: 2, normal: 1, dataErrors: 1, expired: 1
 });
