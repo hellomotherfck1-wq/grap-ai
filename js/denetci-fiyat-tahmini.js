@@ -117,8 +117,11 @@
     meta = meta || {};
     var currentTime = finite(now) ? now : Date.now();
     if (meta.timeframe !== '15m') return null;
-    if (meta.sourceInfo && (meta.sourceInfo.failed || meta.sourceInfo.stale)) {
+    if (!meta.sourceInfo || meta.sourceInfo.failed || meta.sourceInfo.stale) {
       return unavailable('Veri kaynağının güncelliği doğrulanamadı.');
+    }
+    if (Number(meta.intervalMs) !== STEP_MS) {
+      return unavailable('Kaynak zaman dilimi 15 dakikalık olarak doğrulanamadı.');
     }
 
     var fetchedAt = Number(meta.fetchedAt);
