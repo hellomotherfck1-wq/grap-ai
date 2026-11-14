@@ -349,6 +349,29 @@
         priceForecast = { status: 'unavailable', reason: 'Tahmin becerisi yüklenemedi.' };
       }
       if (priceForecast && priceForecast.status === 'pending') {
+        var chartRead = priceForecast.chartRead;
+        if (chartRead) {
+          var chartPriceText = function (value) {
+            var amount = Number(value);
+            if (!Number.isFinite(amount) || amount <= 0) return '—';
+            var digits = amount >= 1000 ? 2 : amount >= 1 ? 4 : 8;
+            return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: digits }).format(amount);
+          };
+          var momentumText = Number.isFinite(chartRead.momentum5BarsPct)
+            ? (chartRead.momentum5BarsPct > 0 ? '+' : '') +
+              chartRead.momentum5BarsPct.toFixed(2).replace('.', ',') + '%'
+            : 'hesaplanamadı';
+          var rsiText = Number.isFinite(chartRead.rsi) ? String(chartRead.rsi).replace('.', ',') : 'hesaplanamadı';
+          var volumeText = chartRead.volumePressure === null ? 'hacim teyidi yok'
+            : chartRead.volumePressure > 0.15 ? 'alıcı baskısı'
+              : chartRead.volumePressure < -0.15 ? 'satıcı baskısı' : 'dengeli hacim';
+          dn.push('📊 Grafik okuması: EMA9/21 trendi ' + chartRead.trend +
+            ' · RSI14: ' + rsiText + ' · son mum: ' + chartRead.lastCandle +
+            ' · son 5 mum momentumu: ' + momentumText + '.');
+          dn.push('📍 Grafik seviyeleri: destek ' + chartPriceText(chartRead.support) +
+            ' · direnç ' + chartPriceText(chartRead.resistance) +
+            ' · hacim yorumu: ' + volumeText + '.');
+        }
         var priceText = function (value) {
           var amount = Number(value);
           var digits = amount >= 1000 ? 2 : amount >= 1 ? 4 : 8;
