@@ -161,7 +161,9 @@ assert.equal(listedCoins, 216, 'The forecast sweep must cover all 216 coins in t
 assert.ok(coinScan.includes("Veri.binance(symbol, '15m', 120)") &&
   coinScan.includes('tumCoinTahminleriniUret') &&
   coinScan.includes('priceForecastSummary') &&
-  coinScan.includes('renderTopluTahminList'),
+  coinScan.includes('renderTopluTahminList') &&
+  coinScan.includes('tahminHatasiOzetle') &&
+  coinScan.includes('Binance 15 dakikalık veri alınamadı.'),
   'The Coin Tahmin scan must produce and show 15m five-candle forecasts for the entire app list');
 assert.ok(workerWorkflow.includes('five-candle-forecast-smoke.cjs') &&
   browserWorkflow.includes('five-candle-forecast-smoke.cjs'),
