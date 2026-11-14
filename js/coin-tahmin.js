@@ -497,6 +497,23 @@
     };
   }
 
+  function tahminHatasiOzetle(error) {
+    var message = String(error && error.message ? error.message : error || '');
+    if (/en az 60|mum sayısı yetersiz|kapanmış mum/i.test(message)) {
+      return 'Yeterli kapanmış 15 dakikalık mum bulunamadı.';
+    }
+    if (/benzer geçmiş|örüntü sayısı|ayrışan geçmiş örnek/i.test(message)) {
+      return 'Benzer geçmiş grafik örnekleri tahmin için yeterli değil.';
+    }
+    if (/eski|güncel değil|güncelliği doğrulan|alınma zamanı/i.test(message)) {
+      return 'Grafik verisinin güncelliği doğrulanamadı.';
+    }
+    if (/geçersiz coin|geçersiz.*sembol/i.test(message)) {
+      return 'Bu coin için Binance Spot işlem çifti doğrulanamadı.';
+    }
+    return 'Binance 15 dakikalık veri alınamadı.';
+  }
+
   async function tahminBir(item) {
     var model = window.GrapAIDenetciFiyatTahmini;
     if (!model || typeof model.olustur !== 'function') {
@@ -576,7 +593,7 @@
           symbol: symbol,
           status: 'unavailable',
           forecast: null,
-          reason: String(error && error.message ? error.message : error).slice(0, 220)
+          reason: tahminHatasiOzetle(error)
         });
       }
       await sleep(220);
