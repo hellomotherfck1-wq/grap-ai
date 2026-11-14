@@ -244,6 +244,15 @@
       sourceRoute: String(forecast.sourceRoute || '').slice(0, 80),
       sourceFetchedAt: num(forecast.sourceFetchedAt) ? forecast.sourceFetchedAt : null,
       lastClosedCandleAt: num(forecast.lastClosedCandleAt) ? forecast.lastClosedCandleAt : null,
+      chartRead: forecast.chartRead && typeof forecast.chartRead === 'object' ? {
+        trend: String(forecast.chartRead.trend || '').slice(0, 20),
+        rsi: num(forecast.chartRead.rsi) ? forecast.chartRead.rsi : null,
+        momentum5BarsPct: num(forecast.chartRead.momentum5BarsPct) ? forecast.chartRead.momentum5BarsPct : null,
+        lastCandle: String(forecast.chartRead.lastCandle || '').slice(0, 50),
+        support: num(forecast.chartRead.support) ? forecast.chartRead.support : null,
+        resistance: num(forecast.chartRead.resistance) ? forecast.chartRead.resistance : null,
+        volumePressure: num(forecast.chartRead.volumePressure) ? forecast.chartRead.volumePressure : null
+      } : null,
       signalAt: forecastAt,
       dueAt: dueAt,
       createdAt: num(forecast.createdAt) ? forecast.createdAt : Date.now()
@@ -316,7 +325,7 @@
       horizon: Math.max(2, Math.min(30, Number(input.horizon) || HORIZON)),
       tradeStatus: decision === 'AL' ? 'pending' : 'not-applicable',
       spotStatus: decision === 'SAT' ? 'pending' : 'not-applicable',
-      directionStatus: 'pending',
+      directionStatus: input.directionStatus === 'not-applicable' ? 'not-applicable' : 'pending',
       tradeResult: null,
       spotResult: null,
       forwardPct: null,
@@ -459,6 +468,8 @@
         timeframe: meta.timeframe || c.zd,
         signalAt: c.signalAt,
         price: c.fiyat,
+        priceForecast: c.priceForecast || null,
+        directionStatus: c.priceForecast ? 'not-applicable' : 'pending',
         stop: c.stopFiyat,
         target: c.hedefFiyat,
         rr: c.rr,
@@ -1087,19 +1098,24 @@
     var tableWrap = el('div', 'backtest-table-wrap');
     var table = el('table', 'backtest-trade-table');
     var head = el('thead'), header = el('tr');
-    ['Tarih', 'Varlık', 'Başlangıç fiyatı', '5 mum tahmini', 'Gerçekleşen fiyat', 'Mutlak hata'].forEach(function (label) {
+    ['Tarih', 'Varlık', 'Başlangıç fiyatı', '5 mum tahmini', 'Gerçekleşen fiyat', 'Mutlak hata', 'Grafik okuması'].forEach(function (label) {
       header.appendChild(el('th', '', label));
     });
     head.appendChild(header);
     table.appendChild(head);
     var body = el('tbody');
-    forecasts.slice(0, 30).forEach(function (record) {
+    forecasts.slice(0, 216).forEach(function (record) {
       var forecast = record.priceForecast;
       var actual = forecast.status === 'completed' ? priceYazi(forecast.actualPrice)
         : forecast.status === 'expired' ? 'Veri aralığı dışında' : '5 mum bekleniyor';
       var error = forecast.status === 'completed' && num(forecast.absoluteErrorPct)
         ? pct(forecast.absoluteErrorPct) : '—';
       var range = priceYazi(forecast.predictedLow) + ' – ' + priceYazi(forecast.predictedHigh);
+      var chart = forecast.chartRead
+        ? forecast.chartRead.trend + ' · RSI ' +
+          (num(forecast.chartRead.rsi) ? forecast.chartRead.rsi : '—') + ' · ' +
+          (forecast.chartRead.lastCandle || '—')
+        : '—';
       var row = el('tr');
       [
         new Date(record.signalAt).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }),
@@ -1107,7 +1123,8 @@
         priceYazi(forecast.basePrice),
         priceYazi(forecast.predictedPrice) + ' (' + range + ')',
         actual,
-        error
+        error,
+        chart
       ].forEach(function (value) { row.appendChild(el('td', '', value)); });
       body.appendChild(row);
     });
