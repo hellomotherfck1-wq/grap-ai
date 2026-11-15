@@ -127,5 +127,6 @@ jobs:
             live-e2e-report.json
             live-e2e-failure.png
             binance-live-api-report.json
+            market-skills-backtest-report.json
           if-no-files-found: ignore
           retention-days: 7
