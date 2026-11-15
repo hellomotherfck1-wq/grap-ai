@@ -165,6 +165,15 @@
     satir(container, 'Kısa vade · 1–4 hafta', report.shortTerm);
     satir(container, 'Uzun vade · 6–12 ay', report.longTerm);
     satir(container, 'Değerleme ekranı', report.valuation.text);
+    if (report.marketSkills) {
+      var ms = report.marketSkills;
+      satir(container, 'Ortak grafik becerileri', ms.structure.trend + ' · RSI ' + (ms.indicators.rsi14 == null ? '—' : ms.indicators.rsi14.toFixed(1)) +
+        ' · MACD ' + (ms.indicators.macdHistogram == null ? '—' : (ms.indicators.macdHistogram >= 0 ? 'pozitif' : 'negatif')) +
+        ' · ADX ' + (ms.indicators.adx14 == null ? '—' : ms.indicators.adx14.toFixed(1)) + ' · ATR% ' + (ms.indicators.atrPercent == null ? '—' : ms.indicators.atrPercent.toFixed(2)));
+      satir(container, 'Kırılım / hacim', ms.structure.breakout + ' · göreli hacim ' + (ms.volume.relativeVolume == null ? 'hesaplanamadı' : ms.volume.relativeVolume.toFixed(2) + 'x'));
+      if (ms.warnings.length) satir(container, 'Grafik veri uyarısı', ms.warnings.join(' '));
+    }
+    if (report.financialSkills) satir(container, 'Finansal veri kontrolü', report.financialSkills.warnings.join(' ') || 'Alanlar mevcut; dönem doğrulaması ayrıca gerekli.');
 
     var f = report.fundamentals;
     if (f) {
@@ -257,6 +266,10 @@
       ? window.TahminAI.ajanlaraSor(sonuc.s, dn.kal)
       : null;
     var report = await research(v, dn, panel);
+    if (window.PiyasaBecerileri) {
+      report.marketSkills = window.PiyasaBecerileri.oku(dn.d, { market: 'BIST', timeframe: '1d', closedCandles: true, fresh: true });
+      report.financialSkills = window.PiyasaBecerileri.temelVeriKontrol(report.fundamentals || null);
+    }
     render(report, container);
     if (window.HaberAjani && typeof window.HaberAjani.analizEt === 'function') {
       var newsBox = document.createElement('div');
