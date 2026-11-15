@@ -11,8 +11,9 @@
   function adx(b,p){if(b.length<p*2+1)return null;var trSum=0,plusSum=0,minusSum=0,dx=[];for(var i=1;i<=p;i++){var up=b[i].h-b[i-1].h,down=b[i-1].l-b[i].l;trSum+=tr(b,i);plusSum+=up>down&&up>0?up:0;minusSum+=down>up&&down>0?down:0;}function dxValue(){var pdi=trSum?100*plusSum/trSum:0,mdi=trSum?100*minusSum/trSum:0;return pdi+mdi?100*Math.abs(pdi-mdi)/(pdi+mdi):0;}dx.push(dxValue());for(i=p+1;i<b.length;i++){up=b[i].h-b[i-1].h;down=b[i-1].l-b[i].l;trSum=trSum-trSum/p+tr(b,i);plusSum=plusSum-plusSum/p+(up>down&&up>0?up:0);minusSum=minusSum-minusSum/p+(down>up&&down>0?down:0);dx.push(dxValue());}if(dx.length<p)return null;var value=avg(dx.slice(0,p));for(i=p;i<dx.length;i++)value=(value*(p-1)+dx[i])/p;return value;}
   function normalize(input) { return (Array.isArray(input)?input:[]).map(function(x){if(!x)return null;var o=num(x.o),h=num(x.h),l=num(x.l),c=num(x.c);if(o===null||h===null||l===null||c===null||h<l||c<=0)return null;return {o:o,h:h,l:l,c:c,v:num(x.v!=null?x.v:x.volume),t:num(x.t!=null?x.t:x.openTime),quoteVolume:num(x.quoteVolume),takerBuyQuoteVolume:num(x.takerBuyQuoteVolume)};}).filter(Boolean); }
   function oku(input, options) {
-    options=options||{};var b=normalize(input),n=b.length;
+    options=options||{};var rawBars=Array.isArray(input)?input:[],b=normalize(rawBars),n=b.length;
     var R={version:VERSION,mode:'shadow',market:options.market||'Genel',timeframe:options.timeframe||null,candleCount:n,quality:'yetersiz',warnings:[],indicators:{},structure:{},volume:{},signals:[],score:{direction:'nötr',value:0,confidence:'düşük'},decisionImpact:'none'};
+    if(n<rawBars.length)R.warnings.push((rawBars.length-n)+' bozuk OHLC mum kaydı dışarıda bırakıldı.');
     if(n<20){R.warnings.push('En az 20 geçerli kapanmış mum gerekli.');return R;}
     var cl=b.map(function(x){return x.c;}),last=b[n-1],e9=ema(cl,9),e20=ema(cl,20),e50=ema(cl,50),e200=ema(cl,200);
     var r=rsi(cl,14),a=atr(b,14),adxV=adx(b,14),m12=ema(cl,12),m26=ema(cl,26),macd=null,signal=null;
@@ -59,8 +60,8 @@
     var structureVote=breakout!=='yok'&&vRatio!==null&&vRatio>=1.2?(breakout==='yukarı'?1:-1):0;
     var volumeVote=vRatio!==null&&vRatio>=1.3&&upVol+downVol>0?(upVol>downVol?1:-1):0;
     var groups=[trendVote,momentumVote,structureVote,volumeVote];
-    var sum=groups.reduce(function(x,y){return x+y;},0),dir=sum>=2?'yükseliş':sum<=-2?'düşüş':'nötr';
-    R.score={direction:dir,value:sum,confidence:groups.length>=4&&Math.abs(sum)>=3?'orta':'düşük',independentGroups:groups.filter(function(x){return x!==0;}).length};
+    var sum=groups.reduce(function(x,y){return x+y;},0),activeGroups=groups.filter(function(x){return x!==0;}).length,dir=sum>=2?'yükseliş':sum<=-2?'düşüş':'nötr';
+    R.score={direction:dir,value:sum,confidence:activeGroups>=3&&Math.abs(sum)>=3?'orta':'düşük',independentGroups:activeGroups};
     if(adxV!==null)R.signals.push('ADX14 '+adxV.toFixed(1)+' · '+(adxV>=25?'trend güçlü':adxV<18?'trend zayıf':'trend gelişiyor'));
     if(r!==null)R.signals.push('RSI14 '+r.toFixed(1));
     if(R.indicators.atrPercent!==null)R.signals.push('ATR% '+R.indicators.atrPercent.toFixed(2));
