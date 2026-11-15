@@ -8,7 +8,7 @@
 
   var KEY = 'graphai_coin_tahmin_v1';
   var BUGUN_KEY = 'graphai_coin_tahmin_bugun';
-  var CACHE_VERSION = 'crypto-intelligence-2.5.0';
+  var CACHE_VERSION = 'crypto-intelligence-2.6.0';
   function cacheKey(zd) {
     return BUGUN_KEY + ':' + CACHE_VERSION + ':' + (zd || '15m');
   }
@@ -684,16 +684,28 @@
     var adaylar = [];
     var hatalar = [];
 
-    for (var i = 0; i < LISTE.length; i++) {
-      var item = LISTE[i];
-      if (typeof onProgress === 'function') onProgress(i + 1, LISTE.length, item.ad, '15 dk ajan testi');
-      try {
-        adaylar.push(await taraBir(item, zd));
-      } catch (e) {
-        hatalar.push(item.ad + ': ' + (e && e.message ? e.message : String(e)));
+    // Binance isteklerini kontrollü paralel çalıştır: sırayla beklemek yerine 6 işçi.
+    var nextCoin = 0;
+    var tamamlananCoin = 0;
+    async function coinWorker() {
+      while (nextCoin < LISTE.length) {
+        var index = nextCoin++;
+        var item = LISTE[index];
+        if (typeof onProgress === 'function') {
+          onProgress(tamamlananCoin + 1, LISTE.length, item.ad, '15 dk ajan testi');
+        }
+        try {
+          adaylar.push(await taraBir(item, zd));
+        } catch (e) {
+          hatalar.push(item.ad + ': ' + (e && e.message ? e.message : String(e)));
+        }
+        tamamlananCoin++;
       }
-      await sleep(220);
     }
+    await Promise.all([
+      coinWorker(), coinWorker(), coinWorker(),
+      coinWorker(), coinWorker(), coinWorker()
+    ]);
 
     if (window.KriptoAjanlari && typeof window.KriptoAjanlari.derinAnaliz === 'function' && adaylar.length) {
       var derinSonuc = await window.KriptoAjanlari.derinAnaliz(adaylar, onProgress);
