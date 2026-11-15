@@ -612,43 +612,52 @@
   async function tumCoinTahminleriniUret(onProgress) {
     var items = [];
     var candidates = [];
-    for (var i = 0; i < LISTE.length; i++) {
-      var item = LISTE[i];
-      var symbol = String(item.q || '').toUpperCase().replace(/USDT$/, '') + 'USDT';
-      if (typeof onProgress === 'function') {
-        onProgress(i + 1, LISTE.length, item.ad, '15 dk grafik tahmini');
+    // 15m fiyat tahminlerini de 6 kontrollü işçiyle al; coin sırasını koru.
+    var nextForecast = 0;
+    var completedForecast = 0;
+    async function forecastWorker() {
+      while (nextForecast < LISTE.length) {
+        var index = nextForecast++;
+        var item = LISTE[index];
+        var symbol = String(item.q || '').toUpperCase().replace(/USDT$/, '') + 'USDT';
+        if (typeof onProgress === 'function') {
+          onProgress(completedForecast + 1, LISTE.length, item.ad, '15 dk grafik tahmini');
+        }
+        try {
+          // Her coin kendi 15m verisini alır; geçici hata diğer coinleri durdurmaz.
+          var result = await tahminBir(item);
+          items[index] = result;
+          candidates.push({
+            q: item.q,
+            ad: result.name,
+            sembol: result.symbol,
+            zd: '15m',
+            horizon: 5,
+            karar: 'BEKLE',
+            genelKarar: 'BEKLE',
+            teknikVar: false,
+            hacimVar: false,
+            fiyat: result.forecast.basePrice,
+            signalAt: result.forecast.signalAt,
+            priceForecast: result.forecast,
+            agentVersion: result.forecast.modelVersion
+          });
+        } catch (error) {
+          items[index] = {
+            name: item.ad,
+            symbol: symbol,
+            status: 'unavailable',
+            forecast: null,
+            reason: tahminHatasiOzetle(error)
+          };
+        }
+        completedForecast++;
       }
-      try {
-        // 15m verisini her coin için bağımsız al; 1h taramasında yaşanan
-        // geçici bir hata bu coin için 15m tahminini engellemesin.
-        var result = await tahminBir(item);
-        items.push(result);
-        candidates.push({
-          q: item.q,
-          ad: result.name,
-          sembol: result.symbol,
-          zd: '15m',
-          horizon: 5,
-          karar: 'BEKLE',
-          genelKarar: 'BEKLE',
-          teknikVar: false,
-          hacimVar: false,
-          fiyat: result.forecast.basePrice,
-          signalAt: result.forecast.signalAt,
-          priceForecast: result.forecast,
-          agentVersion: result.forecast.modelVersion
-        });
-      } catch (error) {
-        items.push({
-          name: item.ad,
-          symbol: symbol,
-          status: 'unavailable',
-          forecast: null,
-          reason: tahminHatasiOzetle(error)
-        });
-      }
-      await sleep(220);
     }
+    await Promise.all([
+      forecastWorker(), forecastWorker(), forecastWorker(),
+      forecastWorker(), forecastWorker(), forecastWorker()
+    ]);
 
     var saved = 0;
     if (candidates.length && window.AjanPerformans &&
