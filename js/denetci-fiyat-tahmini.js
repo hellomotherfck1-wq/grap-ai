@@ -11,7 +11,7 @@
   var PATTERN_LENGTH = 10;
   var MIN_BARS = 60;
   var NEIGHBORS = 7;
-  var MODEL_VERSION = 'auditor-price-5bar-chart-v3';
+  var MODEL_VERSION = 'auditor-price-5bar-chart-v4';
 
   function finite(value) {
     return typeof value === 'number' && Number.isFinite(value);
@@ -378,6 +378,16 @@
     }
 
     var outcomes = selected.map(function (item) { return item.forwardReturn; });
+    // Yönü geçmiş benzer örneklerin salt ortalamasına bırakma:
+    // en az 4/7 örnek aynı yönde değilse sistem tahmini zorlamadan çekilsin.
+    var directionDeadband = 0.0005;
+    var upVotes = outcomes.filter(function (value) { return value > directionDeadband; }).length;
+    var downVotes = outcomes.filter(function (value) { return value < -directionDeadband; }).length;
+    var flatVotes = outcomes.length - upVotes - downVotes;
+    var directionalVotes = Math.max(upVotes, downVotes);
+    if (directionalVotes < 4) {
+      return unavailable('Benzer geçmiş örneklerde yön birliği zayıf; güvenilir yön tahmini üretilemedi.');
+    }
     var expectedReturn = median(outcomes);
     var lowReturn = quantile(outcomes, 0.20);
     var highReturn = quantile(outcomes, 0.80);
@@ -399,6 +409,10 @@
       predictedHigh: basePrice * Math.exp(highReturn),
       predictedChangePct: (Math.exp(expectedReturn) - 1) * 100,
       historicalSampleCount: selected.length,
+      historicalUpVotes: upVotes,
+      historicalDownVotes: downVotes,
+      historicalFlatVotes: flatVotes,
+      directionConsensusPct: directionalVotes / outcomes.length * 100,
       historicalCandidateCount: candidates.length,
       nearestDistance: selected[0].distance,
       volumeUsed: volumeUsed,
