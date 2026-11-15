@@ -320,10 +320,13 @@
         };
         var skillTf = context && context.timeframe || meta.zd || null;
         var skillStep = { '15m': 900000, '1h': 3600000, '4h': 14400000, '1d': 86400000 }[skillTf] || null;
-        sonuc.beceriler = window.PiyasaBecerileri.oku(c.map(function (bar, index) {
+        /* Analiz.yap açık mumu analysisC dışında tutar; ortak beceriler de aynı kapanmış veri setini kullanır. */
+        var skillBars = Array.isArray(s.analysisC) && s.analysisC.length ? s.analysisC :
+          (meta.sonMumAcik && c.length > 1 ? c.slice(0, -1) : c);
+        sonuc.beceriler = window.PiyasaBecerileri.oku(skillBars.map(function (bar, index) {
           return { o: bar.o, h: bar.h, l: bar.l, c: bar.c, v: v ? v[index] : null };
-        }), { market: market, timeframe: context && context.timeframe || meta.zd || null,
-          closedCandles: !meta.sonMumAcik, fresh: meta.guncel !== false, expectedIntervalMs: skillStep });
+        }), { market: market, timeframe: skillTf,
+          closedCandles: true, fresh: meta.guncel !== false, expectedIntervalMs: skillStep });
         sonuc.tartisma.push('🧠 Ortak piyasa becerileri (gölge): ' + sonuc.beceriler.score.direction +
           ' · RSI ' + (sonuc.beceriler.indicators.rsi14 == null ? '—' : sonuc.beceriler.indicators.rsi14.toFixed(1)) +
           ' · ADX ' + (sonuc.beceriler.indicators.adx14 == null ? '—' : sonuc.beceriler.indicators.adx14.toFixed(1)) +
