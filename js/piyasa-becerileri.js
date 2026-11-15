@@ -70,7 +70,7 @@
     R.signals.push('Yakın destek: '+(support===null?'bulunamadı':support)+' · yakın direnç: '+(resistance===null?'bulunamadı':resistance));
     R.signals.push('Son mum formasyonu: '+candlePattern);
     if(R.volume.binanceAggressiveBuyShare!==null)R.signals.push('Binance Spot agresif alım payı: %'+(R.volume.binanceAggressiveBuyShare*100).toFixed(1));
-    if(groups.length<3)R.warnings.push('Bağımsız teyit grubu sayısı yetersiz; skor karar için kullanılmıyor.');
+    if(activeGroups<3)R.warnings.push('Bağımsız teyit grubu sayısı yetersiz; skor karar için kullanılmıyor.');
     if(options.market==='BIST')R.signals.push('BIST notu: seans dışı son fiyat ve günlük mumun kapanış zamanı ayrıca doğrulanmalı; finansallar KAP dönemiyle eşleştirilmeli.');
     R.decisionImpact='none';
     return R;
