@@ -66,7 +66,7 @@
     if(period&&(!isFinite(age)||age>200*86400000))warnings.push('Finansal dönem 200 günden eski; güncellik doğrulanmalı.');
     if(!period)warnings.push('Finansal verinin raporlama dönemi doğrulanamadı.');
     if(f.debtToEquity!=null&&/bank|financial|insurance/i.test(String(f.sector||'')+' '+String(f.industry||'')))warnings.push('Borç/özkaynak oranı finans sektörü için doğrudan sanayi şirketi eşiğiyle yorumlanmamalı.');
-    return {version:VERSION,market:'BIST',availableFields:available,missingFields:keys.filter(function(k){return available.indexOf(k)<0;}),periodEnd:period,ageDays:age===null?null:Math.floor(age/86400000),warnings:warnings,mode:'shadow'};
+    return {version:VERSION,market:'BIST',availableFields:available,missingFields:keys.filter(function(k){return available.indexOf(k)<0;}),periodEnd:period,ageDays:age===null||!isFinite(age)?null:Math.floor(age/86400000),warnings:warnings,mode:'shadow'};
   }
   root.PiyasaBecerileri={version:VERSION,oku:oku,temelVeriKontrol:temelVeriKontrol};
 })(typeof window!=='undefined'?window:this);
