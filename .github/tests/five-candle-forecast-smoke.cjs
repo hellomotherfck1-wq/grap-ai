@@ -150,7 +150,7 @@ const expired = worker.expiredPatch({
 assert.equal(expired.priceForecast.status, 'expired');
 
 assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=3') && index.includes('js/ajan2.js?v=6') &&
-  index.includes('js/coin-tahmin.js?v=13') &&
+  index.includes('js/coin-tahmin.js?v=16') &&
   index.includes('js/ajan-performans.js?v=19'),
   'The forecast module must load in the browser');
 assert.ok(/graph-ai-v\d+/.test(sw) && sw.includes('./js/denetci-fiyat-tahmini.js'),
