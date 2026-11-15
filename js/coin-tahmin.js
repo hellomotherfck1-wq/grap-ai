@@ -768,7 +768,12 @@
       saat: new Date().toISOString(),
       zd: zd,
       secim: secim,
-      adaylar: adaylar.map(kisaOzet),
+      adaylar: adaylar.slice(0, 20).map(kisaOzet),
+      adaySayisi: adaylar.length,
+      kararDagilimi: adaylar.reduce(function (counts, item) {
+        if (item && counts[item.karar] !== undefined) counts[item.karar]++;
+        return counts;
+      }, { AL: 0, SAT: 0, BEKLE: 0 }),
       hataSayisi: hatalar.length,
       hatalar: hatalar.slice(0, 8),
       priceForecastSummary: forecastSummary,
@@ -917,15 +922,16 @@
 
   function renderTaramaOzeti(kayit) {
     var adaylar = Array.isArray(kayit.adaylar) ? kayit.adaylar : [];
-    var counts = { AL: 0, SAT: 0, BEKLE: 0 };
-    adaylar.forEach(function (item) {
+    var counts = kayit.kararDagilimi || { AL: 0, SAT: 0, BEKLE: 0 };
+    if (!kayit.kararDagilimi) adaylar.forEach(function (item) {
       if (item && counts[item.karar] !== undefined) counts[item.karar]++;
     });
+    var analyzedCount = Number.isFinite(Number(kayit.adaySayisi)) ? Number(kayit.adaySayisi) : adaylar.length;
     var forecastSummary = kayit.priceForecastSummary || {};
     var unavailable = Number.isFinite(Number(kayit.hataSayisi))
       ? Number(kayit.hataSayisi) : (Array.isArray(kayit.hatalar) ? kayit.hatalar.length : 0);
     return kart('Tarama özeti', [
-      adaylar.length + ' coin incelendi · ' + unavailable + ' coin için veri alınamadı.',
+      analyzedCount + ' coin incelendi · ' + unavailable + ' coin için veri alınamadı.',
       'Kararlar: ' + counts.AL + ' AL · ' + counts.SAT + ' SAT · ' + counts.BEKLE + ' BEKLE.',
       '5 mum sonrası fiyat tahmini: ' + (forecastSummary.ready || 0) + '/' +
         (forecastSummary.requested || LISTE.length) + ' coin için hazır.',
@@ -1177,7 +1183,7 @@
       var errorDetails = document.createElement('details');
       errorDetails.className = 'kart';
       var errorTitle = document.createElement('summary');
-      errorTitle.textContent = 'Veri alınamayan coinler (' + kayit.hatalar.length + ')';
+      errorTitle.textContent = 'Veri alınamayan coinler (' + (kayit.hataSayisi || kayit.hatalar.length) + ')';
       errorDetails.appendChild(errorTitle);
       var errorBody = document.createElement('div');
       errorBody.style.cssText = 'margin-top:9px;font-size:12px;line-height:1.5;color:#f0b429';
