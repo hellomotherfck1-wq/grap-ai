@@ -306,6 +306,23 @@
 
     sonuc.skor = skorla(s, H, T, N, D);
     sonuc.ozet = ozetYap(s, H, T, N, sonuc.skor);
+    /* Ortak piyasa becerileri tüm grafik ajanlarına gölge modda sunulur. */
+    if (window.PiyasaBecerileri && typeof window.PiyasaBecerileri.oku === 'function') {
+      try {
+        var meta = s.meta || {};
+        var symbol = String(meta.sembol || meta.symbol || '');
+        var market = context && context.market ? context.market :
+          (/\\.IS$/i.test(symbol) ? 'BIST' : (/USDT$|BTC$|ETH$|BNB$/i.test(symbol) || meta.kaynak === 'b' ? 'Binance' : 'Genel'));
+        sonuc.beceriler = window.PiyasaBecerileri.oku(c.map(function (bar, index) {
+          return { o: bar.o, h: bar.h, l: bar.l, c: bar.c, v: v ? v[index] : null };
+        }), { market: market, timeframe: context && context.timeframe || meta.zd || null,
+          closedCandles: !meta.sonMumAcik, fresh: meta.guncel !== false });
+        sonuc.tartisma.push('🧠 Ortak piyasa becerileri (gölge): ' + sonuc.beceriler.score.direction +
+          ' · RSI ' + (sonuc.beceriler.indicators.rsi14 == null ? '—' : sonuc.beceriler.indicators.rsi14.toFixed(1)) +
+          ' · ADX ' + (sonuc.beceriler.indicators.adx14 == null ? '—' : sonuc.beceriler.indicators.adx14.toFixed(1)) +
+          ' · ' + sonuc.beceriler.structure.breakout + ' kırılım. Karar ağırlığını henüz değiştirmez.');
+      } catch (skillError) { sonuc.beceriler = { mode: 'shadow', warnings: ['Ortak beceri analizi tamamlanamadı.'] }; }
+    }
     return sonuc;
   }
 
