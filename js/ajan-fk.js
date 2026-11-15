@@ -277,6 +277,8 @@
       }
     }
 
+    var financialSkills = window.PiyasaBecerileri && typeof window.PiyasaBecerileri.temelVeriKontrol === 'function'
+      ? window.PiyasaBecerileri.temelVeriKontrol(data || null) : null;
     var son = base;
     var dusuruldu = false;
     if (base === 'AL') {
@@ -318,6 +320,7 @@
       bant: bant,
       olumlu: olumlu,
       riskler: riskler,
+      financialSkills: financialSkills,
       data: data || null
     };
   }
