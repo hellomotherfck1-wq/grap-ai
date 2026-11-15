@@ -58,7 +58,7 @@ const prediction = forecast.olustur(bars, meta, now);
 assert.equal(prediction.status, 'pending', 'A fresh 15m chart with enough closed OHLCV must produce a pending forecast');
 assert.equal(prediction.horizonBars, 5);
 assert.equal(prediction.timeframe, '15m');
-assert.equal(prediction.modelVersion, 'auditor-price-5bar-chart-v3');
+assert.equal(prediction.modelVersion, 'auditor-price-5bar-chart-v4');
 assert.ok(prediction.chartRead && ['Yükseliş', 'Düşüş', 'Yatay'].includes(prediction.chartRead.trend),
   'The forecast must include a chart-derived EMA trend reading');
 assert.ok(Number.isFinite(prediction.chartRead.rsi),
@@ -72,7 +72,7 @@ assert.ok(prediction.method.includes('EMA9-EMA21') && prediction.method.includes
 assert.ok(Number.isFinite(prediction.basePrice) && prediction.basePrice > 0);
 assert.ok(Number.isFinite(prediction.predictedPrice) && prediction.predictedPrice > 0);
 assert.ok(prediction.predictedLow <= prediction.predictedHigh);
-assert.ok(prediction.historicalSampleCount >= 5);
+assert.ok(prediction.historicalSampleCount >= 5);\nassert.ok(prediction.directionConsensusPct >= 4 / 7 * 100,\n  'A forecast must require at least four of seven historical neighbors to agree on direction');
 assert.equal(prediction.volumeUsed, true);
 
 assert.equal(forecast.olustur(bars, Object.assign({}, meta, { timeframe: '1h' }), now), null,
@@ -149,7 +149,7 @@ const expired = worker.expiredPatch({
 });
 assert.equal(expired.priceForecast.status, 'expired');
 
-assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=3') && index.includes('js/ajan2.js?v=6') &&
+assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=4') && index.includes('js/ajan2.js?v=6') &&
   index.includes('js/coin-tahmin.js?v=16') &&
   index.includes('js/ajan-performans.js?v=20'),
   'The forecast module must load in the browser');
