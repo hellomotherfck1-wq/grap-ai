@@ -1610,11 +1610,18 @@
               ? shared.patchMany(errorPatches) : null;
           });
         }).then(function () {
-          setStatus('Kontrol ediliyor: ' + completed + '/' + list.length + ' varlık · ' + failures + ' veri hatası…');
-          return new Promise(function (resolve) { setTimeout(resolve, 160); });
-        }).then(worker);
+          if (completed + failures === list.length || (completed + failures) % 5 === 0) {
+            setStatus('Kontrol ediliyor: ' + completed + '/' + list.length + ' varlık · ' + failures + ' veri hatası…');
+          }
+          return worker();
+        });
       }
-      return Promise.all([worker(), worker(), worker()]).then(function () {
+      // Binance ve Yahoo isteklerini kontrollü paralelleştir; üç işçili eski kuyruk
+      // 197 varlıkta gereksiz uzun sürüyordu. Sekiz eşzamanlı istek rate-limit için ölçülü kalır.
+      var concurrency = Math.min(8, list.length);
+      var workers = [];
+      for (var w = 0; w < concurrency; w++) workers.push(worker());
+      return Promise.all(workers).then(function () {
         return allRecords().then(function (fresh) {
           fresh = fresh.filter(function (record) { return !isTestRecord(record); });
           render(fresh);
