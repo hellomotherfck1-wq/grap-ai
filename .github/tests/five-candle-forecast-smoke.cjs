@@ -151,8 +151,10 @@ assert.equal(expired.priceForecast.status, 'expired');
 
 assert.ok(index.includes('js/denetci-fiyat-tahmini.js?v=3') && index.includes('js/ajan2.js?v=6') &&
   index.includes('js/coin-tahmin.js?v=16') &&
-  index.includes('js/ajan-performans.js?v=19'),
+  index.includes('js/ajan-performans.js?v=20'),
   'The forecast module must load in the browser');
+assert.ok(performance.includes('Math.min(8, list.length)') && performance.includes('var workers = []'),
+  'Result refresh must process symbols with bounded parallel workers');
 assert.ok(/graph-ai-v\d+/.test(sw) && sw.includes('./js/denetci-fiyat-tahmini.js'),
   'The service worker must cache the new module under a versioned cache');
 assert.ok(auditor.includes('5 mum sonrası tahmini fiyat') && auditor.includes('priceForecast') && auditor.includes('Grafik okuması'),
