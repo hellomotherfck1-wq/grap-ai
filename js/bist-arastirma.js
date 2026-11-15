@@ -286,6 +286,12 @@
       ? window.TahminAI.ajanlaraSor(s, dn.kal) : null;
     status.textContent = 'Finansal göstergeler ve haber başlıkları araştırılıyor…';
     var report = await research(v, dn, panel);
+    if (window.PiyasaBecerileri && typeof window.PiyasaBecerileri.oku === 'function') {
+      report.marketSkills = window.PiyasaBecerileri.oku(dn.d.map(function (bar) {
+        return { o: bar.o, h: bar.h, l: bar.l, c: bar.c, v: bar.v, t: bar.t };
+      }), { market: 'BIST', timeframe: '1d', closedCandles: true, fresh: true });
+      report.financialSkills = window.PiyasaBecerileri.temelVeriKontrol(report.fundamentals || null);
+    }
     var newsBox = null;
     if (window.HaberAjani && typeof window.HaberAjani.analizEt === 'function') {
       newsBox = document.createElement('div');
