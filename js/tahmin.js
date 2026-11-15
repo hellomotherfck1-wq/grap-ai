@@ -313,6 +313,11 @@
         var symbol = String(meta.sembol || meta.symbol || '');
         var market = context && context.market ? context.market :
           (/\\.IS$/i.test(symbol) ? 'BIST' : (/USDT$|BTC$|ETH$|BNB$/i.test(symbol) || meta.kaynak === 'b' ? 'Binance' : 'Genel'));
+        var skillLevelText = function (level) {
+          if (level == null) return '—';
+          if (typeof Analiz !== 'undefined' && Analiz && typeof Analiz.fiyat === 'function') return Analiz.fiyat(level, kal || null);
+          return '%' + Math.round(level * 100);
+        };
         sonuc.beceriler = window.PiyasaBecerileri.oku(c.map(function (bar, index) {
           return { o: bar.o, h: bar.h, l: bar.l, c: bar.c, v: v ? v[index] : null };
         }), { market: market, timeframe: context && context.timeframe || meta.zd || null,
@@ -320,8 +325,8 @@
         sonuc.tartisma.push('🧠 Ortak piyasa becerileri (gölge): ' + sonuc.beceriler.score.direction +
           ' · RSI ' + (sonuc.beceriler.indicators.rsi14 == null ? '—' : sonuc.beceriler.indicators.rsi14.toFixed(1)) +
           ' · ADX ' + (sonuc.beceriler.indicators.adx14 == null ? '—' : sonuc.beceriler.indicators.adx14.toFixed(1)) +
-          ' · ' + sonuc.beceriler.structure.breakout + ' kırılım · destek ' + (sonuc.beceriler.structure.support == null ? '—' : sonuc.beceriler.structure.support.toFixed(4)) +
-          ' · direnç ' + (sonuc.beceriler.structure.resistance == null ? '—' : sonuc.beceriler.structure.resistance.toFixed(4)) +
+          ' · ' + sonuc.beceriler.structure.breakout + ' kırılım · destek ' + skillLevelText(sonuc.beceriler.structure.support) +
+          ' · direnç ' + skillLevelText(sonuc.beceriler.structure.resistance) +
           ' · ATR% ' + (sonuc.beceriler.indicators.atrPercent == null ? '—' : sonuc.beceriler.indicators.atrPercent.toFixed(2)) +
           ' · formasyon ' + sonuc.beceriler.structure.candlePattern + '. Karar ağırlığını henüz değiştirmez.');
       } catch (skillError) { sonuc.beceriler = { mode: 'shadow', warnings: ['Ortak beceri analizi tamamlanamadı.'] }; }
