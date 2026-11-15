@@ -320,7 +320,10 @@
         sonuc.tartisma.push('🧠 Ortak piyasa becerileri (gölge): ' + sonuc.beceriler.score.direction +
           ' · RSI ' + (sonuc.beceriler.indicators.rsi14 == null ? '—' : sonuc.beceriler.indicators.rsi14.toFixed(1)) +
           ' · ADX ' + (sonuc.beceriler.indicators.adx14 == null ? '—' : sonuc.beceriler.indicators.adx14.toFixed(1)) +
-          ' · ' + sonuc.beceriler.structure.breakout + ' kırılım. Karar ağırlığını henüz değiştirmez.');
+          ' · ' + sonuc.beceriler.structure.breakout + ' kırılım · destek ' + (sonuc.beceriler.structure.support == null ? '—' : sonuc.beceriler.structure.support.toFixed(4)) +
+          ' · direnç ' + (sonuc.beceriler.structure.resistance == null ? '—' : sonuc.beceriler.structure.resistance.toFixed(4)) +
+          ' · ATR% ' + (sonuc.beceriler.indicators.atrPercent == null ? '—' : sonuc.beceriler.indicators.atrPercent.toFixed(2)) +
+          ' · formasyon ' + sonuc.beceriler.structure.candlePattern + '. Karar ağırlığını henüz değiştirmez.');
       } catch (skillError) { sonuc.beceriler = { mode: 'shadow', warnings: ['Ortak beceri analizi tamamlanamadı.'] }; }
     }
     return sonuc;
