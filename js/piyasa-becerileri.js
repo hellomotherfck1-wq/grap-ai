@@ -59,7 +59,7 @@
     return R;
   }
   function temelVeriKontrol(f, options) {
-    options=options||{};f=f||{};var keys=['revenueGrowth','earningsGrowth','roe','profitMargins','debtToEquity','trailingPE','priceToBook'];
+    options=options||{};f=f||{};var keys=['revenueGrowth','earningsGrowth','roe','returnOnAssets','profitMargins','grossMargins','operatingMargins','debtToEquity','currentRatio','quickRatio','freeCashflow','operatingCashflow','totalDebt','totalCash','trailingPE','forwardPE','priceToBook','dividendYield','payoutRatio'];
     var available=keys.filter(function(k){return num(f[k])!==null;});
     var period=f.periodEnd||f.asOfDate||null,age=period?Date.now()-Date.parse(period):null;
     var warnings=[];if(!available.length)warnings.push('Temel finansal veri bulunamadı; oran veya değerleme üretilmedi.');
