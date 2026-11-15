@@ -345,8 +345,8 @@
               ? (coin15.adx14 >= 25 ? 'Güçlü' : coin15.adx14 >= 20 ? 'Gelişiyor' : 'Zayıf') : 'Belirsiz',
             atrPct: coin15 && sayi(coin15.atrPct) ? coin15.atrPct : null,
             volatilityRatio: coin15 && sayi(coin15.volatilityRatio) ? coin15.volatilityRatio : null,
-            volatilityRegime: coin15 ? coin15.volatilityRegime : 'Belirsiz',
-            breakout: coin15 ? coin15.breakout : 'Belirsiz',
+            volatilityRegime: coin15 && typeof coin15.volatilityRegime === 'string' ? coin15.volatilityRegime : 'Belirsiz',
+            breakout: coin15 && typeof coin15.breakout === 'string' ? coin15.breakout : 'Belirsiz',
             breakoutVolumeRatio: coin15 && sayi(coin15.breakoutVolumeRatio) ? coin15.breakoutVolumeRatio : null,
             breakoutConfirmed: !!(coin15 && coin15.breakoutConfirmed),
             relativeStrengthVsBtcPct: relativeStrength
