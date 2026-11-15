@@ -1465,7 +1465,8 @@
   }
 
   function fetchGroupHistory(group) {
-    if (group.market === 'Kripto' && typeof Veri.binance === 'function') {
+    // Eski ortak havuz kayıtlarında market alanı boş olabilir; USDT sembolünü de kripto olarak tanı.
+    if ((group.market === 'Kripto' || marketOf(group.symbol) === 'Kripto') && typeof Veri.binance === 'function') {
       return Veri.binance(group.symbol, group.timeframe, group.timeframe === '15m' ? 200 : 1000).then(function (mumlar) {
         return { mumlar: mumlar };
       });
@@ -1505,7 +1506,12 @@
         if (!dueTimes.length || Date.now() < Math.min.apply(null, dueTimes)) return;
         if (num(r.nextCheckAt) && Date.now() < r.nextCheckAt) return;
         var key = r.symbol + '|' + r.timeframe;
-        if (!groups[key]) groups[key] = { symbol: r.symbol, timeframe: r.timeframe, records: [] };
+        if (!groups[key]) groups[key] = {
+          symbol: r.symbol,
+          market: r.market || marketOf(r.symbol),
+          timeframe: r.timeframe,
+          records: []
+        };
         groups[key].records.push(r);
       });
       var list = Object.keys(groups).map(function (key) { return groups[key]; });
