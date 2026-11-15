@@ -418,7 +418,7 @@
       }
     }
 
-    await Promise.all([worker(), worker()]);
+    await Promise.all([worker(), worker(), worker(), worker()]);
     all.forEach(function (item) {
       if (item && item.sembol && !selected[item.sembol] &&
           (item.karar === 'AL' || item.karar === 'SAT')) {
