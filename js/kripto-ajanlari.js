@@ -396,6 +396,8 @@
               'Kripto derin analizindeki veri eksikliği veya çelişki nedeniyle sinyal BEKLE’ye indirildi.';
           }
           item.tartisma = (Array.isArray(item.tartisma) ? item.tartisma : []).concat([
+            '🧠 Ortak Binance becerileri (gölge): ' + (sharedSkills ? sharedSkills.signals.join(' · ') : 'veri yetersiz') +
+              (sharedSkills && sharedSkills.warnings.length ? ' · Uyarı: ' + sharedSkills.warnings.join(' ') : ''),
             '🟪 Order Flow: ' + flow.reason,
             '🟦 Çoklu zaman dilimi: 1G ' + (mtf.daily ? mtf.daily.trend : 'veri yok') +
               ' · 4S ' + (mtf.fourHour ? mtf.fourHour.trend : 'veri yok') +
