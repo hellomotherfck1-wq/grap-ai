@@ -171,6 +171,7 @@
         ' · MACD ' + (ms.indicators.macdHistogram == null ? '—' : (ms.indicators.macdHistogram >= 0 ? 'pozitif' : 'negatif')) +
         ' · ADX ' + (ms.indicators.adx14 == null ? '—' : ms.indicators.adx14.toFixed(1)) + ' · ATR% ' + (ms.indicators.atrPercent == null ? '—' : ms.indicators.atrPercent.toFixed(2)));
       satir(container, 'Kırılım / hacim', ms.structure.breakout + ' · göreli hacim ' + (ms.volume.relativeVolume == null ? 'hesaplanamadı' : ms.volume.relativeVolume.toFixed(2) + 'x'));
+      satir(container, 'Destek / direnç', (ms.structure.support == null ? 'destek bulunamadı' : fiyatYaz(ms.structure.support, report.currency)) + ' / ' + (ms.structure.resistance == null ? 'direnç bulunamadı' : fiyatYaz(ms.structure.resistance, report.currency)) + ' · ' + ms.structure.candlePattern);
       if (ms.warnings.length) satir(container, 'Grafik veri uyarısı', ms.warnings.join(' '));
     }
     if (report.financialSkills) satir(container, 'Finansal veri kontrolü', report.financialSkills.warnings.join(' ') || 'Alanlar mevcut; dönem doğrulaması ayrıca gerekli.');
