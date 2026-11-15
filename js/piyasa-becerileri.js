@@ -8,7 +8,7 @@
   function rsi(a,p) { if(a.length<p+1)return null;var g=0,l=0,i;for(i=1;i<=p;i++){var d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}g/=p;l/=p;for(i=p+1;i<a.length;i++){d=a[i]-a[i-1];g=(g*(p-1)+(d>0?d:0))/p;l=(l*(p-1)+(d<0?-d:0))/p;}return l===0?100:g===0?0:100*g/(g+l);}
   function tr(b,i){return Math.max(b[i].h-b[i].l,Math.abs(b[i].h-b[i-1].c),Math.abs(b[i].l-b[i-1].c));}
   function atr(b,p){if(b.length<p+1)return null;var a=[];for(var i=1;i<b.length;i++)a.push(tr(b,i));return avg(a.slice(-p));}
-  function adx(b,p){if(b.length<p*2+1)return null;var plus=0,minus=0,trs=0,dx=[];for(var i=b.length-p;i<b.length;i++){var up=b[i].h-b[i-1].h,down=b[i-1].l-b[i].l;plus+=up>down&&up>0?up:0;minus+=down>up&&down>0?down:0;trs+=tr(b,i);}if(!trs)return null;var pdi=100*plus/trs,mdi=100*minus/trs;return pdi+mdi?100*Math.abs(pdi-mdi)/(pdi+mdi):0;}
+  function adx(b,p){if(b.length<p*2+1)return null;var trSum=0,plusSum=0,minusSum=0,dx=[];for(var i=1;i<=p;i++){var up=b[i].h-b[i-1].h,down=b[i-1].l-b[i].l;trSum+=tr(b,i);plusSum+=up>down&&up>0?up:0;minusSum+=down>up&&down>0?down:0;}function dxValue(){var pdi=trSum?100*plusSum/trSum:0,mdi=trSum?100*minusSum/trSum:0;return pdi+mdi?100*Math.abs(pdi-mdi)/(pdi+mdi):0;}dx.push(dxValue());for(i=p+1;i<b.length;i++){up=b[i].h-b[i-1].h;down=b[i-1].l-b[i].l;trSum=trSum-trSum/p+tr(b,i);plusSum=plusSum-plusSum/p+(up>down&&up>0?up:0);minusSum=minusSum-minusSum/p+(down>up&&down>0?down:0);dx.push(dxValue());}if(dx.length<p)return null;var value=avg(dx.slice(0,p));for(i=p;i<dx.length;i++)value=(value*(p-1)+dx[i])/p;return value;}
   function normalize(input) { return (Array.isArray(input)?input:[]).map(function(x){if(!x)return null;var o=num(x.o),h=num(x.h),l=num(x.l),c=num(x.c);if(o===null||h===null||l===null||c===null||h<l||c<=0)return null;return {o:o,h:h,l:l,c:c,v:num(x.v!=null?x.v:x.volume),t:num(x.t!=null?x.t:x.openTime),quoteVolume:num(x.quoteVolume),takerBuyQuoteVolume:num(x.takerBuyQuoteVolume)};}).filter(Boolean); }
   function oku(input, options) {
     options=options||{};var b=normalize(input),n=b.length;
@@ -37,15 +37,16 @@
     if(options.market==='Binance'&&b.slice(-5).every(function(x){return x.quoteVolume!==null&&x.takerBuyQuoteVolume!==null;})){
       var qv=0,buy=0;b.slice(-5).forEach(function(x){qv+=x.quoteVolume;buy+=x.takerBuyQuoteVolume;});R.volume.binanceAggressiveBuyShare=qv?buy/qv:null;
     }
-    var groups=[];
-    if(trend==='yükseliş')groups.push(1);else if(trend==='düşüş')groups.push(-1);
-    if(macd!==null&&signal!==null)groups.push(macd>signal?1:macd<signal?-1:0);
-    if(r!==null)groups.push(r>=55&&r<75?1:r<=45&&r>25?-1:0);
-    if(bbp!==null)groups.push(bbp>=0.55&&bbp<=1?1:bbp<=0.45&&bbp>=0?-1:0);
-    if(vRatio!==null&&vRatio>=1.3&&upVol+downVol>0)groups.push(upVol>downVol?1:-1);
-    if(breakout!=='yok'&&vRatio!==null&&vRatio>=1.2)groups.push(breakout==='yukarı'?1:-1);
+    var trendVote=trend==='yükseliş'?1:trend==='düşüş'?-1:0;
+    var momentumVotes=[];
+    if(macd!==null&&signal!==null)momentumVotes.push(macd>signal?1:macd<signal?-1:0);
+    if(r!==null)momentumVotes.push(r>=55&&r<75?1:r<=45&&r>25?-1:0);
+    var momentumAvg=avg(momentumVotes),momentumVote=momentumAvg>=0.5?1:momentumAvg<=-0.5?-1:0;
+    var structureVote=breakout!=='yok'&&vRatio!==null&&vRatio>=1.2?(breakout==='yukarı'?1:-1):0;
+    var volumeVote=vRatio!==null&&vRatio>=1.3&&upVol+downVol>0?(upVol>downVol?1:-1):0;
+    var groups=[trendVote,momentumVote,structureVote,volumeVote];
     var sum=groups.reduce(function(x,y){return x+y;},0),dir=sum>=2?'yükseliş':sum<=-2?'düşüş':'nötr';
-    R.score={direction:dir,value:sum,confidence:groups.length>=4&&Math.abs(sum)>=3?'orta':'düşük',independentGroups:groups.length};
+    R.score={direction:dir,value:sum,confidence:groups.length>=4&&Math.abs(sum)>=3?'orta':'düşük',independentGroups:groups.filter(function(x){return x!==0;}).length};
     if(adxV!==null)R.signals.push('ADX14 '+adxV.toFixed(1)+' · '+(adxV>=25?'trend güçlü':adxV<18?'trend zayıf':'trend gelişiyor'));
     if(r!==null)R.signals.push('RSI14 '+r.toFixed(1));
     if(R.indicators.atrPercent!==null)R.signals.push('ATR% '+R.indicators.atrPercent.toFixed(2));
