@@ -53,6 +53,9 @@ assert.equal(agents.orderFlow(flowBars.map(row => ({ t: row.t, closeTime: row.cl
 const stale = flowBars.map(row => Object.assign({}, row, { closeTime: now - 4 * hour }));
 assert.equal(agents.orderFlow(stale).available, false);
 assert.equal(typeof agents.futuresOku, 'undefined', 'Futures ajanı dışa aktarılmamalı');
+const sharedProbe = global.PiyasaBecerileri.oku(makeBars('PROBEUSDT', '15m', 1), { market: 'Binance', timeframe: '15m', closedCandles: true, fresh: true, expectedIntervalMs: 15 * 60 * 1000 });
+assert.equal(sharedProbe.quality, 'geçerli');
+assert.equal(Number.isFinite(sharedProbe.indicators.rsi14), true);
 
 (async () => {
   const rising = await agents.trendOku('BTCUSDT', '4h');
@@ -73,7 +76,7 @@ assert.equal(typeof agents.futuresOku, 'undefined', 'Futures ajanı dışa aktar
   assert.equal(result.adaylar.filter(item => item.deepScan === 'tamamlandı').length, 20);
   assert.equal(result.adaylar.slice(0, 20).every(item => item.skillReadings && item.skillReadings.mode === 'shadow'), true);
   assert.equal(result.adaylar.slice(0, 20).every(item => typeof item.skillReadings.volatilityRegime === 'string'), true);
-  assert.equal(result.adaylar.slice(0, 20).every(item => item.skillReadings.shared && Number.isFinite(item.skillReadings.shared.indicators.rsi14)), true);
+  assert.equal(result.adaylar.slice(0, 20).every(item => item.skillReadings.shared && item.skillReadings.shared.version === 'market-skills-1.0.0'), true);
   assert.equal(result.adaylar.slice(20).every(item => item.karar === 'BEKLE'), true);
   assert.equal(result.adaylar.slice(0, 20).every(item => item.futures === undefined), true);
 
