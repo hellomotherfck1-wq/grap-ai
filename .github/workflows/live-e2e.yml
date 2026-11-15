@@ -52,6 +52,9 @@ jobs:
         run: node .github/tests/crypto-agent-smoke.cjs
       - name: Smoke test shared BIST and Binance market skills
         run: node .github/tests/market-skills-smoke.cjs
+      - name: Backtest shared skills on live historical candles
+        continue-on-error: true
+        run: node .github/tests/market-skills-backtest.cjs
 
       - name: Smoke test shared admin-only results pool
         run: node .github/tests/shared-results-smoke.cjs
@@ -124,5 +127,6 @@ jobs:
             live-e2e-report.json
             live-e2e-failure.png
             binance-live-api-report.json
+            market-skills-backtest-report.json
           if-no-files-found: ignore
           retention-days: 7
