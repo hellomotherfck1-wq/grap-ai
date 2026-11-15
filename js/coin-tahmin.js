@@ -8,9 +8,22 @@
 
   var KEY = 'graphai_coin_tahmin_v1';
   var BUGUN_KEY = 'graphai_coin_tahmin_bugun';
-  var CACHE_VERSION = 'crypto-intelligence-2.4.0';
+  var CACHE_VERSION = 'crypto-intelligence-2.5.0';
   function cacheKey(zd) {
     return BUGUN_KEY + ':' + CACHE_VERSION + ':' + (zd || '15m');
+  }
+
+  // Eski sürüm önbelleklerini bir kez temizle; ölçüm kayıtlarına dokunma.
+  function eskiOnbellekleriTemizle() {
+    try {
+      var keep = cacheKey('15m');
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var key = localStorage.key(i);
+        if (key && key.indexOf(BUGUN_KEY + ':') === 0 && key !== keep) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (e) {}
   }
 
   /** Binance'te kesin USDT çifti olan ~200 coin */
@@ -755,8 +768,14 @@
       saat: new Date().toISOString(),
       zd: zd,
       secim: secim,
-      adaylar: adaylar.map(kisaOzet),
-      hatalar: hatalar,
+      adaylar: adaylar.slice(0, 20).map(kisaOzet),
+      adaySayisi: adaylar.length,
+      kararDagilimi: adaylar.reduce(function (counts, item) {
+        if (item && counts[item.karar] !== undefined) counts[item.karar]++;
+        return counts;
+      }, { AL: 0, SAT: 0, BEKLE: 0 }),
+      hataSayisi: hatalar.length,
+      hatalar: hatalar.slice(0, 8),
       priceForecastSummary: forecastSummary,
       priceForecasts: forecastItems,
       ajanSurum: CACHE_VERSION
@@ -774,7 +793,7 @@
       fiyat: secim.fiyat,
       zd: zd
     });
-    if (hafiza.tahminler.length > 60) hafiza.tahminler = hafiza.tahminler.slice(0, 60);
+    if (hafiza.tahminler.length > 20) hafiza.tahminler = hafiza.tahminler.slice(0, 20);
     yazHafiza(hafiza);
     yazBugunCache(kayit);
 
@@ -903,23 +922,20 @@
 
   function renderTaramaOzeti(kayit) {
     var adaylar = Array.isArray(kayit.adaylar) ? kayit.adaylar : [];
-    var hatalar = Array.isArray(kayit.hatalar) ? kayit.hatalar : [];
-    var counts = { AL: 0, SAT: 0, BEKLE: 0 };
-    adaylar.forEach(function (item) {
+    var counts = kayit.kararDagilimi || { AL: 0, SAT: 0, BEKLE: 0 };
+    if (!kayit.kararDagilimi) adaylar.forEach(function (item) {
       if (item && counts[item.karar] !== undefined) counts[item.karar]++;
     });
-    var deepCount = adaylar.filter(function (item) { return item && item.deepScan === 'tamamlandı'; }).length;
+    var analyzedCount = Number.isFinite(Number(kayit.adaySayisi)) ? Number(kayit.adaySayisi) : adaylar.length;
     var forecastSummary = kayit.priceForecastSummary || {};
-    return kart('15 dakikalık test özeti', [
-      '216 coin 15 dakikalık Binance Spot verisiyle tarandı: ' + adaylar.length +
-        ' coin analiz edildi, ' + hatalar.length + ' coin için veri alınamadı.',
-      'Ajan kararları 5 kapanmış mum sonra ölçülecek; sonuçlar gerçek fiyatla karşılaştırılacak.',
-      'Son karar dağılımı: ' + counts.AL + ' AL · ' + counts.SAT + ' SAT · ' + counts.BEKLE + ' BEKLE.',
-      deepCount + ' güçlü adayda 1 saat, 4 saat ve günlük grafikler ek doğrulama bağlamı olarak kullanıldı.',
-      '5 mum fiyat tahmini: ' + (forecastSummary.ready || 0) + '/' +
-        (forecastSummary.requested || LISTE.length) + ' hazır; ' +
-        (forecastSummary.unavailable || 0) + ' coin için doğrulanmış tahmin üretilemedi.',
-      'ADX, volatilite, kırılım ve BTC’ye göre göreli güç ilk testte gölge beceridir; ölçülmeden kararı değiştirmez.'
+    var unavailable = Number.isFinite(Number(kayit.hataSayisi))
+      ? Number(kayit.hataSayisi) : (Array.isArray(kayit.hatalar) ? kayit.hatalar.length : 0);
+    return kart('Tarama özeti', [
+      analyzedCount + ' coin incelendi · ' + unavailable + ' coin için veri alınamadı.',
+      'Kararlar: ' + counts.AL + ' AL · ' + counts.SAT + ' SAT · ' + counts.BEKLE + ' BEKLE.',
+      '5 mum sonrası fiyat tahmini: ' + (forecastSummary.ready || 0) + '/' +
+        (forecastSummary.requested || LISTE.length) + ' coin için hazır.',
+      'Tahminler kesin sonuç değildir; gerçekleşen fiyatlarla ölçülür.'
     ], '#2f81f7');
   }
 
@@ -1167,7 +1183,7 @@
       var errorDetails = document.createElement('details');
       errorDetails.className = 'kart';
       var errorTitle = document.createElement('summary');
-      errorTitle.textContent = 'Veri alınamayan coinler (' + kayit.hatalar.length + ')';
+      errorTitle.textContent = 'Veri alınamayan coinler (' + (kayit.hataSayisi || kayit.hatalar.length) + ')';
       errorDetails.appendChild(errorTitle);
       var errorBody = document.createElement('div');
       errorBody.style.cssText = 'margin-top:9px;font-size:12px;line-height:1.5;color:#f0b429';
@@ -1212,8 +1228,8 @@
 
     sec.innerHTML =
       '<h2>Coin Tahmin AI</h2>' +
-      '<p class="alt">216 coin önce 15 dakikalık Binance Spot grafiğinde analiz edilir. Ajan kararları ve Denetçi fiyat tahmini 5 mum sonra gerçek fiyatla ölçülür. En güçlü 20 adayda 1 saat, 4 saat ve günlük grafikler ek bağlamdır.</p>' +
-      '<button type="button" id="coin-tahmin-btn" class="buton">216 COİNİ 15 DK TEST ET</button>' +
+      '<p class="alt">Coinleri tara, sistemin kararını ve 5 mum sonrası fiyat tahminini sade biçimde gör.</p>' +
+      '<button type="button" id="coin-tahmin-btn" class="buton">TÜM COİNLERİ TARA</button>' +
       '<p id="coin-tahmin-durum" class="alt"></p>' +
       '<div id="coin-tahmin-alan"></div>' +
       '<div id="coin-tahmin-hafiza"></div>' +
@@ -1283,6 +1299,7 @@
 
   function baslat() {
     try {
+      eskiOnbellekleriTemizle();
       navGuncelle();
       kurUI();
     } catch (e) {

@@ -1332,7 +1332,7 @@ try {
       coinResultText.includes('Denetçi kontrolü') &&
       coinResultText.includes('Spot piyasada alım') &&
       coinResultText.includes('açığa satış') &&
-      coinResultText.includes('15 dakikalık test özeti') &&
+      coinResultText.includes('Tarama özeti') &&
       coinResultText.includes('Tüm coinlerin 15 dk') &&
       coinResultText.includes('5 mum fiyat tahminleri'),
     coinResultText.slice(0, 1000)
