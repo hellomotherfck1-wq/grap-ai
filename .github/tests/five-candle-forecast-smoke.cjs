@@ -15,6 +15,10 @@ const sql = fs.readFileSync(
   'supabase/migrations/20261114000100_auditor_five_candle_forecast.sql', 'utf8'
 );
 const workerWorkflow = fs.readFileSync('.github/workflows/pending-results-worker.yml', 'utf8');
+assert.ok(performance.includes("marketOf(group.symbol) === 'Kripto'"),
+  'Crypto result checks must route by symbol even when legacy records omit market');
+assert.ok(performance.includes('market: r.market || marketOf(r.symbol)'),
+  'Result groups must retain the market so crypto uses Binance Spot');
 const browserWorkflow = fs.readFileSync('.github/workflows/live-e2e.yml', 'utf8');
 const coinScan = fs.readFileSync('js/coin-tahmin.js', 'utf8');
 
