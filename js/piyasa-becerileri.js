@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
   var VERSION = 'market-skills-1.0.0';
-  function num(x) { var n = Number(x); return isFinite(n) ? n : null; }
+  function num(x) { if (x === null || x === undefined || x === '') return null; var n = Number(x); return isFinite(n) ? n : null; }
   function avg(a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
   function median(a) { if (!a.length) return null; var b = a.slice().sort(function (x,y) { return x-y; }); var m=Math.floor(b.length/2); return b.length%2?b[m]:(b[m-1]+b[m])/2; }
   function ema(a, p) { if (a.length < p) return null; var out=[], k=2/(p+1), v=avg(a.slice(0,p)); for(var i=0;i<p-1;i++) out.push(null); out.push(v); for(i=p;i<a.length;i++){v=a[i]*k+v*(1-k);out.push(v);} return out; }
