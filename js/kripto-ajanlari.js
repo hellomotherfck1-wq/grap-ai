@@ -334,8 +334,12 @@
           var coin15 = mtf.fifteenMinute;
           var relativeStrength = coin15 && btc15 && sayi(coin15.momentum15BarsPct) && sayi(btc15.momentum15BarsPct)
             ? coin15.momentum15BarsPct - btc15.momentum15BarsPct : null;
+          var sharedSkills = window.PiyasaBecerileri && typeof window.PiyasaBecerileri.oku === 'function'
+            ? window.PiyasaBecerileri.oku(item._mumlar || [], { market: 'Binance', timeframe: item.zd || '15m', closedCandles: true, fresh: true,
+              expectedIntervalMs: TF_MS[item.zd || '15m'] || TF_MS['15m'] }) : null;
           var skills = {
             mode: 'shadow',
+            shared: sharedSkills,
             adx14: coin15 && sayi(coin15.adx14) ? coin15.adx14 : null,
             trendStrength: coin15 && sayi(coin15.adx14)
               ? (coin15.adx14 >= 25 ? 'Güçlü' : coin15.adx14 >= 20 ? 'Gelişiyor' : 'Zayıf') : 'Belirsiz',
@@ -393,6 +397,8 @@
               'Kripto derin analizindeki veri eksikliği veya çelişki nedeniyle sinyal BEKLE’ye indirildi.';
           }
           item.tartisma = (Array.isArray(item.tartisma) ? item.tartisma : []).concat([
+            '🧠 Ortak Binance becerileri (gölge): ' + (sharedSkills ? sharedSkills.signals.join(' · ') : 'veri yetersiz') +
+              (sharedSkills && sharedSkills.warnings.length ? ' · Uyarı: ' + sharedSkills.warnings.join(' ') : ''),
             '🟪 Order Flow: ' + flow.reason,
             '🟦 Çoklu zaman dilimi: 1G ' + (mtf.daily ? mtf.daily.trend : 'veri yok') +
               ' · 4S ' + (mtf.fourHour ? mtf.fourHour.trend : 'veri yok') +

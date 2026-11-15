@@ -147,6 +147,16 @@
       profitMargins: deger(financial.profitMargins),
       debtToEquity: deger(financial.debtToEquity),
       currentRatio: deger(financial.currentRatio),
+      quickRatio: deger(financial.quickRatio),
+      freeCashflow: deger(financial.freeCashflow),
+      operatingCashflow: deger(financial.operatingCashflow),
+      totalDebt: deger(financial.totalDebt),
+      totalCash: deger(financial.totalCash),
+      returnOnAssets: deger(financial.returnOnAssets),
+      grossMargins: deger(financial.grossMargins),
+      operatingMargins: deger(financial.operatingMargins),
+      dividendYield: deger(detail.dividendYield),
+      payoutRatio: deger(detail.payoutRatio),
       marketCap: deger(priceBox.marketCap),
       targetMeanPrice: deger(financial.targetMeanPrice),
       sector: String(profile.sector || ''),
@@ -277,6 +287,8 @@
       }
     }
 
+    var financialSkills = window.PiyasaBecerileri && typeof window.PiyasaBecerileri.temelVeriKontrol === 'function'
+      ? window.PiyasaBecerileri.temelVeriKontrol(data || null) : null;
     var son = base;
     var dusuruldu = false;
     if (base === 'AL') {
@@ -318,6 +330,7 @@
       bant: bant,
       olumlu: olumlu,
       riskler: riskler,
+      financialSkills: financialSkills,
       data: data || null
     };
   }
@@ -337,6 +350,9 @@
       satirlar.push('F/K Ajanı: Kullanılabilir F/K verisi yok. Eksik değeri tahmin etmiyorum.');
     }
 
+    if (sonuc.financialSkills && sonuc.financialSkills.warnings.length) {
+      satirlar.push('Temel veri denetimi: ' + sonuc.financialSkills.warnings.join(' '));
+    }
     if (data) {
       var temel = [];
       if (data.earningsGrowth !== null) temel.push('kâr büyümesi ' + fmt(data.earningsGrowth * 100, 1) + '%');
@@ -384,6 +400,10 @@
     if (data && data.trailingPE !== null) L.push('Son 12 ay F/K: ' + fmt(data.trailingPE, 2) + 'x.');
     if (data && data.forwardPE !== null) L.push('İleri F/K: ' + fmt(data.forwardPE, 2) + 'x.');
     if (data && data.priceToBook !== null) L.push('PD/DD: ' + fmt(data.priceToBook, 2) + 'x.');
+    if (data && data.freeCashflow !== null) L.push('Serbest nakit akışı: ' + fmt(data.freeCashflow, 0) + '.');
+    if (data && data.operatingCashflow !== null) L.push('Faaliyet nakit akışı: ' + fmt(data.operatingCashflow, 0) + '.');
+    if (data && data.totalDebt !== null && data.totalCash !== null) L.push('Net borç (toplam borç - nakit): ' + fmt(data.totalDebt - data.totalCash, 0) + '.');
+    if (data && data.currentRatio !== null) L.push('Cari oran: ' + fmt(data.currentRatio, 2) + '.');
     if (data && (data.sector || data.industry)) {
       L.push('Sektör: ' + [data.sector, data.industry].filter(Boolean).join(' / ') + '.');
     }

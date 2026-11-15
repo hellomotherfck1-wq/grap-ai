@@ -50,6 +50,8 @@ jobs:
 
       - name: Smoke test crypto agents
         run: node .github/tests/crypto-agent-smoke.cjs
+      - name: Smoke test shared BIST and Binance market skills
+        run: node .github/tests/market-skills-smoke.cjs
 
       - name: Smoke test shared admin-only results pool
         run: node .github/tests/shared-results-smoke.cjs

@@ -37,6 +37,7 @@ global.Veri = {
   }
 };
 
+require('../../js/piyasa-becerileri.js');
 require('../../js/kripto-ajanlari.js');
 const agents = global.KriptoAjanlari;
 
@@ -65,17 +66,18 @@ assert.equal(typeof agents.futuresOku, 'undefined', 'Futures ajanı dışa aktar
   const candidates = Array.from({ length: 22 }, (_, i) => ({
     ad: 'Coin ' + i, sembol: 'COIN' + i + 'USDT',
     karar: 'AL', skor: 90 - i, trend: 'Yükseliş',
-    signalAt: now - hour, _mumlar: flowBars
+    signalAt: now - hour, zd: '15m', _mumlar: makeBars('COIN' + i + 'USDT', '15m', 1)
   }));
   const result = await agents.derinAnaliz(candidates, null);
   assert.equal(result.derinTaranan, 20);
   assert.equal(result.adaylar.filter(item => item.deepScan === 'tamamlandı').length, 20);
   assert.equal(result.adaylar.slice(0, 20).every(item => item.skillReadings && item.skillReadings.mode === 'shadow'), true);
   assert.equal(result.adaylar.slice(0, 20).every(item => typeof item.skillReadings.volatilityRegime === 'string'), true);
+  assert.equal(result.adaylar.slice(0, 20).every(item => item.skillReadings.shared && Number.isFinite(item.skillReadings.shared.indicators.rsi14)), true);
   assert.equal(result.adaylar.slice(20).every(item => item.karar === 'BEKLE'), true);
   assert.equal(result.adaylar.slice(0, 20).every(item => item.futures === undefined), true);
 
-  console.log('PASS crypto-agent smoke: Spot order flow, ADX, ATR volatility, breakout, relative strength, MTF and top-20 gate; no derivatives calls');
+  console.log('PASS crypto-agent smoke: shared RSI/MACD/ADX/ATR/volume skills, Spot order flow, breakout, relative strength, MTF and top-20 gate; no derivatives calls');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
