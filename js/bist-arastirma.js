@@ -50,16 +50,21 @@
 
   async function haberGetir(sembol) {
     var url = YAHOO + '/v1/finance/search?q=' + encodeURIComponent(sembol) + '&quotesCount=0&newsCount=8';
-    var json = await jsonGet(url);
-    var items = Array.isArray(json && json.news) ? json.news : [];
-    return items.slice(0, 8).map(function (x) {
-      return {
-        title: String(x.title || 'Başlıksız haber'),
-        publisher: String(x.publisher || x.provider || 'Kaynak belirtilmemiş'),
-        link: String(x.link || x.url || ''),
-        date: x.providerPublishTime ? new Date(x.providerPublishTime * 1000) : null
-      };
-    }).filter(function (x) { return x.link.indexOf('http') === 0; });
+    try {
+      var json = await jsonGet(url);
+      var items = Array.isArray(json && json.news) ? json.news : [];
+      return items.slice(0, 8).map(function (x) {
+        return {
+          title: String(x.title || 'Başlıksız haber'),
+          publisher: String(x.publisher || x.provider || 'Kaynak belirtilmemiş'),
+          link: String(x.link || x.url || ''),
+          date: x.providerPublishTime ? new Date(x.providerPublishTime * 1000) : null
+        };
+      }).filter(function (x) { return x.link.indexOf('http') === 0; });
+    } catch (error) {
+      // News is supplemental: a proxy/Yahoo outage must never abort chart or company research.
+      return [];
+    }
   }
 
   function kisaVade(panel, teknik, hacim) {
