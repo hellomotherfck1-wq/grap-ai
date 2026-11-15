@@ -72,7 +72,9 @@ assert.ok(prediction.method.includes('EMA9-EMA21') && prediction.method.includes
 assert.ok(Number.isFinite(prediction.basePrice) && prediction.basePrice > 0);
 assert.ok(Number.isFinite(prediction.predictedPrice) && prediction.predictedPrice > 0);
 assert.ok(prediction.predictedLow <= prediction.predictedHigh);
-assert.ok(prediction.historicalSampleCount >= 5);\nassert.ok(prediction.directionConsensusPct >= 4 / 7 * 100,\n  'A forecast must require at least four of seven historical neighbors to agree on direction');
+assert.ok(prediction.historicalSampleCount >= 5);
+assert.ok(prediction.directionConsensusPct >= 4 / 7 * 100,
+  'A forecast must require at least four of seven historical neighbors to agree on direction');
 assert.equal(prediction.volumeUsed, true);
 
 assert.equal(forecast.olustur(bars, Object.assign({}, meta, { timeframe: '1h' }), now), null,
