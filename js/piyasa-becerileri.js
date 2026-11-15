@@ -23,6 +23,20 @@
     var upVol=0,downVol=0,obv=0;for(var i=Math.max(1,n-20);i<n;i++){if(b[i].v!==null){if(b[i].c>b[i-1].c){upVol+=b[i].v;obv+=b[i].v;}else if(b[i].c<b[i-1].c){downVol+=b[i].v;obv-=b[i].v;}}}
     var hi=Math.max.apply(null,b.slice(-21,-1).map(function(x){return x.h;})),lo=Math.min.apply(null,b.slice(-21,-1).map(function(x){return x.l;}));
     var breakout=last.c>hi?'yukarı':last.c<lo?'aşağı':'yok';
+    var pivotHighs=[],pivotLows=[];
+    for(var pi=2;pi<n-2;pi++){
+      if(b[pi].h>=Math.max(b[pi-2].h,b[pi-1].h,b[pi+1].h,b[pi+2].h))pivotHighs.push(b[pi].h);
+      if(b[pi].l<=Math.min(b[pi-2].l,b[pi-1].l,b[pi+1].l,b[pi+2].l))pivotLows.push(b[pi].l);
+    }
+    var resistance=pivotHighs.filter(function(x){return x>last.c;}).sort(function(x,y){return x-y;})[0]||null;
+    var support=pivotLows.filter(function(x){return x<last.c;}).sort(function(x,y){return y-x;})[0]||null;
+    var body=Math.abs(last.c-last.o),range=last.h-last.l,upperWick=last.h-Math.max(last.o,last.c),lowerWick=Math.min(last.o,last.c)-last.l;
+    var candlePattern='belirgin formasyon yok';
+    if(range>0&&body/range<0.1)candlePattern='doji / kararsızlık';
+    else if(body>0&&lowerWick>=body*2&&upperWick<=body)candlePattern='çekiç benzeri';
+    else if(body>0&&upperWick>=body*2&&lowerWick<=body)candlePattern='ters çekiç / kayan yıldız benzeri';
+    else if(n>=2&&last.c>last.o&&b[n-2].c<b[n-2].o&&last.c>=b[n-2].o&&last.o<=b[n-2].c)candlePattern='yutan boğa';
+    else if(n>=2&&last.c<last.o&&b[n-2].c>b[n-2].o&&last.c<=b[n-2].o&&last.o>=b[n-2].c)candlePattern='yutan ayı';
     var trend=e20&&e50?(last.c>e20[n-1]&&e20[n-1]>e50[n-1]?'yükseliş':last.c<e20[n-1]&&e20[n-1]<e50[n-1]?'düşüş':'karışık'):'belirsiz';
     var ret=cl.length>10?(last.c/cl[n-11]-1)*100:null;
     R.quality='geçerli';
@@ -32,7 +46,7 @@
     if(n<200)R.warnings.push('200 mumdan az veri: EMA200 hesaplanamadı.');
     if(options.expectedIntervalMs&&n>2){for(i=1;i<b.length;i++)if(b[i].t&&b[i-1].t&&b[i].t-b[i-1].t>options.expectedIntervalMs*1.8){R.warnings.push('Mum zamanlarında veri boşluğu var.');break;}}
     R.indicators={rsi14:r,ema9:e9?e9[n-1]:null,ema20:e20?e20[n-1]:null,ema50:e50?e50[n-1]:null,ema200:e200?e200[n-1]:null,macd:macd,macdSignal:signal,macdHistogram:macd!==null&&signal!==null?macd-signal:null,bollinger:{upper:upper,middle:mu,lower:lower,percentB:bbp},atr14:a,atrPercent:a&&last.c?a/last.c*100:null,adx14:adxV,return10Pct:ret};
-    R.structure={trend:trend,breakout:breakout,breakoutLevel:breakout==='yukarı'?hi:breakout==='aşağı'?lo:null,rangeHigh:hi,rangeLow:lo};
+    R.structure={trend:trend,breakout:breakout,breakoutLevel:breakout==='yukarı'?hi:breakout==='aşağı'?lo:null,rangeHigh:hi,rangeLow:lo,support:support,resistance:resistance,candlePattern:candlePattern};
     R.volume={available:vols.length>=15,relativeVolume:vRatio,upVolumeShare:upVol+downVol?(upVol/(upVol+downVol)):null,obvNet:obv,binanceAggressiveBuyShare:null};
     if(options.market==='Binance'&&b.slice(-5).every(function(x){return x.quoteVolume!==null&&x.takerBuyQuoteVolume!==null;})){
       var qv=0,buy=0;b.slice(-5).forEach(function(x){qv+=x.quoteVolume;buy+=x.takerBuyQuoteVolume;});R.volume.binanceAggressiveBuyShare=qv?buy/qv:null;
@@ -52,6 +66,8 @@
     if(R.indicators.atrPercent!==null)R.signals.push('ATR% '+R.indicators.atrPercent.toFixed(2));
     if(vRatio!==null)R.signals.push('Göreli hacim '+vRatio.toFixed(2)+'x');
     R.signals.push('Fiyat yapısı: '+trend+' · 20 mum kırılımı: '+breakout);
+    R.signals.push('Yakın destek: '+(support===null?'bulunamadı':support)+' · yakın direnç: '+(resistance===null?'bulunamadı':resistance));
+    R.signals.push('Son mum formasyonu: '+candlePattern);
     if(R.volume.binanceAggressiveBuyShare!==null)R.signals.push('Binance Spot agresif alım payı: %'+(R.volume.binanceAggressiveBuyShare*100).toFixed(1));
     if(groups.length<3)R.warnings.push('Bağımsız teyit grubu sayısı yetersiz; skor karar için kullanılmıyor.');
     if(options.market==='BIST')R.signals.push('BIST notu: seans dışı son fiyat ve günlük mumun kapanış zamanı ayrıca doğrulanmalı; finansallar KAP dönemiyle eşleştirilmeli.');
