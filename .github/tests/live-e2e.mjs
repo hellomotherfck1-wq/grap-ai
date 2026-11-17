@@ -1293,7 +1293,7 @@ try {
   check(
     'Coin toplu tarama ve 216 coin 15 dk tahmin akışı',
     coinScan.scanned > 0 && coinScan.scanned + coinScan.errors === coinScan.total &&
-      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.4.0' &&
+      coinScan.deepScanned === 20 && coinScan.deepVersion === 'crypto-intelligence-2.6.0' &&
       coinScan.forecastCount === coinScan.total &&
       coinScan.forecastReady + coinScan.forecastUnavailable === coinScan.total &&
       coinScan.forecastReady > 0 && coinScan.forecastSaved === coinScan.forecastReady &&
