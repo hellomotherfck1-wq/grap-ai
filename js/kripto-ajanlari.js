@@ -7,7 +7,7 @@
     '4h': 4 * 60 * 60 * 1000,
     '1d': 24 * 60 * 60 * 1000
   };
-  var SURUM = 'crypto-intelligence-2.2.0';
+  var SURUM = 'crypto-intelligence-2.2.1';
   var candleCache = Object.create(null);
 
   function sayi(x) { return typeof x === 'number' && isFinite(x); }
@@ -170,54 +170,64 @@
     };
   }
 
+  function trendHesapla(rows, symbol, tf) {
+    var bars = kapanmis(rows, tf);
+    if (bars.length < 55) throw new Error(symbol + ' ' + tf + ' kapanmış mum sayısı yetersiz.');
+    var last = bars[bars.length - 1];
+    var lastAt = last.closeTime != null ? Number(last.closeTime) : Number(last.t) + TF_MS[tf] - 1;
+    if (!sayi(lastAt) || lastAt >= Date.now() || Date.now() - lastAt > 2 * TF_MS[tf]) {
+      throw new Error(symbol + ' ' + tf + ' verisi eski.');
+    }
+    var closes = bars.map(function (bar) { return Number(bar.c); }).filter(sayi);
+    if (closes.length < 55) throw new Error(symbol + ' ' + tf + ' kapanış verisi eksik.');
+    var fastNow = ortalama(closes.slice(-20));
+    var slowNow = ortalama(closes.slice(-50));
+    var fastPrev = ortalama(closes.slice(-30, -10));
+    var lastClose = closes[closes.length - 1];
+    var slope = fastPrev > 0 ? (fastNow / fastPrev) - 1 : 0;
+    var direction = 0;
+    if (lastClose > fastNow && fastNow > slowNow && slope > 0.001) direction = 1;
+    else if (lastClose < fastNow && fastNow < slowNow && slope < -0.001) direction = -1;
+
+    var atrs = atrSeries(bars);
+    var atrNow = atrs[atrs.length - 1];
+    var previousAtrs = atrs.slice(Math.max(14, atrs.length - 21), -1).filter(sayi);
+    var baselineAtr = medyan(previousAtrs);
+    var volatilityRatio = sayi(atrNow) && baselineAtr > 0 ? atrNow / baselineAtr : null;
+    var volatilityRegime = !sayi(volatilityRatio) ? 'Belirsiz'
+      : volatilityRatio >= 1.8 ? 'Yüksek' : volatilityRatio <= 0.65 ? 'Düşük' : 'Normal';
+    var breakout = breakoutRead(bars);
+    var momentum15BarsPct = closes.length > 15
+      ? (lastClose / closes[closes.length - 16] - 1) * 100 : null;
+
+    return {
+      symbol: symbol, timeframe: tf,
+      trend: direction > 0 ? 'Yükseliş' : direction < 0 ? 'Düşüş' : 'Yatay/Karışık',
+      direction: direction,
+      changePct: closes.length > 1 ? ((lastClose / closes[closes.length - 2]) - 1) * 100 : null,
+      momentum15BarsPct: momentum15BarsPct,
+      adx14: adx14(bars),
+      atrPct: sayi(atrNow) && lastClose > 0 ? atrNow / lastClose * 100 : null,
+      volatilityRatio: volatilityRatio,
+      volatilityRegime: volatilityRegime,
+      breakout: breakout.direction,
+      breakoutVolumeRatio: breakout.volumeRatio,
+      breakoutConfirmed: breakout.confirmed,
+      lastCandleAt: lastAt
+    };
+  }
+
   async function trendOku(symbol, tf) {
     var key = symbol + '|' + tf;
     if (!candleCache[key]) {
-      candleCache[key] = Veri.binance(symbol, tf, 120).then(function (rows) {
-        var bars = kapanmis(rows, tf);
-        if (bars.length < 55) throw new Error(symbol + ' ' + tf + ' kapanmış mum sayısı yetersiz.');
-        var last = bars[bars.length - 1];
-        var lastAt = last.closeTime != null ? Number(last.closeTime) : Number(last.t) + TF_MS[tf] - 1;
-        if (!sayi(lastAt) || lastAt >= Date.now() || Date.now() - lastAt > 2 * TF_MS[tf]) {
-          throw new Error(symbol + ' ' + tf + ' verisi eski.');
-        }
-        var closes = bars.map(function (bar) { return Number(bar.c); }).filter(sayi);
-        if (closes.length < 55) throw new Error(symbol + ' ' + tf + ' kapanış verisi eksik.');
-        var fastNow = ortalama(closes.slice(-20));
-        var slowNow = ortalama(closes.slice(-50));
-        var fastPrev = ortalama(closes.slice(-30, -10));
-        var lastClose = closes[closes.length - 1];
-        var slope = fastPrev > 0 ? (fastNow / fastPrev) - 1 : 0;
-        var direction = 0;
-        if (lastClose > fastNow && fastNow > slowNow && slope > 0.001) direction = 1;
-        else if (lastClose < fastNow && fastNow < slowNow && slope < -0.001) direction = -1;
-
-        var atrs = atrSeries(bars);
-        var atrNow = atrs[atrs.length - 1];
-        var previousAtrs = atrs.slice(Math.max(14, atrs.length - 21), -1).filter(sayi);
-        var baselineAtr = medyan(previousAtrs);
-        var volatilityRatio = sayi(atrNow) && baselineAtr > 0 ? atrNow / baselineAtr : null;
-        var volatilityRegime = !sayi(volatilityRatio) ? 'Belirsiz'
-          : volatilityRatio >= 1.8 ? 'Yüksek' : volatilityRatio <= 0.65 ? 'Düşük' : 'Normal';
-        var breakout = breakoutRead(bars);
-        var momentum15BarsPct = closes.length > 15
-          ? (lastClose / closes[closes.length - 16] - 1) * 100 : null;
-
-        return {
-          symbol: symbol, timeframe: tf,
-          trend: direction > 0 ? 'Yükseliş' : direction < 0 ? 'Düşüş' : 'Yatay/Karışık',
-          direction: direction,
-          changePct: closes.length > 1 ? ((lastClose / closes[closes.length - 2]) - 1) * 100 : null,
-          momentum15BarsPct: momentum15BarsPct,
-          adx14: adx14(bars),
-          atrPct: sayi(atrNow) && lastClose > 0 ? atrNow / lastClose * 100 : null,
-          volatilityRatio: volatilityRatio,
-          volatilityRegime: volatilityRegime,
-          breakout: breakout.direction,
-          breakoutVolumeRatio: breakout.volumeRatio,
-          breakoutConfirmed: breakout.confirmed,
-          lastCandleAt: lastAt
-        };
+      var pending = Promise.resolve().then(function () {
+        return Veri.binance(symbol, tf, 120);
+      }).then(function (rows) {
+        return trendHesapla(rows, symbol, tf);
+      });
+      candleCache[key] = pending;
+      pending.catch(function () {
+        if (candleCache[key] === pending) delete candleCache[key];
       });
     }
     return candleCache[key];
@@ -308,8 +318,14 @@
     var all = Array.isArray(adaylar) ? adaylar : [];
     candleCache = Object.create(null);
     all.forEach(function (item) {
-      if (item && item.zd === '15m' && item.sembol && Array.isArray(item._mumlar) && item._mumlar.length >= 55) {
-        candleCache[item.sembol + '|15m'] = Promise.resolve(item._mumlar);
+      if (!item || item.zd !== '15m' || !item.sembol ||
+          !Array.isArray(item._mumlar) || item._mumlar.length < 55) return;
+      var key = item.sembol + '|15m';
+      try {
+        // Cache'e ham mum dizisi değil, trendOku ile aynı şemadaki hesaplanmış sonuç yazılır.
+        candleCache[key] = Promise.resolve(trendHesapla(item._mumlar, item.sembol, '15m'));
+      } catch (error) {
+        // Önceden alınmış mumlar eksik/eskiyse cache'e koyma; trendOku güncel veriyi yeniden alır.
       }
     });
     var top = all.filter(function (item) {
