@@ -76,7 +76,7 @@ assert.equal(Number.isFinite(sharedProbe.indicators.rsi14), true);
   const result = await agents.derinAnaliz(candidates, null);
   assert.equal(result.derinTaranan, 20);
   assert.equal(result.adaylar.filter(item => item.deepScan === 'tamamlandı').length, 20);
-  assert.equal(binanceCalls.filter(key => key.startsWith('COIN') && key.endsWith('USDT|15m')).length, 0,
+  assert.deepEqual(binanceCalls.filter(key => key.startsWith('COIN') && key.endsWith('USDT|15m')), [],
     'Önceden alınmış 15m mumlar hesaplanmış trend önbelleğine dönüştürülmeli; tekrar API çağrısı yapılmamalı.');
   assert.equal(result.adaylar.slice(0, 20).every(item => item.skillReadings && item.skillReadings.mode === 'shadow'), true);
   assert.equal(result.adaylar.slice(0, 20).every(item => typeof item.skillReadings.volatilityRegime === 'string'), true);
