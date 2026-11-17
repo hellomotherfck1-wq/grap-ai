@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 global.window = global;
 const hour = 60 * 60 * 1000;
 const now = Date.now();
+const binanceCalls = [];
 
 function makeBars(symbol, tf, direction) {
   const step = ({ '15m': 15 * 60 * 1000, '1h': hour, '4h': 4 * hour, '1d': 24 * hour })[tf];
@@ -29,6 +30,7 @@ global.Veri = {
     return rows.filter(row => Number(row.closeTime) < now && Number(row.t) + step <= now);
   },
   async binance(symbol, tf) {
+    binanceCalls.push(symbol + '|' + tf);
     return makeBars(symbol, tf, 1);
   },
   async getir(url) {
@@ -74,6 +76,8 @@ assert.equal(Number.isFinite(sharedProbe.indicators.rsi14), true);
   const result = await agents.derinAnaliz(candidates, null);
   assert.equal(result.derinTaranan, 20);
   assert.equal(result.adaylar.filter(item => item.deepScan === 'tamamlandı').length, 20);
+  assert.equal(binanceCalls.filter(key => /^COIN\\d+USDT\\|15m$/.test(key)).length, 0,
+    'Önceden alınmış 15m mumlar hesaplanmış trend önbelleğine dönüştürülmeli; tekrar API çağrısı yapılmamalı.');
   assert.equal(result.adaylar.slice(0, 20).every(item => item.skillReadings && item.skillReadings.mode === 'shadow'), true);
   assert.equal(result.adaylar.slice(0, 20).every(item => typeof item.skillReadings.volatilityRegime === 'string'), true);
   assert.equal(result.adaylar.slice(0, 20).every(item => item.skillReadings.shared && item.skillReadings.shared.version === 'market-skills-1.0.0'), true);
