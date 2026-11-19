@@ -122,6 +122,14 @@ const delayedError = Object.assign({}, waitRecord, {
   lastError: 'HTTP 503',
   nextCheckAt: now + 1000
 });
+assert.equal(worker.retryDelayMs(new Error('HTTP 503: upstream unavailable')), 15 * 60 * 1000,
+  'Transient provider/server errors should retry on the next 15-minute worker cycle');
+assert.equal(worker.retryDelayMs(new Error('fetch failed: ECONNRESET')), 15 * 60 * 1000,
+  'Network interruptions should not strand pending results for six hours');
+assert.equal(worker.retryDelayMs(new Error('HTTP 429: too many requests')), 60 * 60 * 1000,
+  'Rate limits should use a longer cooldown to avoid hammering providers');
+assert.equal(worker.retryDelayMs(new Error('Invalid currency pair BTC_FAKE')), 6 * 60 * 60 * 1000,
+  'Unsupported symbols should retain the long cooldown');
 assert.equal(worker.shouldEvaluate(delayedError, now), false);
 assert.equal(worker.shouldEvaluate(delayedError, now, { forceRetryErrors: true }), true,
   'Manual diagnostic retry must bypass the cooldown only for records with data errors');
