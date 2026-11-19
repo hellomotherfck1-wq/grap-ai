@@ -303,6 +303,20 @@ function safeError(error) {
     .slice(0, 350);
 }
 
+function retryDelayMs(error) {
+  const message = String(error && error.message ? error.message : error || '');
+  if (/HTTP 429|rate limit|too many requests|retCode[^\\n]*10006/i.test(message)) {
+    return 60 * 60 * 1000;
+  }
+  if (/HTTP 408|HTTP 5\\d\\d|timeout|timed out|aborted|ECONNRESET|ECONNREFUSED|EAI_AGAIN|fetch failed|network/i.test(message)) {
+    return 15 * 60 * 1000;
+  }
+  if (/yeterli .* geçmiş verisi yok|yeterli .* veri/i.test(message)) {
+    return 60 * 60 * 1000;
+  }
+  return RETRY_ERROR_MS;
+}
+
 function normalizeFailureReason(message) {
   return String(message || '')
     .replace(/Invalid currency pair [A-Z0-9_]+/gi, 'Invalid currency pair [pair]')
@@ -557,7 +571,7 @@ async function processGroup(group, stats) {
   try {
     bars = await fetchGroupBars(group);
   } catch (error) {
-    const retryAt = Date.now() + RETRY_ERROR_MS;
+    const retryAt = Date.now() + retryDelayMs(error);
     const message = safeError(error);
     const reason = normalizeFailureReason(message);
     const patches = group.records.map(function (record) {
@@ -704,5 +718,6 @@ module.exports = {
   fetchBinanceBars: fetchBinanceBars,
   fetchBybitBars: fetchBybitBars,
   fetchGateBars: fetchGateBars,
-  safeError: safeError
+  safeError: safeError,
+  retryDelayMs: retryDelayMs
 };
